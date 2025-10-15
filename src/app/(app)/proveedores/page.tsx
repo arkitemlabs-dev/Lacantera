@@ -1,11 +1,6 @@
 import Link from 'next/link';
-import {
-  MoreHorizontal,
-  PlusCircle,
-  Search,
-} from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Search } from 'lucide-react';
 import { suppliers } from '@/lib/data';
-import { Header } from '@/components/header';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -43,7 +38,16 @@ import {
 const statusVariant = {
   active: 'default',
   inactive: 'destructive',
+  pending: 'secondary',
+  attention: 'destructive',
 } as const;
+
+const statusText = {
+    active: 'Activo',
+    inactive: 'Inactivo',
+    pending: 'Pendiente',
+    attention: 'Atención'
+}
 
 export default function ProveedoresPage() {
   return (
@@ -78,8 +82,11 @@ export default function ProveedoresPage() {
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="active">Activo</SelectItem>
                   <SelectItem value="inactive">Inactivo</SelectItem>
+                  <SelectItem value="pending">Pendiente</SelectItem>
+                  <SelectItem value="attention">Requiere Atención</SelectItem>
                 </SelectContent>
               </Select>
               <Button>
@@ -111,7 +118,7 @@ export default function ProveedoresPage() {
                     <TableCell>{supplier.registrationDate}</TableCell>
                     <TableCell>
                       <Badge variant={statusVariant[supplier.status]}>
-                        {supplier.status === 'active' ? 'Activo' : 'Inactivo'}
+                        {statusText[supplier.status]}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -128,8 +135,9 @@ export default function ProveedoresPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                          <DropdownMenuItem>Ver Detalles</DropdownMenuItem>
                           <DropdownMenuItem>Editar</DropdownMenuItem>
-                          <DropdownMenuItem>Eliminar</DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-500">Eliminar</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

@@ -26,7 +26,7 @@ export const navItems: NavItem[] = [
   },
   {
     title: 'Mensajería',
-    href: '#',
+    href: '/mensajeria',
     icon: MessageSquare,
   },
   {
@@ -46,6 +46,8 @@ export const suppliers: Supplier[] = [
   { id: '2', name: 'Logística Express Mexicana', contactName: 'Maria Garcia', contactEmail: 'ventas@materialesabc.com', status: 'active', registrationDate: '22/03/2023', spent: 75000, trend: -5 },
   { id: '3', name: 'Componentes Electrónicos Globales', contactName: 'Carlos López', contactEmail: 'info@constructorarapida.dev', status: 'inactive', registrationDate: '01/06/2023', spent: 250000, trend: 8 },
   { id: '4', name: 'Plásticos Industriales del Sureste', contactName: 'Ana Martinez', contactEmail: 'soporte@lallave.com', status: 'active', registrationDate: '19/08/2023', spent: 45000, trend: 20 },
+  { id: '5', name: 'Suministros Industriales de la Costa', contactName: 'Laura Sanchez', contactEmail: 'laura.s@suministros.com', status: 'attention', registrationDate: '05/02/2024', spent: 0, trend: 0 },
+  { id: '6', name: 'Transportes Rápidos del Sur', contactName: 'Miguel Hernandez', contactEmail: 'miguel.h@transportes.com', status: 'pending', registrationDate: '12/03/2024', spent: 0, trend: 0 },
 ];
 
 export const invoices: Invoice[] = [
