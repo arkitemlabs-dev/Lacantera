@@ -16,16 +16,18 @@ export type Invoice = {
   invoiceNumber: string;
   supplierName: string;
   amount: number;
-  dueDate: string;
-  status: 'approved' | 'pending' | 'rejected' | 'paid';
+  entryDate: string;
+  status: 'Aprobada' | 'En Revisión' | 'Rechazada' | 'Pagada';
+  actionable: boolean;
 };
 
 export type Notification = {
-  id: string;
-  type: 'new_supplier' | 'doc_update' | 'invoice_status' | 'message';
+  id: number;
+  type: 'warning' | 'success' | 'error' | 'info';
   title: string;
   description: string;
-  date: string;
+  time: string;
+  tag: string;
   read: boolean;
 };
 
