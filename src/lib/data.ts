@@ -31,7 +31,7 @@ export const navItems: NavItem[] = [
   },
   {
     title: 'Notificaciones',
-    href: '#',
+    href: '/notificaciones',
     icon: Bell,
   },
   {
