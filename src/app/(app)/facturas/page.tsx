@@ -1,4 +1,8 @@
+'use client';
+
+import { useState } from 'react';
 import { Calendar as CalendarIcon, ListFilter, Search } from 'lucide-react';
+import { format } from 'date-fns';
 
 import { invoices, suppliers } from '@/lib/data';
 import { Badge } from '@/components/ui/badge';
@@ -27,17 +31,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import type { Invoice } from '@/lib/types';
 
-const statusVariant = {
-  Aprobada: 'success',
-  'En Revisión': 'secondary',
-  Rechazada: 'destructive',
-  Pagada: 'default',
-} as const;
 
-type InvoiceStatus = keyof typeof statusVariant;
-
-const getBadgeVariant = (status: InvoiceStatus) => {
+const getBadgeVariant = (status: Invoice['status']) => {
     switch (status) {
         case 'Aprobada':
             return 'bg-green-500/20 text-green-200 border-green-500/30 hover:bg-green-500/30';
@@ -54,6 +66,14 @@ const getBadgeVariant = (status: InvoiceStatus) => {
 
 
 export default function FacturasPage() {
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [paymentDate, setPaymentDate] = useState<Date>();
+
+  const handleApproveClick = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setPaymentDate(undefined);
+  }
+
   return (
     <main className="flex flex-1 flex-col gap-4 bg-muted/40 p-4 md:gap-8 md:p-8">
       <div className="mx-auto grid w-full max-w-7xl gap-2">
@@ -128,7 +148,7 @@ export default function FacturasPage() {
                     <TableCell>{invoice.invoiceNumber}</TableCell>
                     <TableCell>{invoice.entryDate}</TableCell>
                     <TableCell>
-                    <Badge className={getBadgeVariant(invoice.status as InvoiceStatus)}>
+                    <Badge className={cn(getBadgeVariant(invoice.status))}>
                         {invoice.status}
                     </Badge>
                     </TableCell>
@@ -140,7 +160,13 @@ export default function FacturasPage() {
                     </TableCell>
                     <TableCell className="text-center">
                     {invoice.actionable && (
-                         <Button variant="outline" size="sm">Aprobar</Button>
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" size="sm" onClick={() => handleApproveClick(invoice)}>
+                                    Aprobar
+                                </Button>
+                            </DialogTrigger>
+                        </Dialog>
                     )}
                     </TableCell>
                 </TableRow>
@@ -148,6 +174,63 @@ export default function FacturasPage() {
             </TableBody>
         </Table>
 
+         {selectedInvoice && (
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Aprobar Factura: {selectedInvoice.invoiceNumber}</DialogTitle>
+              <DialogDescription>
+                Por favor, define la fecha de pago y añade cualquier observación necesaria.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="paymentDate" className="text-right">
+                  Fecha de Pago
+                </Label>
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button
+                        variant={"outline"}
+                        className={cn(
+                            "w-[280px] justify-start text-left font-normal",
+                            !paymentDate && "text-muted-foreground"
+                        )}
+                        >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {paymentDate ? format(paymentDate, "PPP") : <span>Selecciona una fecha</span>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                        <Calendar
+                        mode="single"
+                        selected={paymentDate}
+                        onSelect={setPaymentDate}
+                        initialFocus
+                        />
+                    </PopoverContent>
+                </Popover>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="observations" className="text-right">
+                  Observaciones
+                </Label>
+                <Textarea
+                  id="observations"
+                  placeholder="Añade tus observaciones aquí..."
+                  className="col-span-3"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="ghost">Cancelar</Button>
+              </DialogClose>
+              <DialogClose asChild>
+                <Button type="submit">Aprobar y Guardar</Button>
+              </DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        )}
       </div>
     </main>
   );
