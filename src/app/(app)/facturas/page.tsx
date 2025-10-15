@@ -68,10 +68,17 @@ const getBadgeVariant = (status: Invoice['status']) => {
 export default function FacturasPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [paymentDate, setPaymentDate] = useState<Date>();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const handleApproveClick = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
     setPaymentDate(undefined);
+    setIsDialogOpen(true);
+  }
+
+  const handleDialogClose = () => {
+    setIsDialogOpen(false);
+    setSelectedInvoice(null);
   }
 
   return (
@@ -130,107 +137,102 @@ export default function FacturasPage() {
           </CardFooter>
         </Card>
 
-        <Table>
-            <TableHeader>
-                <TableRow>
-                <TableHead>Proveedor</TableHead>
-                <TableHead>No. Factura</TableHead>
-                <TableHead>Fecha de Entrada</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Monto</TableHead>
-                <TableHead className="text-center">Acción</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {invoices.map((invoice) => (
-                <TableRow key={invoice.id}>
-                    <TableCell className="font-medium">{invoice.supplierName}</TableCell>
-                    <TableCell>{invoice.invoiceNumber}</TableCell>
-                    <TableCell>{invoice.entryDate}</TableCell>
-                    <TableCell>
-                    <Badge className={cn(getBadgeVariant(invoice.status))}>
-                        {invoice.status}
-                    </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                    {new Intl.NumberFormat('es-MX', {
-                        style: 'currency',
-                        currency: 'MXN',
-                    }).format(invoice.amount)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                    {invoice.actionable && (
-                        <Dialog>
+         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                    <TableHead>Proveedor</TableHead>
+                    <TableHead>No. Factura</TableHead>
+                    <TableHead>Fecha de Entrada</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                    <TableHead className="text-center">Acción</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {invoices.map((invoice) => (
+                    <TableRow key={invoice.id}>
+                        <TableCell className="font-medium">{invoice.supplierName}</TableCell>
+                        <TableCell>{invoice.invoiceNumber}</TableCell>
+                        <TableCell>{invoice.entryDate}</TableCell>
+                        <TableCell>
+                        <Badge className={cn(getBadgeVariant(invoice.status))}>
+                            {invoice.status}
+                        </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                        {new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: 'MXN',
+                        }).format(invoice.amount)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                        {invoice.actionable && (
                             <DialogTrigger asChild>
                                 <Button variant="outline" size="sm" onClick={() => handleApproveClick(invoice)}>
                                     Aprobar
                                 </Button>
                             </DialogTrigger>
-                        </Dialog>
-                    )}
-                    </TableCell>
-                </TableRow>
-                ))}
-            </TableBody>
-        </Table>
-
-         {selectedInvoice && (
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Aprobar Factura: {selectedInvoice.invoiceNumber}</DialogTitle>
-              <DialogDescription>
-                Por favor, define la fecha de pago y añade cualquier observación necesaria.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="paymentDate" className="text-right">
-                  Fecha de Pago
-                </Label>
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <Button
-                        variant={"outline"}
-                        className={cn(
-                            "w-[280px] justify-start text-left font-normal",
-                            !paymentDate && "text-muted-foreground"
                         )}
-                        >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {paymentDate ? format(paymentDate, "PPP") : <span>Selecciona una fecha</span>}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                        <Calendar
-                        mode="single"
-                        selected={paymentDate}
-                        onSelect={setPaymentDate}
-                        initialFocus
-                        />
-                    </PopoverContent>
-                </Popover>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="observations" className="text-right">
-                  Observaciones
-                </Label>
-                <Textarea
-                  id="observations"
-                  placeholder="Añade tus observaciones aquí..."
-                  className="col-span-3"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button variant="ghost">Cancelar</Button>
-              </DialogClose>
-              <DialogClose asChild>
-                <Button type="submit">Aprobar y Guardar</Button>
-              </DialogClose>
-            </DialogFooter>
-          </DialogContent>
-        )}
+                        </TableCell>
+                    </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+            {selectedInvoice && (
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Aprobar Factura: {selectedInvoice.invoiceNumber}</DialogTitle>
+                  <DialogDescription>
+                    Por favor, define la fecha de pago y añade cualquier observación necesaria.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="paymentDate" className="text-right">
+                      Fecha de Pago
+                    </Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                            variant={"outline"}
+                            className={cn(
+                                "w-[280px] justify-start text-left font-normal",
+                                !paymentDate && "text-muted-foreground"
+                            )}
+                            >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {paymentDate ? format(paymentDate, "PPP") : <span>Selecciona una fecha</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                            <Calendar
+                            mode="single"
+                            selected={paymentDate}
+                            onSelect={setPaymentDate}
+                            initialFocus
+                            />
+                        </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="observations" className="text-right">
+                      Observaciones
+                    </Label>
+                    <Textarea
+                      id="observations"
+                      placeholder="Añade tus observaciones aquí..."
+                      className="col-span-3"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="ghost" onClick={handleDialogClose}>Cancelar</Button>
+                  <Button type="submit" onClick={handleDialogClose}>Aprobar y Guardar</Button>
+                </DialogFooter>
+              </DialogContent>
+            )}
+        </Dialog>
       </div>
     </main>
   );
