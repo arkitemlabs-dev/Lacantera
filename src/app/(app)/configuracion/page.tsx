@@ -1,3 +1,6 @@
+
+'use client';
+
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -17,7 +20,63 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { Upload } from 'lucide-react';
+import {
+  MoreHorizontal,
+  PlusCircle,
+  Upload,
+} from 'lucide-react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
+
+const users = [
+  {
+    id: '1',
+    name: 'Juan Pérez',
+    email: 'juan.perez@globalmining.com',
+    role: 'Administrador',
+    status: 'Activo',
+  },
+  {
+    id: '2',
+    name: 'Maria García',
+    email: 'maria.garcia@globalmining.com',
+    role: 'Compras',
+    status: 'Activo',
+  },
+  {
+    id: '3',
+    name: 'Carlos López',
+    email: 'carlos.lopez@globalmining.com',
+    role: 'Contabilidad',
+    status: 'Activo',
+  },
+  {
+    id: '4',
+    name: 'Ana Martinez',
+    email: 'ana.martinez@globalmining.com',
+    role: 'Invitado',
+    status: 'Inactivo',
+  },
+];
+
+const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } = {
+  Activo: 'default',
+  Inactivo: 'secondary',
+};
 
 export default function ConfiguracionPage() {
   return (
@@ -26,10 +85,16 @@ export default function ConfiguracionPage() {
         <div className="mx-auto grid w-full max-w-6xl gap-2">
           <h1 className="text-3xl font-semibold">Configuración</h1>
           <TabsList className="grid w-full grid-cols-2 bg-transparent p-0 border-b rounded-none">
-            <TabsTrigger value="general" className="rounded-none data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary">
+            <TabsTrigger
+              value="general"
+              className="rounded-none data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary"
+            >
               Configuración general
             </TabsTrigger>
-            <TabsTrigger value="users" className="rounded-none data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary">
+            <TabsTrigger
+              value="users"
+              className="rounded-none data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary"
+            >
               Usuarios y Roles
             </TabsTrigger>
           </TabsList>
@@ -46,8 +111,13 @@ export default function ConfiguracionPage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="companyName">Nombre de la Empresa *</Label>
-                        <Input id="companyName" defaultValue="Global Mining Solutions" />
+                        <Label htmlFor="companyName">
+                          Nombre de la Empresa *
+                        </Label>
+                        <Input
+                          id="companyName"
+                          defaultValue="Global Mining Solutions"
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="rfc">RFC / NIT *</Label>
@@ -55,7 +125,10 @@ export default function ConfiguracionPage() {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="fiscalAddress">Dirección Fiscal</Label>
-                        <Input id="fiscalAddress" placeholder="Calle, Número, Colonia, CP, Ciudad, Estado" />
+                        <Input
+                          id="fiscalAddress"
+                          placeholder="Calle, Número, Colonia, CP, Ciudad, Estado"
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label>Logo de la Empresa</Label>
@@ -64,8 +137,13 @@ export default function ConfiguracionPage() {
                           <p className="mt-2 text-sm text-muted-foreground">
                             Arrastra tu logo aquí o haz clic para seleccionar
                           </p>
-                          <p className="text-xs text-muted-foreground">Formatos: PNG, JPG - Máx: 2MB</p>
-                          <Input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                          <p className="text-xs text-muted-foreground">
+                            Formatos: PNG, JPG - Máx: 2MB
+                          </p>
+                          <Input
+                            type="file"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          />
                         </div>
                       </div>
                     </CardContent>
@@ -97,7 +175,9 @@ export default function ConfiguracionPage() {
                             <SelectValue placeholder="Seleccionar zona horaria" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="gmt-6">América/Ciudad de México (GMT-6)</SelectItem>
+                            <SelectItem value="gmt-6">
+                              América/Ciudad de México (GMT-6)
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -108,8 +188,12 @@ export default function ConfiguracionPage() {
                             <SelectValue placeholder="Seleccionar moneda" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="mxn">MXN - Peso Mexicano</SelectItem>
-                            <SelectItem value="usd">USD - Dólar Americano</SelectItem>
+                            <SelectItem value="mxn">
+                              MXN - Peso Mexicano
+                            </SelectItem>
+                            <SelectItem value="usd">
+                              USD - Dólar Americano
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -132,8 +216,12 @@ export default function ConfiguracionPage() {
                             <SelectValue placeholder="Seleccionar formato" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="comma">1,234.56 (Coma para miles)</SelectItem>
-                             <SelectItem value="dot">1.234,56 (Punto para miles)</SelectItem>
+                            <SelectItem value="comma">
+                              1,234.56 (Coma para miles)
+                            </SelectItem>
+                            <SelectItem value="dot">
+                              1.234,56 (Punto para miles)
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -148,31 +236,100 @@ export default function ConfiguracionPage() {
                     <CardTitle>Términos y Políticas</CardTitle>
                   </CardHeader>
                   <CardContent className="grid md:grid-cols-2 gap-8">
-                     <div className="space-y-2">
-                        <Label htmlFor="terms">Términos y Condiciones Generales</Label>
-                        <Textarea id="terms" placeholder="Ingrese los términos y condiciones que aplicarán a todos los proveedores..." className="min-h-32" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="privacy">Políticas de Privacidad</Label>
-                        <Textarea id="privacy" placeholder="Defina las políticas de privacidad y tratamiento de datos..." className="min-h-32" />
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="terms">
+                        Términos y Condiciones Generales
+                      </Label>
+                      <Textarea
+                        id="terms"
+                        placeholder="Ingrese los términos y condiciones que aplicarán a todos los proveedores..."
+                        className="min-h-32"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="privacy">Políticas de Privacidad</Label>
+                      <Textarea
+                        id="privacy"
+                        placeholder="Defina las políticas de privacidad y tratamiento de datos..."
+                        className="min-h-32"
+                      />
+                    </div>
                   </CardContent>
                 </Card>
               </div>
             </div>
-             <div className="flex justify-end mt-8">
-                <Button>Guardar Configuración</Button>
+            <div className="flex justify-end mt-8">
+              <Button>Guardar Configuración</Button>
             </div>
           </TabsContent>
           <TabsContent value="users">
             <Card>
-                <CardHeader>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
                     <CardTitle>Usuarios y Roles</CardTitle>
-                    <CardDescription>Aquí podrás gestionar los usuarios y sus roles en el sistema.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <p>Contenido de Usuarios y Roles...</p>
-                </CardContent>
+                    <CardDescription>
+                      Aquí podrás gestionar los usuarios y sus roles en el
+                      sistema.
+                    </CardDescription>
+                  </div>
+                  <Button size="sm" className="gap-1">
+                    <PlusCircle className="h-4 w-4" />
+                    Nuevo Usuario
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Rol</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>
+                        <span className="sr-only">Acciones</span>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>{user.role}</TableCell>
+                        <TableCell>
+                           <Badge variant={statusVariant[user.status]}>
+                            {user.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                aria-haspopup="true"
+                                size="icon"
+                                variant="ghost"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Toggle menu</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                              <DropdownMenuItem>Editar</DropdownMenuItem>
+                              <DropdownMenuItem>Cambiar Rol</DropdownMenuItem>
+                               <DropdownMenuItem className="text-red-500">
+                                Desactivar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
             </Card>
           </TabsContent>
         </div>
