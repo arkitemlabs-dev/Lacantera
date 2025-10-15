@@ -1,19 +1,21 @@
 import type { Supplier, Invoice, Notification, NavItem } from '@/lib/types';
 import {
-  LayoutDashboard,
+  Home,
   Users,
   FileText,
+  MessageSquare,
+  Bell,
   Settings,
 } from 'lucide-react';
 
 export const navItems: NavItem[] = [
   {
-    title: 'Dashboard',
+    title: 'Inicio',
     href: '/dashboard',
-    icon: LayoutDashboard,
+    icon: Home,
   },
   {
-    title: 'Proveedores',
+    title: 'Gestión de proveedores',
     href: '/proveedores',
     icon: Users,
   },
@@ -23,6 +25,16 @@ export const navItems: NavItem[] = [
     icon: FileText,
   },
   {
+    title: 'Mensajería',
+    href: '#',
+    icon: MessageSquare,
+  },
+  {
+    title: 'Notificaciones',
+    href: '#',
+    icon: Bell,
+  },
+  {
     title: 'Configuración',
     href: '/configuracion',
     icon: Settings,
@@ -30,11 +42,10 @@ export const navItems: NavItem[] = [
 ];
 
 export const suppliers: Supplier[] = [
-  { id: '1', name: 'Aceros del Norte', contactEmail: 'contacto@acerosnorte.com', status: 'active', registrationDate: '2023-01-15', spent: 120500, trend: 12 },
-  { id: '2', name: 'Materiales ABC', contactEmail: 'ventas@materialesabc.com', status: 'pending', registrationDate: '2023-02-20', spent: 75000, trend: -5 },
-  { id: '3', name: 'Constructora Rápida', contactEmail: 'info@constructorarapida.dev', status: 'active', registrationDate: '2023-03-10', spent: 250000, trend: 8 },
-  { id: '4', name: 'Ferretería La Llave', contactEmail: 'soporte@lallave.com', status: 'attention', registrationDate: '2023-04-05', spent: 45000, trend: 20 },
-  { id: '5', name: 'Suministros Eléctricos LUX', contactEmail: 'cotiza@lux.com', status: 'active', registrationDate: '2023-05-12', spent: 98000, trend: -2 },
+  { id: '1', name: 'Aceros del Norte S.A. de C.V.', contactName: 'Juan Pérez', contactEmail: 'contacto@acerosnorte.com', status: 'active', registrationDate: '15/01/2023', spent: 120500, trend: 12 },
+  { id: '2', name: 'Logística Express Mexicana', contactName: 'Maria Garcia', contactEmail: 'ventas@materialesabc.com', status: 'active', registrationDate: '22/03/2023', spent: 75000, trend: -5 },
+  { id: '3', name: 'Componentes Electrónicos Globales', contactName: 'Carlos López', contactEmail: 'info@constructorarapida.dev', status: 'inactive', registrationDate: '01/06/2023', spent: 250000, trend: 8 },
+  { id: '4', name: 'Plásticos Industriales del Sureste', contactName: 'Ana Martinez', contactEmail: 'soporte@lallave.com', status: 'active', registrationDate: '19/08/2023', spent: 45000, trend: 20 },
 ];
 
 export const invoices: Invoice[] = [
@@ -54,11 +65,11 @@ export const notifications: Notification[] = [
 ];
 
 export const spendingData = [
-    { month: "Enero", "Aceros del Norte": 4000, "Materiales ABC": 2400, "Constructora Rápida": 1800 },
-    { month: "Febrero", "Aceros del Norte": 3000, "Materiales ABC": 1398, "Constructora Rápida": 2210 },
-    { month: "Marzo", "Aceros del Norte": 2000, "Materiales ABC": 9800, "Constructora Rápida": 2290 },
-    { month: "Abril", "Aceros del Norte": 2780, "Materiales ABC": 3908, "Constructora Rápida": 2000 },
-    { month: "Mayo", "Aceros del Norte": 1890, "Materiales ABC": 4800, "Constructora Rápida": 2181 },
-    { month: "Junio", "Aceros del Norte": 2390, "Materiales ABC": 3800, "Constructora Rápida": 2500 },
-    { month: "Julio", "Aceros del Norte": 3490, "Materiales ABC": 4300, "Constructora Rápida": 2100 },
+  { month: 'Enero', 'Aceros del Norte': 2000, 'Materiales ABC': 1500, 'Constructora Rápida': 1000 },
+  { month: 'Febrero', 'Aceros del Norte': 2500, 'Materiales ABC': 1800, 'Constructora Rápida': 1200 },
+  { month: 'Marzo', 'Aceros del Norte': 3000, 'Materiales ABC': 2200, 'Constructora Rápida': 1500 },
+  { month: 'Abril', 'Aceros del Norte': 2800, 'Materiales ABC': 2000, 'Constructora Rápida': 1300 },
+  { month: 'Mayo', 'Aceros del Norte': 3200, 'Materiales ABC': 2500, 'Constructora Rápida': 1800 },
+  { month: 'Junio', 'Aceros del Norte': 3500, 'Materiales ABC': 2800, 'Constructora Rápida': 2000 },
+  { month: 'Julio', 'Aceros del Norte': 4000, 'Materiales ABC': 3000, 'Constructora Rápida': 2200 },
 ];

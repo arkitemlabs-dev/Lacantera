@@ -32,7 +32,7 @@ export function Nav() {
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
                 asChild
-                isActive={pathname === item.href}
+                isActive={pathname.startsWith(item.href)}
                 tooltip={{ children: item.title, side: 'right' }}
               >
                 <Link href={item.href}>

@@ -4,7 +4,8 @@ export type Supplier = {
   id: string;
   name: string;
   contactEmail: string;
-  status: 'active' | 'pending' | 'attention';
+  contactName?: string;
+  status: 'active' | 'pending' | 'attention' | 'inactive';
   registrationDate: string;
   spent: number;
   trend: number;
@@ -21,7 +22,7 @@ export type Invoice = {
 
 export type Notification = {
   id: string;
-  type: 'new_supplier' | 'doc_update' | 'invoice_status';
+  type: 'new_supplier' | 'doc_update' | 'invoice_status' | 'message';
   title: string;
   description: string;
   date: string;

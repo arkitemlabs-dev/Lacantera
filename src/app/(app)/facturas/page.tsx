@@ -1,6 +1,5 @@
 import { MoreHorizontal, ListFilter, File } from 'lucide-react';
 import { invoices } from '@/lib/data';
-import { Header } from '@/components/header';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,8 +46,8 @@ const statusText = {
 export default function FacturasPage() {
   return (
     <>
-      <Header title="Gestión de Facturas" />
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+        <h1 className="text-2xl font-bold">Gestión de Facturas</h1>
         <Tabs defaultValue="all">
           <div className="flex items-center">
             <TabsList>

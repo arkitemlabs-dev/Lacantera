@@ -1,5 +1,9 @@
 import Link from 'next/link';
-import { MoreHorizontal, PlusCircle, ArrowUp, ArrowDown } from 'lucide-react';
+import {
+  MoreHorizontal,
+  PlusCircle,
+  Search,
+} from 'lucide-react';
 import { suppliers } from '@/lib/data';
 import { Header } from '@/components/header';
 
@@ -27,32 +31,60 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const statusVariant = {
   active: 'default',
-  pending: 'secondary',
-  attention: 'destructive',
+  inactive: 'destructive',
 } as const;
 
 export default function ProveedoresPage() {
   return (
     <>
-      <Header title="Gestión de Proveedores" />
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Gestión de Proveedores</h1>
+            <p className="text-muted-foreground">
+              Administre, agregue o edite la información de sus proveedores.
+            </p>
+          </div>
+          <Button asChild size="sm" className="gap-1">
+            <Link href="/proveedores/nuevo">
+              <PlusCircle className="h-4 w-4" />
+              Agregar Proveedor
+            </Link>
+          </Button>
+        </div>
+
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Proveedores</CardTitle>
-                <CardDescription>
-                  Gestiona los proveedores de tu empresa.
-                </CardDescription>
-              </div>
-              <Button asChild size="sm" className="gap-1">
-                <Link href="/proveedores/nuevo">
-                  <PlusCircle className="h-4 w-4" />
-                  Agregar Proveedor
-                </Link>
+            <CardTitle>Filtrar Proveedores</CardTitle>
+            <CardDescription>Refine su búsqueda de proveedores.</CardDescription>
+            <div className="mt-4 flex items-center gap-4">
+              <Input
+                placeholder="Buscar por nombre o RFC..."
+                className="max-w-xs"
+              />
+              <Select>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Activo</SelectItem>
+                  <SelectItem value="inactive">Inactivo</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button>
+                <Search className="mr-2 h-4 w-4" />
+                Buscar
               </Button>
             </div>
           </CardHeader>
@@ -60,16 +92,12 @@ export default function ProveedoresPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Proveedor</TableHead>
-                  <TableHead className="hidden md:table-cell">Status</TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Gastado
-                  </TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Fecha de Registro
-                  </TableHead>
+                  <TableHead>Nombre del Proveedor</TableHead>
+                  <TableHead>Contacto</TableHead>
+                  <TableHead>Fecha de Registro</TableHead>
+                  <TableHead>Estado</TableHead>
                   <TableHead>
-                    <span className="sr-only">Actions</span>
+                    <span className="sr-only">Acciones</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -77,34 +105,14 @@ export default function ProveedoresPage() {
                 {suppliers.map((supplier) => (
                   <TableRow key={supplier.id}>
                     <TableCell className="font-medium">
-                      <div className="font-medium">{supplier.name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {supplier.contactEmail}
-                      </div>
+                      {supplier.name}
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">
+                    <TableCell>{supplier.contactName}</TableCell>
+                    <TableCell>{supplier.registrationDate}</TableCell>
+                    <TableCell>
                       <Badge variant={statusVariant[supplier.status]}>
-                        {supplier.status.charAt(0).toUpperCase() +
-                          supplier.status.slice(1)}
+                        {supplier.status === 'active' ? 'Activo' : 'Inactivo'}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <div className="flex items-center">
-                        <span>
-                          {new Intl.NumberFormat('en-US', {
-                            style: 'currency',
-                            currency: 'USD',
-                          }).format(supplier.spent)}
-                        </span>
-                        {supplier.trend > 0 ? (
-                          <ArrowUp className="h-4 w-4 ml-2 text-green-500" />
-                        ) : (
-                          <ArrowDown className="h-4 w-4 ml-2 text-red-500" />
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {supplier.registrationDate}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
