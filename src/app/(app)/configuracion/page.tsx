@@ -25,18 +25,12 @@ export default function ConfiguracionPage() {
       <Tabs defaultValue="general">
         <div className="mx-auto grid w-full max-w-6xl gap-2">
           <h1 className="text-3xl font-semibold">Configuración</h1>
-          <TabsList className="grid w-full grid-cols-4 bg-transparent p-0 border-b rounded-none">
+          <TabsList className="grid w-full grid-cols-2 bg-transparent p-0 border-b rounded-none">
             <TabsTrigger value="general" className="rounded-none data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary">
               Configuración general
             </TabsTrigger>
             <TabsTrigger value="users" className="rounded-none data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary">
               Usuarios y Roles
-            </TabsTrigger>
-            <TabsTrigger value="security" className="rounded-none data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary">
-              Seguridad y acceso
-            </TabsTrigger>
-            <TabsTrigger value="providers" className="rounded-none data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary">
-              Gestión de proveedores
             </TabsTrigger>
           </TabsList>
         </div>
@@ -178,28 +172,6 @@ export default function ConfiguracionPage() {
                 </CardHeader>
                 <CardContent>
                     <p>Contenido de Usuarios y Roles...</p>
-                </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="security">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Seguridad y acceso</CardTitle>
-                    <CardDescription>Aquí podrás configurar las opciones de seguridad y acceso.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <p>Contenido de Seguridad y acceso...</p>
-                </CardContent>
-            </Card>
-          </TabsContent>
-           <TabsContent value="providers">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Gestión de proveedores</CardTitle>
-                    <CardDescription>Aquí podrás configurar opciones relacionadas a los proveedores.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <p>Contenido de Gestión de proveedores...</p>
                 </CardContent>
             </Card>
           </TabsContent>
