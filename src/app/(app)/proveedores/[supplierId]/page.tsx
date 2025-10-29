@@ -6,7 +6,7 @@ import {
   FileClock,
   FileX,
   FileQuestion,
-  Upload,
+  Eye,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -259,7 +259,10 @@ export default function SupplierProfilePage({
                           </TableCell>
                           <TableCell>{doc.date || 'N/A'}</TableCell>
                           <TableCell className="text-right space-x-2">
-                            <Button variant="outline" size="sm" disabled={!isActionable}>Ver</Button>
+                            <Button variant="outline" size="icon" disabled={!isActionable}>
+                               <Eye className="h-4 w-4" />
+                               <span className="sr-only">Ver</span>
+                            </Button>
                              <Button variant="outline" size="sm" disabled={!isActionable}>Aprobar</Button>
                              <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" disabled={!isActionable}>Rechazar</Button>
                             <Button variant="link" size="sm" disabled={!isActionable}>Solicitar Actualización</Button>
@@ -277,3 +280,5 @@ export default function SupplierProfilePage({
     </main>
   );
 }
+
+    
