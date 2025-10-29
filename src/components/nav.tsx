@@ -13,7 +13,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
-import { Building } from 'lucide-react';
+import { Building, CreditCard } from 'lucide-react';
 
 const LaCanteraLogo = () => (
     <Building className="h-6 w-6 text-primary" />

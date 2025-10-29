@@ -43,6 +43,18 @@ export type PurchaseOrder = {
   budget: number;
 };
 
+export type Payment = {
+  id: string;
+  invoiceId: string;
+  supplierName: string;
+  amount: number;
+  executionDate: string;
+  status: 'Realizado' | 'Programado' | 'Cancelado';
+  method: 'Transferencia' | 'Tarjeta de Crédito';
+  paymentProof: boolean;
+  paymentComplement: boolean;
+};
+
 export type Notification = {
   id: number;
   type: 'new_supplier' | 'doc_update' | 'invoice_status';

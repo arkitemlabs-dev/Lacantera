@@ -1,4 +1,4 @@
-import type { Supplier, Invoice, Notification, NavItem, PurchaseOrder } from '@/lib/types';
+import type { Supplier, Invoice, Notification, NavItem, PurchaseOrder, Payment } from '@/lib/types';
 import {
   Home,
   Users,
@@ -8,6 +8,7 @@ import {
   Settings,
   Building,
   ShoppingCart,
+  CreditCard,
 } from 'lucide-react';
 
 export const navItems: NavItem[] = [
@@ -30,6 +31,11 @@ export const navItems: NavItem[] = [
     title: 'Gestion facturas',
     href: '/facturas',
     icon: FileText,
+  },
+  {
+    title: 'Pagos',
+    href: '/pagos',
+    icon: CreditCard,
   },
   {
     title: 'Mensajería',
@@ -59,11 +65,17 @@ export const suppliers: Supplier[] = [
 ];
 
 export const invoices: Invoice[] = [
-  { id: 'INV-001', purchaseOrderId: 'OC-128', invoiceNumber: 'INV-001', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 25500.00, entryDate: '01/07/2024', status: 'Aprobada', actionable: false },
-  { id: 'INV-002', purchaseOrderId: 'OC-127', invoiceNumber: 'INV-002', supplierName: 'Logística Express Mexicana', amount: 12300.50, entryDate: '03/07/2024', status: 'En Revisión', actionable: true },
-  { id: 'INV-003', purchaseOrderId: 'OC-126', invoiceNumber: 'INV-003', supplierName: 'Componentes Electrónicos Globales', amount: 8750.00, entryDate: '05/07/2024', status: 'Pagada', actionable: false },
-  { id: 'INV-004', purchaseOrderId: 'OC-125', invoiceNumber: 'INV-004', supplierName: 'Arrendamientos y Maquinaria Pesada', amount: 4200.00, entryDate: '06/07/2024', status: 'Rechazada', actionable: false },
-  { id: 'INV-005', purchaseOrderId: 'OC-124', invoiceNumber: 'INV-005', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 31000.00, entryDate: '08/07/2024', status: 'En Revisión', actionable: true },
+  { id: 'INV-001', purchaseOrderId: 'OC-128', invoiceNumber: 'FACT-001', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 25500.00, entryDate: '01/07/2024', status: 'Pagada', actionable: false },
+  { id: 'INV-002', purchaseOrderId: 'OC-127', invoiceNumber: 'FACT-002', supplierName: 'Logística Express Mexicana', amount: 12300.50, entryDate: '03/07/2024', status: 'Aprobada', actionable: false },
+  { id: 'INV-003', purchaseOrderId: 'OC-126', invoiceNumber: 'FACT-003', supplierName: 'Componentes Electrónicos Globales', amount: 8750.00, entryDate: '05/07/2024', status: 'Pagada', actionable: false },
+  { id: 'INV-004', purchaseOrderId: 'OC-125', invoiceNumber: 'FACT-004', supplierName: 'Arrendamientos y Maquinaria Pesada', amount: 4200.00, entryDate: '06/07/2024', status: 'Rechazada', actionable: false },
+  { id: 'INV-005', purchaseOrderId: 'OC-124', invoiceNumber: 'FACT-005', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 31000.00, entryDate: '08/07/2024', status: 'En Revisión', actionable: true },
+];
+
+export const payments: Payment[] = [
+    { id: 'PAY-001', invoiceId: 'FACT-001', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 25500.00, executionDate: '15/07/2024', status: 'Realizado', method: 'Transferencia', paymentProof: true, paymentComplement: true },
+    { id: 'PAY-002', invoiceId: 'FACT-003', supplierName: 'Componentes Electrónicos Globales', amount: 8750.00, executionDate: '18/07/2024', status: 'Realizado', method: 'Transferencia', paymentProof: true, paymentComplement: false },
+    { id: 'PAY-003', invoiceId: 'FACT-002', supplierName: 'Logística Express Mexicana', amount: 12300.50, executionDate: '20/07/2024', status: 'Programado', method: 'Transferencia', paymentProof: false, paymentComplement: false },
 ];
 
 export const purchaseOrders: PurchaseOrder[] = [

@@ -1,0 +1,53 @@
+import {
+  Home,
+  Users,
+  FileText,
+  MessageSquare,
+  Bell,
+  Settings,
+  ShoppingCart,
+  CreditCard,
+} from 'lucide-react';
+
+export const navItems = [
+  {
+    title: 'Inicio',
+    href: '/dashboard',
+    icon: Home,
+  },
+  {
+    title: 'Gestión de proveedores',
+    href: '/proveedores',
+    icon: Users,
+  },
+  {
+    title: 'Órdenes de Compra',
+    href: '/ordenes-de-compra',
+    icon: ShoppingCart,
+  },
+  {
+    title: 'Gestion facturas',
+    href: '/facturas',
+    icon: FileText,
+  },
+   {
+    title: 'Pagos',
+    href: '/pagos',
+    icon: CreditCard,
+  },
+  {
+    title: 'Mensajería',
+    href: '/mensajeria',
+    icon: MessageSquare,
+  },
+  {
+    title: 'Notificaciones',
+    href: '/notificaciones',
+    icon: Bell,
+  },
+  {
+    title: 'Configuración',
+    href: '/configuracion',
+    icon: Settings,
+  },
+];
