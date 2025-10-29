@@ -1,3 +1,4 @@
+
 'use client';
 import {
   ChevronLeft,
@@ -30,37 +31,30 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { suppliers } from '@/lib/data';
 import { cn } from '@/lib/utils';
-import type { Supplier } from '@/lib/types';
+import type { Supplier, SupplierType } from '@/lib/types';
 import { notFound } from 'next/navigation';
 
-type DocStatus = 'aprobado' | 'pendiente' | 'rechazado' | 'vencido';
+type DocStatus = 'aprobado' | 'pendiente' | 'rechazado' | 'vencido' | 'no aplica';
 
-const documents = [
-  {
-    name: 'Constancia de Situación Fiscal (CSF)',
-    status: 'aprobado' as DocStatus,
-    date: '2024-07-15',
-  },
-  {
-    name: 'Opinión de Cumplimiento SAT',
-    status: 'pendiente' as DocStatus,
-    date: null,
-  },
-  {
-    name: 'Acta Constitutiva',
-    status: 'aprobado' as DocStatus,
-    date: '2023-01-20',
-  },
-  {
-    name: 'Poder Notarial del Representante Legal',
-    status: 'rechazado' as DocStatus,
-    date: '2024-07-10',
-  },
-  {
-    name: 'Póliza de Seguro de RC',
-    status: 'vencido' as DocStatus,
-    date: '2024-06-30',
-  },
+type Document = {
+  name: string;
+  status: DocStatus;
+  date: string | null;
+  types: SupplierType[];
+};
+
+const allDocs: Document[] = [
+    { name: 'Poder notarial del representante legal', status: 'aprobado', date: '2024-07-15', types: ['supplies', 'services', 'leasing', 'transport'] },
+    { name: 'Opinión de cumplimiento positiva del SAT (vigencia mensual)', status: 'pendiente', date: null, types: ['supplies', 'services', 'leasing', 'transport'] },
+    { name: 'Acta constitutiva y sus modificaciones', status: 'aprobado', date: '2023-01-20', types: ['supplies', 'services', 'leasing', 'transport'] },
+    { name: 'Carátula del estado de cuenta bancaria (preferentemente del nombre del titular coincidente)', status: 'rechazado', date: '2024-07-10', types: ['supplies', 'services', 'leasing', 'transport'] },
+    { name: 'Fotografía a color del exterior del domicilio fiscal/comercial', status: 'vencido', date: '2024-06-30', types: ['supplies', 'services', 'leasing', 'transport'] },
+    { name: 'Referencias comerciales', status: 'aprobado', date: '2024-07-18', types: ['supplies', 'services', 'leasing', 'transport'] },
+    { name: 'Carta firmada de aceptación al código de ética', status: 'pendiente', date: null, types: ['supplies', 'services', 'leasing', 'transport'] },
+    { name: 'Registro en el REPSE', status: 'aprobado', date: '2024-05-20', types: ['services'] },
+    { name: 'Título de propiedad del inmueble arrendado o documento que acredite propiedad', status: 'aprobado', date: '2023-11-10', types: ['leasing'] },
+    { name: 'Comprobante de pago de predial vigente', status: 'vencido', date: '2024-03-31', types: ['leasing'] },
+    { name: 'Póliza de seguro de responsabilidad civil vigente', status: 'pendiente', date: null, types: ['transport'] },
 ];
 
 const docStatusConfig = {
@@ -88,6 +82,12 @@ const docStatusConfig = {
     variant: 'destructive',
     className: 'bg-orange-500/20 text-orange-200 border-orange-500/30',
   },
+   'no aplica': {
+    icon: <FileX className="h-5 w-5 text-muted-foreground" />,
+    label: 'No Aplica',
+    variant: 'outline',
+    className: 'text-muted-foreground',
+  },
 };
 
 const InfoRow = ({ label, value }: { label: string; value: string | undefined }) => (
@@ -107,6 +107,13 @@ export default function SupplierProfilePage({
   if (!supplier) {
     notFound();
   }
+  
+  const documentsForSupplier = allDocs.map(doc => {
+      if (doc.types.includes(supplier.type)) {
+          return doc;
+      }
+      return { ...doc, status: 'no aplica' as DocStatus };
+  });
 
   return (
     <main className="flex min-h-[calc(100vh_-_theme(spacing.16))] flex-1 flex-col gap-4 bg-muted/40 p-4 md:gap-8 md:p-10">
@@ -235,8 +242,9 @@ export default function SupplierProfilePage({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {documents.map((doc, index) => {
+                    {documentsForSupplier.map((doc, index) => {
                       const config = docStatusConfig[doc.status];
+                      const isActionable = doc.status !== 'no aplica';
                       return (
                         <TableRow key={index}>
                           <TableCell className="font-medium">{doc.name}</TableCell>
@@ -251,10 +259,10 @@ export default function SupplierProfilePage({
                           </TableCell>
                           <TableCell>{doc.date || 'N/A'}</TableCell>
                           <TableCell className="text-right space-x-2">
-                            <Button variant="outline" size="sm">Ver</Button>
-                             <Button variant="outline" size="sm">Aprobar</Button>
-                             <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">Rechazar</Button>
-                            <Button variant="link" size="sm">Solicitar Actualización</Button>
+                            <Button variant="outline" size="sm" disabled={!isActionable}>Ver</Button>
+                             <Button variant="outline" size="sm" disabled={!isActionable}>Aprobar</Button>
+                             <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" disabled={!isActionable}>Rechazar</Button>
+                            <Button variant="link" size="sm" disabled={!isActionable}>Solicitar Actualización</Button>
                           </TableCell>
                         </TableRow>
                       );
