@@ -11,6 +11,10 @@ import {
   Loader2,
   Upload,
   XCircle,
+  FileText,
+  Building,
+  Truck,
+  Sparkles
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -33,8 +37,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { supplierComplianceCheck } from '@/ai/flows/supplier-compliance-check';
-import { generateSupplierDescription } from '@/ai/flows/generate-supplier-description';
 import {
   Card,
   CardContent,
@@ -42,6 +44,15 @@ import {
   CardHeader,
   CardTitle,
 } from '../ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 const formSchema = z.object({
   // Datos fiscales
@@ -68,22 +79,25 @@ const formSchema = z.object({
   description: z.string().optional(),
 });
 
-type ComplianceResult = {
-  isCompliant: boolean;
-  complianceReport: string;
-};
+type SupplierType = z.infer<typeof formSchema>['supplierType'];
+
+const complementaryDocsConfig = [
+    { id: 'poderNotarial', label: 'Poder notarial del representante legal', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
+    { id: 'opinionSat', label: 'Opinión de cumplimiento positiva del SAT (vigencia mensual)', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
+    { id: 'actaConstitutiva', label: 'Acta constitutiva y sus modificaciones', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
+    { id: 'caratulaBanco', label: 'Carátula del estado de cuenta bancaria', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
+    { id: 'fotoDomicilio', label: 'Fotografía a color del exterior del domicilio fiscal/comercial', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
+    { id: 'referencias', label: 'Referencias comerciales', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
+    { id: 'codigoEtica', label: 'Carta firmada de aceptación al código de ética', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
+    { id: 'repse', label: 'Registro en el REPSE', required: true, types: ['services'] },
+    { id: 'tituloPropiedad', label: 'Título de propiedad del inmueble arrendado', required: true, types: ['leasing'] },
+    { id: 'pagoPredial', label: 'Comprobante de pago de predial vigente', required: true, types: ['leasing'] },
+    { id: 'polizaSeguro', label: 'Póliza de seguro de responsabilidad civil vigente', required: true, types: ['transport'] },
+];
 
 export function AddSupplierForm() {
   const { toast } = useToast();
-  const [document, setDocument] = useState<File | null>(null);
-  const [documentDataUri, setDocumentDataUri] = useState<string | null>(null);
-  const [isCheckingCompliance, setIsCheckingCompliance] = useState(false);
-  const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
-  const [complianceResult, setComplianceResult] = useState<ComplianceResult | null>(null);
   
-  const documentRequirements =
-    'El documento debe ser un PDF. Debe incluir el nombre de la empresa, RFC (Registro Federal de Contribuyentes), y domicilio fiscal. El documento no debe tener más de 1 año de antigüedad.';
-
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -100,71 +114,7 @@ export function AddSupplierForm() {
     },
   });
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setDocument(file);
-      setComplianceResult(null);
-
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const dataUri = e.target?.result as string;
-        setDocumentDataUri(dataUri);
-        await checkCompliance(dataUri);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const checkCompliance = async (dataUri: string) => {
-    setIsCheckingCompliance(true);
-    try {
-      const result = await supplierComplianceCheck({
-        documentDataUri: dataUri,
-        documentRequirements,
-      });
-      setComplianceResult(result);
-    } catch (error) {
-      console.error('Compliance check failed:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error de Verificación',
-        description: 'No se pudo verificar el documento.',
-      });
-    } finally {
-      setIsCheckingCompliance(false);
-    }
-  };
-
-  const handleGenerateDescription = async () => {
-    if (!documentDataUri) {
-       toast({
-        variant: 'destructive',
-        title: 'Falta Documento',
-        description: 'Por favor, sube un documento para generar la descripción.',
-      });
-      return;
-    }
-
-    setIsGeneratingDesc(true);
-    try {
-      const result = await generateSupplierDescription({ documentDataUris: [documentDataUri] });
-      form.setValue('description', result.description);
-       toast({
-        title: 'Descripción Generada',
-        description: 'La descripción del proveedor ha sido generada por IA.',
-      });
-    } catch(error) {
-        console.error('Description generation failed:', error);
-        toast({
-            variant: 'destructive',
-            title: 'Error de Generación',
-            description: 'No se pudo generar la descripción.',
-        });
-    } finally {
-      setIsGeneratingDesc(false);
-    }
-  };
+  const supplierType = form.watch('supplierType');
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     console.log(values);
@@ -173,6 +123,19 @@ export function AddSupplierForm() {
       description: `El proveedor ${values.name} ha sido guardado exitosamente.`,
     });
   }
+
+  const renderFileUpload = (label: string) => (
+     <div className="space-y-2">
+        <FormLabel>{label}</FormLabel>
+        <div className="relative border-2 border-dashed border-muted rounded-lg p-4 flex items-center justify-center text-center h-24">
+            <Upload className="w-6 h-6 text-muted-foreground" />
+            <p className="ml-2 text-xs text-muted-foreground">
+            Arrastra o haz clic para subir
+            </p>
+            <Input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+        </div>
+    </div>
+  );
 
   return (
     <Form {...form}>
@@ -183,6 +146,7 @@ export function AddSupplierForm() {
             <Card>
               <CardHeader>
                 <CardTitle>Datos Fiscales</CardTitle>
+                <CardDescription>Esta información será validada contra el SAT.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <FormField
@@ -190,9 +154,9 @@ export function AddSupplierForm() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nombre del Proveedor</FormLabel>
+                      <FormLabel>Razón Social (Nombre del Proveedor)</FormLabel>
                       <FormControl>
-                        <Input placeholder="Aceros del Norte" {...field} />
+                        <Input placeholder="Aceros del Norte S.A. de C.V." {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -207,6 +171,7 @@ export function AddSupplierForm() {
                       <FormControl>
                         <Input placeholder="XAXX010101000" {...field} />
                       </FormControl>
+                       <FormDescription>Se validará que el RFC no esté duplicado.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -218,7 +183,7 @@ export function AddSupplierForm() {
                     <FormItem>
                       <FormLabel>Dirección Fiscal</FormLabel>
                       <FormControl>
-                        <Input placeholder="Av. Siempre Viva 123" {...field} />
+                        <Input placeholder="Av. Siempre Viva 123, Springfield" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -237,7 +202,7 @@ export function AddSupplierForm() {
                   name="contactName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nombre del Contacto</FormLabel>
+                      <FormLabel>Nombre del Contacto Principal</FormLabel>
                       <FormControl>
                         <Input placeholder="Juan Pérez" {...field} />
                       </FormControl>
@@ -310,7 +275,7 @@ export function AddSupplierForm() {
                   name="bankClabe"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>CLABE</FormLabel>
+                      <FormLabel>CLABE Interbancaria</FormLabel>
                       <FormControl>
                         <Input placeholder="012345678901234567" {...field} />
                       </FormControl>
@@ -323,12 +288,12 @@ export function AddSupplierForm() {
           </div>
 
           {/* Side Panel */}
-          <div className="space-y-6">
+          <div className="space-y-8">
             <Card>
               <CardHeader>
                 <CardTitle>Categoría y Documentos</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
                  <FormField
                   control={form.control}
                   name="supplierType"
@@ -353,95 +318,59 @@ export function AddSupplierForm() {
                   )}
                 />
 
-                <div className="space-y-2">
-                  <FormLabel>Documento de Cumplimiento</FormLabel>
-                  <div className="relative border-2 border-dashed border-muted rounded-lg p-6 flex flex-col items-center justify-center text-center h-48">
-                    <Upload className="w-8 h-8 text-muted-foreground" />
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Arrastra o{' '}
-                      <Button type="button" variant="link" className="text-primary p-0 h-auto">
-                        haz clic para subir
-                      </Button>
-                    </p>
-                    <Input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={handleFileChange} accept="application/pdf" />
-                  </div>
-                </div>
-
-                {document && (
-                    <div className="p-3 border rounded-md bg-muted/50">
-                        <div className="flex items-center gap-3">
-                            <FileIcon className="h-5 w-5 text-muted-foreground" />
-                            <span className="text-sm font-medium truncate flex-1">{document.name}</span>
-                            <button type="button" onClick={() => { setDocument(null); setComplianceResult(null); }} className="text-muted-foreground hover:text-foreground">
-                                <XCircle className="h-4 w-4" />
-                            </button>
-                        </div>
-                        <div className="mt-3">
-                            {isCheckingCompliance ? (
-                                 <div className="flex items-center text-sm text-muted-foreground animate-pulse">
-                                    <Loader2 className="animate-spin mr-2 h-4 w-4" />
-                                    Verificando cumplimiento...
-                                 </div>
-                            ) : complianceResult ? (
-                                <div>
-                                    {complianceResult.isCompliant ? (
-                                        <Badge variant="default" className="bg-green-600 hover:bg-green-700">
-                                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                                            Cumple
-                                        </Badge>
-                                    ) : (
-                                        <Badge variant="destructive">
-                                            <XCircle className="mr-2 h-4 w-4" />
-                                            No Cumple
-                                        </Badge>
-                                    )}
-                                    <p className="text-xs text-muted-foreground mt-2">{complianceResult.complianceReport}</p>
-                                </div>
-                            ) : null}
-                        </div>
+                <div>
+                    <h3 className="text-sm font-medium mb-4">Documentos Iniciales</h3>
+                    <div className="space-y-4">
+                        {renderFileUpload('INE del representante legal')}
+                        {renderFileUpload('Comprobante de domicilio fiscal')}
+                        {renderFileUpload('Constancia de situación fiscal (CSF)')}
                     </div>
-                )}
-                 <div className="p-3 border rounded-md bg-muted/50 space-y-1">
-                    <h4 className="font-semibold text-sm">Requisitos</h4>
-                    <p className="text-xs text-muted-foreground">{documentRequirements}</p>
                 </div>
               </CardContent>
             </Card>
 
-             <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                    <CardTitle>Descripción</CardTitle>
-                    <Button type="button" variant="link" size="sm" onClick={handleGenerateDescription} disabled={isGeneratingDesc || !document}>
-                      {isGeneratingDesc ? <Loader2 className="animate-spin mr-2" /> : null}
-                      Generar con IA
-                    </Button>
-                  </div>
-                   <CardDescription>Esta descripción es generada por IA basada en los documentos.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                 <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Descripción del proveedor..."
-                          className="resize-none h-32"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Documentación Complementaria</CardTitle>
+                    <CardDescription>
+                        Sube los documentos requeridos según el tipo de proveedor.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Documento</TableHead>
+                                <TableHead className="text-right">Acción</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {complementaryDocsConfig
+                                .filter(doc => !supplierType || doc.types.includes(supplierType))
+                                .map(doc => (
+                                <TableRow key={doc.id}>
+                                    <TableCell className="font-medium text-xs py-2">{doc.label}</TableCell>
+                                    <TableCell className="text-right py-2">
+                                        <Button type="button" variant="outline" size="sm" className="h-8">
+                                            <Upload className="h-3 w-3 mr-2" />
+                                            Subir
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                     {!supplierType && (
+                        <div className="text-center py-4 text-sm text-muted-foreground">
+                            Selecciona un tipo de proveedor para ver los documentos requeridos.
+                        </div>
+                    )}
+                </CardContent>
             </Card>
           </div>
         </div>
 
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 mt-8">
           <Button type="button" variant="outline">Cancelar</Button>
           <Button type="submit">Guardar Proveedor</Button>
         </div>
