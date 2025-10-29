@@ -181,21 +181,21 @@ export default function PagosPage() {
                       <TableCell className="text-center space-x-1">
                         <DialogTrigger asChild>
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="icon"
                             disabled={!payment.paymentProof}
                             onClick={() => handleOpenDialog(payment, 'Pago')}
-                            className='h-8 w-8'
+                            className='h-8 w-8 bg-transparent hover:bg-primary/90'
                           >
                             <Eye className="h-4 w-4" />
                             <span className="sr-only">Ver Pago</span>
                           </Button>
                         </DialogTrigger>
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="icon"
                           disabled={!payment.paymentProof}
-                          className='h-8 w-8'
+                          className='h-8 w-8 bg-transparent hover:bg-primary/90'
                         >
                           <Download className="h-4 w-4" />
                           <span className="sr-only">Descargar Pago</span>
@@ -204,21 +204,21 @@ export default function PagosPage() {
                       <TableCell className="text-center space-x-1">
                         <DialogTrigger asChild>
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="icon"
                             disabled={!payment.paymentComplement}
                              onClick={() => handleOpenDialog(payment, 'Complemento')}
-                             className='h-8 w-8'
+                             className='h-8 w-8 bg-transparent hover:bg-primary/90'
                           >
                             <Eye className="h-4 w-4" />
                             <span className="sr-only">Ver Complemento</span>
                           </Button>
                         </DialogTrigger>
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="icon"
                           disabled={!payment.paymentComplement}
-                          className='h-8 w-8'
+                          className='h-8 w-8 bg-transparent hover:bg-primary/90'
                         >
                           <Download className="h-4 w-4" />
                           <span className="sr-only">Descargar Complemento</span>
