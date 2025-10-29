@@ -146,7 +146,8 @@ export default function PagosPage() {
                     <TableHead>Fecha Ejecución</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Método</TableHead>
-                    <TableHead className="text-center">Comprobantes</TableHead>
+                    <TableHead className="text-center">Comprobante de Pago</TableHead>
+                    <TableHead className="text-center">Complemento</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -177,29 +178,51 @@ export default function PagosPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>{payment.method}</TableCell>
-                      <TableCell className="text-center space-x-2">
+                      <TableCell className="text-center space-x-1">
                         <DialogTrigger asChild>
                           <Button
                             variant="outline"
-                            size="sm"
+                            size="icon"
                             disabled={!payment.paymentProof}
                             onClick={() => handleOpenDialog(payment, 'Pago')}
+                            className='h-8 w-8'
                           >
-                            <Eye className="mr-2 h-3 w-3" />
-                            Pago
+                            <Eye className="h-4 w-4" />
+                            <span className="sr-only">Ver Pago</span>
                           </Button>
                         </DialogTrigger>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          disabled={!payment.paymentProof}
+                          className='h-8 w-8'
+                        >
+                          <Download className="h-4 w-4" />
+                          <span className="sr-only">Descargar Pago</span>
+                        </Button>
+                      </TableCell>
+                      <TableCell className="text-center space-x-1">
                         <DialogTrigger asChild>
                           <Button
                             variant="outline"
-                            size="sm"
+                            size="icon"
                             disabled={!payment.paymentComplement}
                              onClick={() => handleOpenDialog(payment, 'Complemento')}
+                             className='h-8 w-8'
                           >
-                            <Eye className="mr-2 h-3 w-3" />
-                            Complemento
+                            <Eye className="h-4 w-4" />
+                            <span className="sr-only">Ver Complemento</span>
                           </Button>
                         </DialogTrigger>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          disabled={!payment.paymentComplement}
+                          className='h-8 w-8'
+                        >
+                          <Download className="h-4 w-4" />
+                          <span className="sr-only">Descargar Complemento</span>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
