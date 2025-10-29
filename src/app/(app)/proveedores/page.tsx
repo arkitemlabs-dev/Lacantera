@@ -1,5 +1,7 @@
+'use client';
+
 import Link from 'next/link';
-import { MoreHorizontal, PlusCircle, Search } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Search, Eye } from 'lucide-react';
 import { suppliers } from '@/lib/data';
 import type { SupplierStatus } from '@/lib/types';
 
@@ -142,7 +144,9 @@ export default function ProveedoresPage() {
                 {displayedSuppliers.map((supplier) => (
                   <TableRow key={supplier.id}>
                     <TableCell className="font-medium">
-                      {supplier.name}
+                      <Link href={`/proveedores/${supplier.id}`} className="hover:underline">
+                        {supplier.name}
+                      </Link>
                     </TableCell>
                     <TableCell>{supplier.contactName}</TableCell>
                     <TableCell>{typeText[supplier.type]}</TableCell>
@@ -166,7 +170,12 @@ export default function ProveedoresPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                          <DropdownMenuItem>Ver Detalles</DropdownMenuItem>
+                           <DropdownMenuItem asChild>
+                             <Link href={`/proveedores/${supplier.id}`} className='flex items-center'>
+                               <Eye className="mr-2 h-4 w-4" />
+                               Ver Detalles
+                             </Link>
+                           </DropdownMenuItem>
                           <DropdownMenuItem>Editar</DropdownMenuItem>
                           <DropdownMenuItem>
                             {supplier.status === 'active' ? 'Desactivar' : 'Activar'}
