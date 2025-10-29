@@ -266,7 +266,7 @@ export default function FacturasPage() {
                         </Card>
                         <Card>
                             <CardHeader>
-                                <CardTitle>Acciones</CardTitle>
+                                <CardTitle>Acciones de Revisión</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                  <div className="space-y-2">
@@ -281,7 +281,7 @@ export default function FacturasPage() {
                         </Card>
                     </div>
                 </div>
-                <DialogFooter>
+                <DialogFooter className="gap-2">
                   <Button variant="ghost" onClick={handleDialogClose}>Cancelar</Button>
                   <Button variant="destructive" onClick={handleDialogClose}>Rechazar con Motivo</Button>
                    <Button variant="outline" onClick={handleDialogClose}>Solicitar Corrección</Button>
