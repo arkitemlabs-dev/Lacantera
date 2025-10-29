@@ -1,3 +1,6 @@
+
+'use client';
+
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,47 +17,48 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { suppliers } from '@/lib/data';
 import { Paperclip, Send } from 'lucide-react';
 
 const conversations = [
   {
     id: 1,
-    name: 'Compras',
+    name: 'Aceros del Norte S.A. de C.V.',
     subject: 'Duda sobre OC-128',
     time: '10:30 AM',
     unread: true,
-    avatar: 'C',
+    avatar: 'A',
   },
   {
     id: 2,
-    name: 'Contabilidad',
+    name: 'Logística Express Mexicana',
     subject: 'Revisión Factura A-5832',
     time: 'Ayer',
     unread: false,
-    avatar: 'C',
+    avatar: 'L',
   },
   {
     id: 3,
-    name: 'Soporte Técnico',
+    name: 'Componentes Electrónicos Globales',
     subject: 'Problema al subir documento',
     time: '2d',
     unread: false,
-    avatar: 'S',
+    avatar: 'C',
   },
 ];
 
 const messages = [
   {
     id: 1,
-    author: 'Compras',
-    avatar: 'C',
+    author: 'Aceros del Norte S.A. de C.V.',
+    avatar: 'A',
     text: 'Buenos días, tenemos una duda sobre la orden de compra OC-128.',
     time: '10:30 AM',
     isCurrentUser: false,
   },
-   {
+  {
     id: 2,
-    author: 'Juan Pérez',
+    author: 'Juan Pérez (Admin)',
     avatar: 'JP',
     text: 'Buen día, ¿cuál es su duda?',
     time: '10:31 AM',
@@ -62,8 +66,8 @@ const messages = [
   },
   {
     id: 3,
-    author: 'Compras',
-    avatar: 'C',
+    author: 'Aceros del Norte S.A. de C.V.',
+    avatar: 'A',
     text: 'El precio del item "Resma de papel" no coincide con nuestra cotización.',
     time: '10:32 AM',
     isCurrentUser: false,
@@ -78,14 +82,14 @@ export default function MensajeriaPage() {
         <div className="p-4">
           <h1 className="text-2xl font-bold">Mensajes</h1>
           <div className="flex items-center gap-2 mt-4">
-            <Select defaultValue="compras">
+            <Select>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Categoría" />
+                <SelectValue placeholder="Seleccionar por proveedor" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="compras">Compras</SelectItem>
-                <SelectItem value="contabilidad">Contabilidad</SelectItem>
-                <SelectItem value="soporte">Soporte Técnico</SelectItem>
+                {suppliers.map((supplier) => (
+                    <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Button>Nuevo Ticket</Button>
@@ -96,7 +100,7 @@ export default function MensajeriaPage() {
             {conversations.map((conv) => (
               <div
                 key={conv.id}
-                className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-muted bg-card"
+                className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-muted bg-background/50"
               >
                 <Avatar className="h-10 w-10">
                   <AvatarFallback>{conv.avatar}</AvatarFallback>
@@ -123,8 +127,8 @@ export default function MensajeriaPage() {
       <div className="flex flex-col">
         <Card className="flex-1 flex flex-col rounded-none border-0 shadow-none">
           <CardHeader className="border-b">
-            <h2 className="text-xl font-semibold">Compras</h2>
-            <p className="text-sm text-muted-foreground">Duda sobre OC-128</p>
+            <h2 className="text-xl font-semibold">Aceros del Norte S.A. de C.V.</h2>
+            <p className="text-sm text-muted-foreground">Ticket: Duda sobre OC-128</p>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto p-6 space-y-6">
             {messages.map((message) => (
@@ -147,14 +151,14 @@ export default function MensajeriaPage() {
                   }`}
                 >
                   <p className="text-sm">{message.text}</p>
-                   <p className={`text-xs mt-1 ${message.isCurrentUser ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                   <p className={`text-xs mt-1 text-right ${message.isCurrentUser ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                     {message.time}
                   </p>
                 </div>
               </div>
             ))}
           </CardContent>
-          <CardFooter className="p-4 border-t">
+          <CardFooter className="p-4 border-t bg-background">
             <div className="relative w-full">
               <Input
                 placeholder="Escriba su mensaje..."
