@@ -1,6 +1,6 @@
 import { KpiCards } from '@/components/dashboard/kpi-cards';
+import { SupplierPerformance } from '@/components/dashboard/supplier-performance';
 import { SpendingChart } from '@/components/dashboard/spending-chart';
-import { AttentionSuppliers } from '@/components/dashboard/attention-suppliers';
 
 export default function DashboardPage() {
   return (
@@ -10,10 +10,10 @@ export default function DashboardPage() {
         <KpiCards />
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
           <div className="lg:col-span-4">
-            <SpendingChart />
+             <SupplierPerformance />
           </div>
           <div className="lg:col-span-3">
-            <AttentionSuppliers />
+             <SpendingChart />
           </div>
         </div>
       </div>

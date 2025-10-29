@@ -4,29 +4,45 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { FileWarning, Banknote, FileStack } from 'lucide-react';
+import {
+  FileStack,
+  FileClock,
+  FilePlus2,
+  Ticket,
+  TrendingUp,
+} from 'lucide-react';
 
 export function KpiCards() {
   const kpis = [
     {
-      title: 'Órdenes Abiertas',
-      value: '12',
+      title: 'Órdenes de Compra (Mes)',
+      value: '125',
       icon: <FileStack className="h-6 w-6 text-muted-foreground" />,
     },
     {
-      title: 'Gastos Totales (Julio)',
-      value: '$45,231.89',
-      icon: <Banknote className="h-6 w-6 text-muted-foreground" />,
+      title: 'Facturas Pendientes',
+      value: '12',
+      icon: <FileClock className="h-6 w-6 text-muted-foreground" />,
     },
     {
-      title: 'Proveedores que Requieren Atención',
-      value: '3',
-      icon: <FileWarning className="h-6 w-6 text-muted-foreground" />,
+      title: 'Complementos de Pago',
+      value: '8',
+      icon: <FilePlus2 className="h-6 w-6 text-muted-foreground" />,
+    },
+     {
+      title: 'Tickets Abiertos',
+      value: '5',
+      icon: <Ticket className="h-6 w-6 text-muted-foreground" />,
+    },
+    {
+      title: 'Desempeño General',
+      value: '+2.5%',
+      icon: <TrendingUp className="h-6 w-6 text-muted-foreground" />,
     },
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
       {kpis.map((kpi) => (
         <Card key={kpi.title}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
