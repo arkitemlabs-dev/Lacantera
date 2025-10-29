@@ -65,6 +65,7 @@ const typeText = {
 };
 
 export default function ProveedoresPage() {
+  const displayedSuppliers = suppliers.filter(s => s.status !== 'pending');
   return (
     <>
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -138,7 +139,7 @@ export default function ProveedoresPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {suppliers.map((supplier) => (
+                {displayedSuppliers.map((supplier) => (
                   <TableRow key={supplier.id}>
                     <TableCell className="font-medium">
                       {supplier.name}
