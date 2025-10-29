@@ -155,9 +155,6 @@ export default function OrderProfilePage({
                     <InfoRow label="Fecha de Entrega" value={order.deliveryDate} />
                   </div>
                 </div>
-                <Separator />
-                <Button className='w-full'>Aprobar Orden</Button>
-                <Button variant='destructive' className='w-full'>Rechazar Orden</Button>
               </CardContent>
             </Card>
           </div>
