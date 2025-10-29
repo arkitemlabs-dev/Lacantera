@@ -18,6 +18,7 @@ import {
   Download,
   FileText,
   X,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -184,7 +185,7 @@ export default function PagosPage() {
                             disabled={!payment.paymentProof}
                             onClick={() => handleOpenDialog(payment, 'Pago')}
                           >
-                            <Download className="mr-2 h-3 w-3" />
+                            <Eye className="mr-2 h-3 w-3" />
                             Pago
                           </Button>
                         </DialogTrigger>
@@ -195,7 +196,7 @@ export default function PagosPage() {
                             disabled={!payment.paymentComplement}
                              onClick={() => handleOpenDialog(payment, 'Complemento')}
                           >
-                            <Download className="mr-2 h-3 w-3" />
+                            <Eye className="mr-2 h-3 w-3" />
                             Complemento
                           </Button>
                         </DialogTrigger>
