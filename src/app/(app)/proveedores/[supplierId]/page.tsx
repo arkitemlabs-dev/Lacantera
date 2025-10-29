@@ -183,11 +183,11 @@ export default function SupplierProfilePage({
                   <div className="space-y-2">
                     <InfoRow
                       label="Nombre"
-                      value="Lic. Homero Simpson"
+                      value="Lic. Ernesto de la Cruz"
                     />
                     <InfoRow
                       label="Email"
-                      value="h.simpson@example.com"
+                      value="e.delacruz@example.com"
                     />
                      <InfoRow
                       label="Teléfono"
