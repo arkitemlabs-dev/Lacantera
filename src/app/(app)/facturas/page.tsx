@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -197,7 +198,7 @@ export default function FacturasPage() {
                         {invoice.actionable && (
                             <DialogTrigger asChild>
                                 <Button variant="outline" size="sm" onClick={() => handleApproveClick(invoice)}>
-                                    Revisar
+                                    Aprobar
                                 </Button>
                             </DialogTrigger>
                         )}
