@@ -17,8 +17,7 @@ export default function NuevoProveedorPage() {
           <CardHeader>
             <CardTitle>Información del Proveedor</CardTitle>
             <CardDescription>
-              Completa el formulario para registrar un nuevo proveedor. Sube un
-              documento para la verificación de cumplimiento por IA.
+              Completa el formulario para registrar un nuevo proveedor.
             </CardDescription>
           </CardHeader>
           <CardContent>
