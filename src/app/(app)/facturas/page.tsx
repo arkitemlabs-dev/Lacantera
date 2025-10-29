@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Calendar as CalendarIcon, ListFilter, Search } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -39,7 +40,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -98,16 +98,37 @@ export default function FacturasPage() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="relative">
-                <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Rango de Fechas" className="pl-10" />
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button
+                        variant={"outline"}
+                        className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !paymentDate && "text-muted-foreground"
+                        )}
+                        >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {paymentDate ? format(paymentDate, "PPP") : <span>Rango de Fechas</span>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                        <Calendar
+                        mode="single"
+                        selected={paymentDate}
+                        onSelect={setPaymentDate}
+                        initialFocus
+                        />
+                    </PopoverContent>
+                </Popover>
               </div>
               <Select>
                 <SelectTrigger>
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="aprobada">Aprobada</SelectItem>
+                  <SelectItem value="todas">Todas</SelectItem>
                   <SelectItem value="en-revision">En Revisión</SelectItem>
+                  <SelectItem value="aprobada">Aprobada</SelectItem>
                   <SelectItem value="pagada">Pagada</SelectItem>
                   <SelectItem value="rechazada">Rechazada</SelectItem>
                 </SelectContent>
@@ -126,7 +147,7 @@ export default function FacturasPage() {
             </div>
           </CardContent>
           <CardFooter className="justify-end gap-2">
-            <Button variant="ghost">
+            <Button variant="outline">
                 <ListFilter className="mr-2 h-4 w-4" />
                 Limpiar Filtros
             </Button>
@@ -142,6 +163,7 @@ export default function FacturasPage() {
                 <TableHeader>
                     <TableRow>
                     <TableHead>Proveedor</TableHead>
+                    <TableHead>Orden de Compra</TableHead>
                     <TableHead>No. Factura</TableHead>
                     <TableHead>Fecha de Entrada</TableHead>
                     <TableHead>Estado</TableHead>
@@ -153,6 +175,11 @@ export default function FacturasPage() {
                     {invoices.map((invoice) => (
                     <TableRow key={invoice.id}>
                         <TableCell className="font-medium">{invoice.supplierName}</TableCell>
+                        <TableCell>
+                            <Link href={`/ordenes-de-compra/${invoice.purchaseOrderId}`} className="hover:underline text-blue-400">
+                                {invoice.purchaseOrderId}
+                            </Link>
+                        </TableCell>
                         <TableCell>{invoice.invoiceNumber}</TableCell>
                         <TableCell>{invoice.entryDate}</TableCell>
                         <TableCell>
@@ -170,7 +197,7 @@ export default function FacturasPage() {
                         {invoice.actionable && (
                             <DialogTrigger asChild>
                                 <Button variant="outline" size="sm" onClick={() => handleApproveClick(invoice)}>
-                                    Aprobar
+                                    Revisar
                                 </Button>
                             </DialogTrigger>
                         )}
@@ -180,55 +207,84 @@ export default function FacturasPage() {
                 </TableBody>
             </Table>
             {selectedInvoice && (
-              <DialogContent>
+              <DialogContent className="max-w-4xl grid-rows-[auto_1fr_auto]">
                 <DialogHeader>
-                  <DialogTitle>Aprobar Factura: {selectedInvoice.invoiceNumber}</DialogTitle>
+                  <DialogTitle>Revisión de Factura: {selectedInvoice.invoiceNumber}</DialogTitle>
                   <DialogDescription>
-                    Por favor, define la fecha de pago y añade cualquier observación necesaria.
+                    Proveedor: {selectedInvoice.supplierName} | Orden de Compra: {' '}
+                     <Link href={`/ordenes-de-compra/${selectedInvoice.purchaseOrderId}`} className="hover:underline text-blue-400">
+                        {selectedInvoice.purchaseOrderId}
+                    </Link>
                   </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="paymentDate" className="text-right">
-                      Fecha de Pago
-                    </Label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button
-                            variant={"outline"}
-                            className={cn(
-                                "w-[280px] justify-start text-left font-normal",
-                                !paymentDate && "text-muted-foreground"
-                            )}
-                            >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {paymentDate ? format(paymentDate, "PPP") : <span>Selecciona una fecha</span>}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                            <Calendar
-                            mode="single"
-                            selected={paymentDate}
-                            onSelect={setPaymentDate}
-                            initialFocus
-                            />
-                        </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="observations" className="text-right">
-                      Observaciones
-                    </Label>
-                    <Textarea
-                      id="observations"
-                      placeholder="Añade tus observaciones aquí..."
-                      className="col-span-3"
-                    />
-                  </div>
+                <div className="grid md:grid-cols-2 gap-6 overflow-y-auto max-h-[60vh] p-1">
+                    <div className="space-y-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Visualizador de PDF</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="bg-muted h-96 flex items-center justify-center rounded-md">
+                                    <p className="text-muted-foreground">Vista previa del PDF no disponible.</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                             <CardHeader>
+                                <CardTitle>Datos del XML</CardTitle>
+                            </CardHeader>
+                            <CardContent className="text-xs space-y-2">
+                                <p><span className="font-semibold">RFC Emisor:</span> {suppliers.find(s => s.name === selectedInvoice.supplierName)?.taxId}</p>
+                                <p><span className="font-semibold">RFC Receptor:</span> GMS850101ABC</p>
+                                <p><span className="font-semibold">Folio Fiscal (UUID):</span> 5AB7C8-1234-5678-90AB-CDEF12345678</p>
+                                <p><span className="font-semibold">Subtotal:</span> {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(selectedInvoice.amount / 1.16)}</p>
+                                <p><span className="font-semibold">IVA (16%):</span> {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(selectedInvoice.amount - (selectedInvoice.amount / 1.16))}</p>
+                                <p><span className="font-semibold">Total:</span> {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(selectedInvoice.amount)}</p>
+                            </CardContent>
+                        </Card>
+                    </div>
+                     <div className="space-y-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Validaciones Automáticas</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-md">
+                                    <p className="text-sm text-green-200">RFC del emisor coincide</p>
+                                    <span className="text-green-400">✔</span>
+                                </div>
+                                 <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-md">
+                                    <p className="text-sm text-green-200">Monto total coincide con la OC</p>
+                                    <span className="text-green-400">✔</span>
+                                </div>
+                                <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-md">
+                                    <p className="text-sm text-red-200">Conceptos no coinciden</p>
+                                    <span className="text-red-400">✖</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Acciones</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                 <div className="space-y-2">
+                                     <Label htmlFor="rejectionReason">Motivo de Rechazo (si aplica)</Label>
+                                     <Textarea id="rejectionReason" placeholder="Describe el motivo del rechazo..." />
+                                 </div>
+                                  <div className="space-y-2">
+                                     <Label htmlFor="observations">Observaciones Adicionales</Label>
+                                     <Textarea id="observations" placeholder="Añade tus observaciones aquí..." />
+                                 </div>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </div>
                 <DialogFooter>
                   <Button variant="ghost" onClick={handleDialogClose}>Cancelar</Button>
-                  <Button type="submit" onClick={handleDialogClose}>Aprobar y Guardar</Button>
+                  <Button variant="destructive" onClick={handleDialogClose}>Rechazar con Motivo</Button>
+                   <Button variant="outline" onClick={handleDialogClose}>Solicitar Corrección</Button>
+                  <Button type="submit" onClick={handleDialogClose}>Aprobar Factura</Button>
                 </DialogFooter>
               </DialogContent>
             )}

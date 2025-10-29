@@ -24,6 +24,7 @@ export type Invoice = {
   entryDate: string;
   status: 'Aprobada' | 'En Revisión' | 'Rechazada' | 'Pagada';
   actionable: boolean;
+  purchaseOrderId: string;
 };
 
 export type PurchaseOrderStatus = 'Pendiente' | 'Completa' | 'Atrasada' | 'Cancelada';
@@ -44,11 +45,10 @@ export type PurchaseOrder = {
 
 export type Notification = {
   id: number;
-  type: 'warning' | 'success' | 'error' | 'info';
+  type: 'new_supplier' | 'doc_update' | 'invoice_status';
   title: string;
   description: string;
-  time: string;
-  tag: string;
+  date: string;
   read: boolean;
 };
 

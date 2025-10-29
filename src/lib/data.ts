@@ -27,7 +27,7 @@ export const navItems: NavItem[] = [
     icon: ShoppingCart,
   },
   {
-    title: 'Facturas',
+    title: 'Gestion facturas',
     href: '/facturas',
     icon: FileText,
   },
@@ -59,11 +59,11 @@ export const suppliers: Supplier[] = [
 ];
 
 export const invoices: Invoice[] = [
-  { id: 'INV-001', invoiceNumber: 'INV-001', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 25500.00, entryDate: '01/07/2024', status: 'Aprobada', actionable: false },
-  { id: 'INV-002', invoiceNumber: 'INV-002', supplierName: 'Logística Express Mexicana', amount: 12300.50, entryDate: '03/07/2024', status: 'En Revisión', actionable: true },
-  { id: 'INV-003', invoiceNumber: 'INV-003', supplierName: 'Componentes Electrónicos Globales', amount: 8750.00, entryDate: '05/07/2024', status: 'Pagada', actionable: false },
-  { id: 'INV-004', invoiceNumber: 'INV-004', supplierName: 'Arrendamientos y Maquinaria Pesada', amount: 4200.00, entryDate: '06/07/2024', status: 'Rechazada', actionable: false },
-  { id: 'INV-005', invoiceNumber: 'INV-005', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 31000.00, entryDate: '08/07/2024', status: 'En Revisión', actionable: true },
+  { id: 'INV-001', purchaseOrderId: 'OC-128', invoiceNumber: 'INV-001', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 25500.00, entryDate: '01/07/2024', status: 'Aprobada', actionable: false },
+  { id: 'INV-002', purchaseOrderId: 'OC-127', invoiceNumber: 'INV-002', supplierName: 'Logística Express Mexicana', amount: 12300.50, entryDate: '03/07/2024', status: 'En Revisión', actionable: true },
+  { id: 'INV-003', purchaseOrderId: 'OC-126', invoiceNumber: 'INV-003', supplierName: 'Componentes Electrónicos Globales', amount: 8750.00, entryDate: '05/07/2024', status: 'Pagada', actionable: false },
+  { id: 'INV-004', purchaseOrderId: 'OC-125', invoiceNumber: 'INV-004', supplierName: 'Arrendamientos y Maquinaria Pesada', amount: 4200.00, entryDate: '06/07/2024', status: 'Rechazada', actionable: false },
+  { id: 'INV-005', purchaseOrderId: 'OC-124', invoiceNumber: 'INV-005', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 31000.00, entryDate: '08/07/2024', status: 'En Revisión', actionable: true },
 ];
 
 export const purchaseOrders: PurchaseOrder[] = [
@@ -77,51 +77,26 @@ export const purchaseOrders: PurchaseOrder[] = [
 export const notifications: Notification[] = [
     {
       id: 1,
-      type: 'warning',
-      title: 'Documento por vencer',
-      description:
-        'Estimado PROV-001, uno de sus documentos está próximo a vencer. Por favor, revise la sección de documentos para más detalles.',
-      time: 'Hace 5 minutos',
-      tag: 'Documento por vencer',
+      type: 'new_supplier',
+      title: 'Nuevo proveedor registrado',
+      description: 'El proveedor "Aceros del Norte" ha completado su registro.',
+      date: 'Hace 5 minutos',
       read: false,
     },
     {
       id: 2,
-      type: 'success',
-      title: 'Pago Aplicado',
-      description: 'Se ha aplicado un pago a su cuenta de proveedor PROV-001.',
-      time: 'Hace 20 minutos',
-      tag: 'Pago aplicado',
+      type: 'doc_update',
+      title: 'Documento actualizado',
+      description: '"Logística Express" ha subido su constancia fiscal actualizada.',
+      date: 'Hace 20 minutos',
       read: false,
     },
     {
       id: 3,
-      type: 'error',
-      title: 'Factura Rechazada - ID PROV-001',
-      description:
-        'Su factura ha sido rechazada. Por favor, revise los detalles en el portal y realice las correcciones necesarias para PROV-001.',
-      time: 'Hace 35 minutos',
-      tag: 'Factura rechazada',
-      read: true,
-    },
-    {
-      id: 4,
-      type: 'info',
-      title: 'Nueva Alerta Automática',
-      description:
-        'Se ha generado una nueva alerta automática para PROV-001. Revise su portal de proveedor para más detalles.',
-      time: 'Hace 50 minutos',
-      tag: 'Alerta automática',
-      read: true,
-    },
-    {
-      id: 5,
-      type: 'warning',
-      title: 'Próximo vencimiento de documento',
-      description:
-        'Tu documento está próximo a vencer. Por favor, revisa tus documentos en el portal para evitar interrupciones en tus operaciones.',
-      time: 'Hace 65 minutos',
-      tag: 'Documento por vencer',
+      type: 'invoice_status',
+      title: 'Factura Aprobada',
+      description: 'La factura #INV-001 por $25,500.00 ha sido aprobada para pago.',
+      date: 'Hace 1 hora',
       read: true,
     },
   ];
