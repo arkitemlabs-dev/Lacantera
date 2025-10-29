@@ -135,7 +135,7 @@ export default function ProveedoresPage() {
                   <TableHead>Tipo</TableHead>
                   <TableHead>Fecha de Registro</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead>
+                  <TableHead className="text-right">
                     <span className="sr-only">Acciones</span>
                   </TableHead>
                 </TableRow>
@@ -156,32 +156,34 @@ export default function ProveedoresPage() {
                         {statusText[supplier.status]}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            aria-haspopup="true"
-                            size="icon"
-                            variant="ghost"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                           <DropdownMenuItem asChild>
-                             <Link href={`/proveedores/${supplier.id}`} className='flex items-center'>
-                               <Eye className="mr-2 h-4 w-4" />
-                               Ver Detalles
-                             </Link>
-                           </DropdownMenuItem>
-                          <DropdownMenuItem>Editar</DropdownMenuItem>
-                          <DropdownMenuItem>
-                            {supplier.status === 'active' ? 'Desactivar' : 'Activar'}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button asChild variant="ghost" size="icon">
+                           <Link href={`/proveedores/${supplier.id}`}>
+                             <Eye className="h-4 w-4" />
+                             <span className="sr-only">Ver Detalles</span>
+                           </Link>
+                         </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              aria-haspopup="true"
+                              size="icon"
+                              variant="ghost"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Toggle menu</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                            <DropdownMenuItem>Editar</DropdownMenuItem>
+                            <DropdownMenuItem>
+                              {supplier.status === 'active' ? 'Desactivar' : 'Activar'}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
