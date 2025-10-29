@@ -26,6 +26,22 @@ export type Invoice = {
   actionable: boolean;
 };
 
+export type PurchaseOrderStatus = 'Pendiente' | 'Completa' | 'Atrasada' | 'Cancelada';
+
+export type PurchaseOrder = {
+  id: string;
+  name: string;
+  supplierName: string;
+  emissionDate: string;
+  status: PurchaseOrderStatus;
+  amount: number;
+  deliveryDate: string;
+  area: string;
+  invoice?: string;
+  createdBy: string;
+  budget: number;
+};
+
 export type Notification = {
   id: number;
   type: 'warning' | 'success' | 'error' | 'info';

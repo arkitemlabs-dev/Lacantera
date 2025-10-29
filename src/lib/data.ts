@@ -1,4 +1,4 @@
-import type { Supplier, Invoice, Notification, NavItem } from '@/lib/types';
+import type { Supplier, Invoice, Notification, NavItem, PurchaseOrder } from '@/lib/types';
 import {
   Home,
   Users,
@@ -7,6 +7,7 @@ import {
   Bell,
   Settings,
   Building,
+  ShoppingCart,
 } from 'lucide-react';
 
 export const navItems: NavItem[] = [
@@ -19,6 +20,11 @@ export const navItems: NavItem[] = [
     title: 'Gestión de proveedores',
     href: '/proveedores',
     icon: Users,
+  },
+  {
+    title: 'Órdenes de Compra',
+    href: '/ordenes-de-compra',
+    icon: ShoppingCart,
   },
   {
     title: 'Facturas',
@@ -59,6 +65,14 @@ export const invoices: Invoice[] = [
   { id: 'INV-004', invoiceNumber: 'INV-004', supplierName: 'Arrendamientos y Maquinaria Pesada', amount: 4200.00, entryDate: '06/07/2024', status: 'Rechazada', actionable: false },
   { id: 'INV-005', invoiceNumber: 'INV-005', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 31000.00, entryDate: '08/07/2024', status: 'En Revisión', actionable: true },
 ];
+
+export const purchaseOrders: PurchaseOrder[] = [
+    { id: 'OC-128', name: 'Material de oficina', supplierName: 'Aceros del Norte S.A. de C.V.', emissionDate: '2024-07-20', status: 'Pendiente', amount: 1500.00, deliveryDate: '2024-07-30', area: 'Administración', invoice: undefined, createdBy: 'Ana Lopez', budget: 2000 },
+    { id: 'OC-127', name: 'Equipo de seguridad', supplierName: 'Logística Express Mexicana', emissionDate: '2024-07-18', status: 'Completa', amount: 8500.50, deliveryDate: '2024-07-25', area: 'Operaciones', invoice: 'INV-005', createdBy: 'Carlos Vera', budget: 10000 },
+    { id: 'OC-126', name: 'Refacciones para maquinaria', supplierName: 'Componentes Electrónicos Globales', emissionDate: '2024-07-15', status: 'Atrasada', amount: 25000.00, deliveryDate: '2024-07-22', area: 'Mantenimiento', invoice: undefined, createdBy: 'Maria Garcia', budget: 25000 },
+    { id: 'OC-125', name: 'Servicio de catering', supplierName: 'Servicios de Consultoría Integral', emissionDate: '2024-07-12', status: 'Cancelada', amount: 5000.00, deliveryDate: '2024-07-14', area: 'Eventos', invoice: undefined, createdBy: 'Juan Pérez', budget: 5000 },
+    { id: 'OC-124', name: 'Herramientas manuales', supplierName: 'Suministros Industriales de la Costa', emissionDate: '2024-07-10', status: 'Completa', amount: 3200.75, deliveryDate: '2024-07-18', area: 'Taller', invoice: 'INV-004', createdBy: 'Pedro Gomez', budget: 4000 },
+]
 
 export const notifications: Notification[] = [
     {
