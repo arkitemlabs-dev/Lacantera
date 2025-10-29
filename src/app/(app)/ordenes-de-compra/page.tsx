@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -82,18 +83,6 @@ export default function OrdenesDeCompraPage() {
             <p className="text-muted-foreground">
               Consulte y gestione todas sus órdenes de compra.
             </p>
-          </div>
-          <div className="flex gap-2">
-            <Button asChild size="sm" className="gap-1">
-              <Link href="/ordenes-de-compra/nueva">
-                <PlusCircle className="h-4 w-4" />
-                Nueva Orden
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" className="gap-1">
-              <FileDown className="h-4 w-4" />
-              Descargar Reporte
-            </Button>
           </div>
         </div>
 
