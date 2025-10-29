@@ -35,17 +35,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
-const statusVariant: Record<
+const statusStyles: Record<
   SupplierStatus,
-  'default' | 'destructive' | 'secondary' | 'outline'
+  { variant: 'default' | 'destructive' | 'secondary' | 'outline', className: string }
 > = {
-  active: 'default',
-  inactive: 'destructive',
-  pending: 'secondary',
-  attention: 'destructive',
-  review: 'outline',
+  active: { variant: 'default', className: 'bg-green-500/20 text-green-200 border-green-500/30 hover:bg-green-500/30' },
+  inactive: { variant: 'destructive', className: 'bg-red-500/20 text-red-200 border-red-500/30 hover:bg-red-500/30' },
+  pending: { variant: 'secondary', className: '' },
+  attention: { variant: 'destructive', className: 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30 hover:bg-yellow-500/30' },
+  review: { variant: 'outline', className: 'bg-blue-500/20 text-blue-200 border-blue-500/30 hover:bg-blue-500/30' },
 };
+
 
 const statusText: Record<SupplierStatus, string> = {
   active: 'Activo',
@@ -145,7 +147,7 @@ export default function ProveedoresPage() {
                     <TableCell>{typeText[supplier.type]}</TableCell>
                     <TableCell>{supplier.registrationDate}</TableCell>
                     <TableCell>
-                      <Badge variant={statusVariant[supplier.status]}>
+                      <Badge variant={statusStyles[supplier.status].variant} className={cn(statusStyles[supplier.status].className)}>
                         {statusText[supplier.status]}
                       </Badge>
                     </TableCell>
