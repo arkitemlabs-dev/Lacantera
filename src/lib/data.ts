@@ -43,19 +43,20 @@ export const navItems: NavItem[] = [
 ];
 
 export const suppliers: Supplier[] = [
-  { id: '1', name: 'Aceros del Norte S.A. de C.V.', contactName: 'Juan Pérez', contactEmail: 'contacto@acerosnorte.com', status: 'active', registrationDate: '15/01/2023', spent: 120500, trend: 12 },
-  { id: '2', name: 'Logística Express Mexicana', contactName: 'Maria Garcia', contactEmail: 'ventas@materialesabc.com', status: 'active', registrationDate: '22/03/2023', spent: 75000, trend: -5 },
-  { id: '3', name: 'Componentes Electrónicos Globales', contactName: 'Carlos López', contactEmail: 'info@constructorarapida.dev', status: 'inactive', registrationDate: '01/06/2023', spent: 250000, trend: 8 },
-  { id: '4', name: 'Plásticos Industriales del Sureste', contactName: 'Ana Martinez', contactEmail: 'soporte@lallave.com', status: 'active', registrationDate: '19/08/2023', spent: 45000, trend: 20 },
-  { id: '5', name: 'Suministros Industriales de la Costa', contactName: 'Laura Sanchez', contactEmail: 'laura.s@suministros.com', status: 'attention', registrationDate: '05/02/2024', spent: 0, trend: 0 },
-  { id: '6', name: 'Transportes Rápidos del Sur', contactName: 'Miguel Hernandez', contactEmail: 'miguel.h@transportes.com', status: 'pending', registrationDate: '12/03/2024', spent: 0, trend: 0 },
+  { id: '1', name: 'Aceros del Norte S.A. de C.V.', taxId: 'ANO010203XYZ', contactName: 'Juan Pérez', contactEmail: 'contacto@acerosnorte.com', status: 'active', type: 'supplies', registrationDate: '15/01/2023', spent: 120500, trend: 12 },
+  { id: '2', name: 'Logística Express Mexicana', taxId: 'LEM040506ABC', contactName: 'Maria Garcia', contactEmail: 'ventas@materialesabc.com', status: 'active', type: 'transport', registrationDate: '22/03/2023', spent: 75000, trend: -5 },
+  { id: '3', name: 'Componentes Electrónicos Globales', taxId: 'CEG070809DEF', contactName: 'Carlos López', contactEmail: 'info@constructorarapida.dev', status: 'inactive', type: 'supplies', registrationDate: '01/06/2023', spent: 250000, trend: 8 },
+  { id: '4', name: 'Arrendamientos y Maquinaria Pesada', taxId: 'AMP101112GHI', contactName: 'Ana Martinez', contactEmail: 'soporte@lallave.com', status: 'active', type: 'leasing', registrationDate: '19/08/2023', spent: 45000, trend: 20 },
+  { id: '5', name: 'Servicios de Consultoría Integral', taxId: 'SCI131415JKL', contactName: 'Laura Sanchez', contactEmail: 'laura.s@suministros.com', status: 'attention', type: 'services', registrationDate: '05/02/2024', spent: 0, trend: 0 },
+  { id: '6', name: 'Transportes Rápidos del Sur', taxId: 'TRS161718MNO', contactName: 'Miguel Hernandez', contactEmail: 'miguel.h@transportes.com', status: 'pending', type: 'transport', registrationDate: '12/03/2024', spent: 0, trend: 0 },
+  { id: '7', name: 'Suministros Industriales de la Costa', taxId: 'SIC192021PQR', contactName: 'Elena Gómez', contactEmail: 'elena.g@sicosta.com', status: 'review', type: 'supplies', registrationDate: '25/04/2024', spent: 0, trend: 0 },
 ];
 
 export const invoices: Invoice[] = [
   { id: 'INV-001', invoiceNumber: 'INV-001', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 25500.00, entryDate: '01/07/2024', status: 'Aprobada', actionable: false },
   { id: 'INV-002', invoiceNumber: 'INV-002', supplierName: 'Logística Express Mexicana', amount: 12300.50, entryDate: '03/07/2024', status: 'En Revisión', actionable: true },
   { id: 'INV-003', invoiceNumber: 'INV-003', supplierName: 'Componentes Electrónicos Globales', amount: 8750.00, entryDate: '05/07/2024', status: 'Pagada', actionable: false },
-  { id: 'INV-004', invoiceNumber: 'INV-004', supplierName: 'Plásticos Industriales del Sureste', amount: 4200.00, entryDate: '06/07/2024', status: 'Rechazada', actionable: false },
+  { id: 'INV-004', invoiceNumber: 'INV-004', supplierName: 'Arrendamientos y Maquinaria Pesada', amount: 4200.00, entryDate: '06/07/2024', status: 'Rechazada', actionable: false },
   { id: 'INV-005', invoiceNumber: 'INV-005', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 31000.00, entryDate: '08/07/2024', status: 'En Revisión', actionable: true },
 ];
 

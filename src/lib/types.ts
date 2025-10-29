@@ -1,11 +1,16 @@
 import type { LucideIcon } from 'lucide-react';
 
+export type SupplierStatus = 'active' | 'pending' | 'attention' | 'inactive' | 'review';
+export type SupplierType = 'supplies' | 'services' | 'leasing' | 'transport';
+
 export type Supplier = {
   id: string;
   name: string;
+  taxId: string;
   contactEmail: string;
   contactName?: string;
-  status: 'active' | 'pending' | 'attention' | 'inactive';
+  status: SupplierStatus;
+  type: SupplierType;
   registrationDate: string;
   spent: number;
   trend: number;

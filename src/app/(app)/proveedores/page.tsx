@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { MoreHorizontal, PlusCircle, Search } from 'lucide-react';
 import { suppliers } from '@/lib/data';
+import type { SupplierStatus } from '@/lib/types';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,19 +36,31 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-const statusVariant = {
+const statusVariant: Record<
+  SupplierStatus,
+  'default' | 'destructive' | 'secondary' | 'outline'
+> = {
   active: 'default',
   inactive: 'destructive',
   pending: 'secondary',
   attention: 'destructive',
-} as const;
+  review: 'outline',
+};
 
-const statusText = {
-    active: 'Activo',
-    inactive: 'Inactivo',
-    pending: 'Pendiente',
-    attention: 'Atención'
-}
+const statusText: Record<SupplierStatus, string> = {
+  active: 'Activo',
+  inactive: 'Inactivo',
+  pending: 'Pendiente',
+  attention: 'Atención',
+  review: 'En revisión',
+};
+
+const typeText = {
+  supplies: 'Suministros',
+  services: 'Servicios',
+  leasing: 'Arrendamiento',
+  transport: 'Transporte',
+};
 
 export default function ProveedoresPage() {
   return (
@@ -71,14 +84,16 @@ export default function ProveedoresPage() {
         <Card>
           <CardHeader>
             <CardTitle>Filtrar Proveedores</CardTitle>
-            <CardDescription>Refine su búsqueda de proveedores.</CardDescription>
-            <div className="mt-4 flex items-center gap-4">
+            <CardDescription>
+              Refine su búsqueda de proveedores.
+            </CardDescription>
+            <div className="mt-4 flex flex-wrap items-center gap-4">
               <Input
                 placeholder="Buscar por nombre o RFC..."
                 className="max-w-xs"
               />
               <Select>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full md:w-[180px]">
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
@@ -87,6 +102,19 @@ export default function ProveedoresPage() {
                   <SelectItem value="inactive">Inactivo</SelectItem>
                   <SelectItem value="pending">Pendiente</SelectItem>
                   <SelectItem value="attention">Requiere Atención</SelectItem>
+                  <SelectItem value="review">En revisión</SelectItem>
+                </SelectContent>
+              </Select>
+               <Select>
+                <SelectTrigger className="w-full md:w-[180px]">
+                  <SelectValue placeholder="Tipo de proveedor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="supplies">Suministros</SelectItem>
+                  <SelectItem value="services">Servicios</SelectItem>
+                  <SelectItem value="leasing">Arrendamiento</SelectItem>
+                  <SelectItem value="transport">Transporte</SelectItem>
                 </SelectContent>
               </Select>
               <Button>
@@ -101,6 +129,7 @@ export default function ProveedoresPage() {
                 <TableRow>
                   <TableHead>Nombre del Proveedor</TableHead>
                   <TableHead>Contacto</TableHead>
+                  <TableHead>Tipo</TableHead>
                   <TableHead>Fecha de Registro</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>
@@ -115,6 +144,7 @@ export default function ProveedoresPage() {
                       {supplier.name}
                     </TableCell>
                     <TableCell>{supplier.contactName}</TableCell>
+                    <TableCell>{typeText[supplier.type]}</TableCell>
                     <TableCell>{supplier.registrationDate}</TableCell>
                     <TableCell>
                       <Badge variant={statusVariant[supplier.status]}>
@@ -137,7 +167,9 @@ export default function ProveedoresPage() {
                           <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                           <DropdownMenuItem>Ver Detalles</DropdownMenuItem>
                           <DropdownMenuItem>Editar</DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-500">Eliminar</DropdownMenuItem>
+                          <DropdownMenuItem>
+                            {supplier.status === 'active' ? 'Desactivar' : 'Activar'}
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
