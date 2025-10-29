@@ -9,7 +9,6 @@ import {
   FileClock,
   FilePlus2,
   Ticket,
-  TrendingUp,
 } from 'lucide-react';
 
 export function KpiCards() {
@@ -34,15 +33,10 @@ export function KpiCards() {
       value: '5',
       icon: <Ticket className="h-6 w-6 text-muted-foreground" />,
     },
-    {
-      title: 'Desempeño General',
-      value: '+2.5%',
-      icon: <TrendingUp className="h-6 w-6 text-muted-foreground" />,
-    },
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {kpis.map((kpi) => (
         <Card key={kpi.title}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

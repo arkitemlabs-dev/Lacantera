@@ -1,8 +1,7 @@
 import { KpiCards } from '@/components/dashboard/kpi-cards';
-import { SupplierPerformance } from '@/components/dashboard/supplier-performance';
-import { SpendingChart } from '@/components/dashboard/spending-chart';
+import { SupplierInvoicingChart } from '@/components/dashboard/supplier-invoicing-chart';
 import { RecentActivity } from '@/components/dashboard/recent-activity';
-import { CriticalAlerts } from '@/components/dashboard/critical-alerts';
+import { AttentionSuppliers } from '@/components/dashboard/attention-suppliers';
 
 export default function DashboardPage() {
   return (
@@ -12,12 +11,11 @@ export default function DashboardPage() {
         <KpiCards />
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-7 lg:gap-8">
           <div className="lg:col-span-4 flex flex-col gap-8">
-            <SupplierPerformance />
-            <RecentActivity />
+             <SupplierInvoicingChart />
+             <RecentActivity />
           </div>
           <div className="lg:col-span-3 flex flex-col gap-8">
-            <SpendingChart />
-            <CriticalAlerts />
+            <AttentionSuppliers />
           </div>
         </div>
       </div>
