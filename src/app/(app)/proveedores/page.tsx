@@ -100,9 +100,6 @@ export default function ProveedoresPage() {
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="active">Activo</SelectItem>
                   <SelectItem value="inactive">Inactivo</SelectItem>
-                  <SelectItem value="pending">Pendiente</SelectItem>
-                  <SelectItem value="attention">Requiere Atención</SelectItem>
-                  <SelectItem value="review">En revisión</SelectItem>
                 </SelectContent>
               </Select>
                <Select>
