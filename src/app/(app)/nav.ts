@@ -26,7 +26,7 @@ export const navItems = [
     icon: ShoppingCart,
   },
   {
-    title: 'Gestion facturas',
+    title: 'Facturación',
     href: '/facturas',
     icon: FileText,
   },
