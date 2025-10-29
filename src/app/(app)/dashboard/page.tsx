@@ -1,3 +1,4 @@
+
 import { KpiCards } from '@/components/dashboard/kpi-cards';
 import { SupplierInvoicingChart } from '@/components/dashboard/supplier-invoicing-chart';
 import { RecentActivity } from '@/components/dashboard/recent-activity';
@@ -12,12 +13,16 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-7 lg:gap-8">
           <div className="lg:col-span-4 flex flex-col gap-8">
              <SupplierInvoicingChart />
-             <RecentActivity />
           </div>
           <div className="lg:col-span-3 flex flex-col gap-8">
             <AttentionSuppliers />
           </div>
         </div>
+         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-7 lg:gap-8">
+           <div className="lg:col-span-7">
+              <RecentActivity />
+           </div>
+         </div>
       </div>
     </>
   );

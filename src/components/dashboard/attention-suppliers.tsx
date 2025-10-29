@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import { suppliers } from '@/lib/data';
@@ -64,6 +65,11 @@ export function AttentionSuppliers() {
                       supplier.status === 'attention'
                         ? 'destructive'
                         : 'outline'
+                    }
+                    className={
+                      supplier.status === 'attention'
+                        ? 'bg-red-500/20 text-red-200 border-red-500/30'
+                        : 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30'
                     }
                   >
                     {supplier.status === 'attention' ? 'Atención' : 'En revisión'}
