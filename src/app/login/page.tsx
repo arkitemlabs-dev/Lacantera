@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -19,15 +20,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, User } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export default function LoginPage() {
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [userType, setUserType] = useState('admin');
   const logo = PlaceHolderImages.find((img) => img.id === 'login-logo');
   const bgImage = PlaceHolderImages.find((img) => img.id === 'login-background');
+
+  const dashboardUrl = userType === 'admin' ? '/dashboard' : '/proveedores/dashboard';
 
   return (
     <div className="relative flex items-center justify-center min-h-screen bg-background">
@@ -63,13 +67,24 @@ export default function LoginPage() {
         <CardContent>
           <form className="space-y-4">
             <div className="space-y-2">
+                <Label htmlFor="userType">Tipo de Usuario</Label>
+                <Select value={userType} onValueChange={setUserType}>
+                    <SelectTrigger id="userType">
+                        <SelectValue placeholder="Seleccione un tipo de usuario" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="admin">Administrador</SelectItem>
+                        <SelectItem value="supplier">Proveedor</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="email">Email / Usuario</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="shirley.h@proveedor.com"
+                placeholder={userType === 'admin' ? "admin@lacantora.com" : "contacto@proveedor.com"}
                 required
-                defaultValue="shirley.h@proveedor.com"
               />
             </div>
             <div className="space-y-2">
@@ -116,7 +131,7 @@ export default function LoginPage() {
               </Link>
             </div>
             <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 asChild">
-                <Link href="/dashboard">
+                <Link href={dashboardUrl}>
                     Iniciar sesión
                 </Link>
             </Button>
