@@ -1,4 +1,6 @@
 
+'use client';
+
 import {
   Bell,
   FileCheck2,
@@ -11,6 +13,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 import { notifications } from '@/lib/data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
@@ -40,6 +43,10 @@ const notificationIcons = {
 
 export function UserNav() {
   const userAvatar = PlaceHolderImages.find((img) => img.id === 'user-avatar-1');
+  const pathname = usePathname();
+  const isProviderPortal = pathname.startsWith('/proveedores');
+  const notificationsLink = isProviderPortal ? '/proveedores/notificaciones' : '/notificaciones';
+
   return (
     <div className="flex items-center gap-4">
       <Popover>
@@ -78,7 +85,7 @@ export function UserNav() {
           <Separator />
           <div className="p-2">
             <Button size="sm" className="w-full" asChild>
-              <Link href="/notificaciones">Ver todas las notificaciones</Link>
+              <Link href={notificationsLink}>Ver todas las notificaciones</Link>
             </Button>
           </div>
         </PopoverContent>
