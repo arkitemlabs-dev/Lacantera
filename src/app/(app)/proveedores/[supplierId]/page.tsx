@@ -45,8 +45,11 @@ type Document = {
 
 const allDocs: Document[] = [
     { name: 'Poder notarial del representante legal', status: 'aprobado', date: '2024-07-15', types: ['supplies', 'services', 'leasing', 'transport'] },
+    { name: 'Constancia de Situación Fiscal (vigencia semestral)', status: 'vencido', date: '2024-01-15', types: ['supplies', 'services', 'leasing', 'transport'] },
     { name: 'Opinión de cumplimiento positiva del SAT (vigencia mensual)', status: 'pendiente', date: null, types: ['supplies', 'services', 'leasing', 'transport'] },
+    { name: 'Identificación Oficial del Representante', status: 'aprobado', date: '2024-07-20', types: ['supplies', 'services', 'leasing', 'transport'] },
     { name: 'Acta constitutiva y sus modificaciones', status: 'aprobado', date: '2023-01-20', types: ['supplies', 'services', 'leasing', 'transport'] },
+    { name: 'Comprobante de domicilio fiscal (no mayor a 3 meses)', status: 'aprobado', date: '2024-06-01', types: ['supplies', 'services', 'leasing', 'transport'] },
     { name: 'Carátula del estado de cuenta bancaria (preferentemente del nombre del titular coincidente)', status: 'rechazado', date: '2024-07-10', types: ['supplies', 'services', 'leasing', 'transport'] },
     { name: 'Fotografía a color del exterior del domicilio fiscal/comercial', status: 'vencido', date: '2024-06-30', types: ['supplies', 'services', 'leasing', 'transport'] },
     { name: 'Referencias comerciales', status: 'aprobado', date: '2024-07-18', types: ['supplies', 'services', 'leasing', 'transport'] },
