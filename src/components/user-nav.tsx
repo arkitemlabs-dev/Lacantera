@@ -9,6 +9,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 
 import { notifications } from '@/lib/data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
@@ -122,10 +123,12 @@ export function UserNav() {
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>
-            <LogOut className="mr-2" />
-            <span>Cerrar Sesión</span>
-          </DropdownMenuItem>
+          <Link href="/login">
+             <DropdownMenuItem>
+                <LogOut className="mr-2" />
+                <span>Cerrar Sesión</span>
+             </DropdownMenuItem>
+          </Link>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
