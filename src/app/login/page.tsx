@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -30,8 +31,13 @@ export default function LoginPage() {
   const [userType, setUserType] = useState('admin');
   const logo = PlaceHolderImages.find((img) => img.id === 'login-logo');
   const bgImage = PlaceHolderImages.find((img) => img.id === 'login-background');
+  const router = useRouter();
 
-  const dashboardUrl = userType === 'admin' ? '/dashboard' : '/proveedores/dashboard';
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const dashboardUrl = userType === 'admin' ? '/dashboard' : '/proveedores/dashboard';
+    router.push(dashboardUrl);
+  };
 
   return (
     <div className="relative flex items-center justify-center min-h-screen bg-background">
@@ -39,7 +45,7 @@ export default function LoginPage() {
         <Image
           src={bgImage.imageUrl}
           alt={bgImage.description}
-          layout="fill"
+          fill
           objectFit="cover"
           className="absolute inset-0 z-0"
           data-ai-hint={bgImage.imageHint}
@@ -65,7 +71,7 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4">
+          <form className="space-y-4" onSubmit={handleLogin}>
             <div className="space-y-2">
                 <Label htmlFor="userType">Tipo de Usuario</Label>
                 <Select value={userType} onValueChange={setUserType}>
@@ -130,10 +136,8 @@ export default function LoginPage() {
                 ¿Olvidó su contraseña?
               </Link>
             </div>
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 asChild">
-                <Link href={dashboardUrl}>
-                    Iniciar sesión
-                </Link>
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
+                Iniciar sesión
             </Button>
             <div className="mt-4 text-center text-sm">
                 ¿Nuevo usuario? Registrar como:
