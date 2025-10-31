@@ -126,8 +126,8 @@ export default function LoginPage() {
                     <Button variant="outline" className="w-full" asChild>
                        <Link href="/proveedores/registro">Proveedor</Link>
                     </Button>
-                    <Button variant="outline" className="w-full">
-                        Administrador
+                    <Button variant="outline" className="w-full" asChild>
+                        <Link href="/admin/registro">Administrador</Link>
                     </Button>
                 </div>
             </div>
