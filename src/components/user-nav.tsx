@@ -1,3 +1,4 @@
+
 import {
   Bell,
   FileCheck2,
@@ -76,7 +77,9 @@ export function UserNav() {
           </div>
           <Separator />
           <div className="p-2">
-            <Button size="sm" className="w-full">Ver todas las notificaciones</Button>
+            <Button size="sm" className="w-full" asChild>
+              <Link href="/notificaciones">Ver todas las notificaciones</Link>
+            </Button>
           </div>
         </PopoverContent>
       </Popover>
