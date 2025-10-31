@@ -31,9 +31,7 @@ const navItems = [
 ];
 
 const LaCanteraLogo = () => {
-    const logo = PlaceHolderImages.find((img) => img.id === 'login-logo');
-    if (!logo) return <Building className="h-8 w-8 text-primary" />;
-    return <Image src={logo.imageUrl} alt="La Cantera Logo" width={32} height={32} data-ai-hint={logo.imageHint} />;
+    return <Building className="h-8 w-8 text-primary" />;
 };
 
 export function Nav() {
@@ -89,4 +87,3 @@ export function Nav() {
     </Sidebar>
   );
 }
-
