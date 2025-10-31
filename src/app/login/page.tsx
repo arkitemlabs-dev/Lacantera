@@ -123,8 +123,8 @@ export default function LoginPage() {
             <div className="mt-4 text-center text-sm">
                 ¿Nuevo usuario? Registrar como:
                 <div className="grid grid-cols-2 gap-2 mt-2">
-                    <Button variant="outline" className="w-full">
-                        Proveedor
+                    <Button variant="outline" className="w-full" asChild>
+                       <Link href="/proveedores/registro">Proveedor</Link>
                     </Button>
                     <Button variant="outline" className="w-full">
                         Administrador
