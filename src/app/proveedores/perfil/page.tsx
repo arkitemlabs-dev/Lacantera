@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,10 +31,12 @@ const InfoField = ({
   label,
   value,
   placeholder,
+  disabled,
 }: {
   label: string;
   value?: string;
   placeholder?: string;
+  disabled?: boolean;
 }) => (
   <div className="space-y-1">
     <Label htmlFor={label.toLowerCase()}>{label}</Label>
@@ -43,6 +45,7 @@ const InfoField = ({
       defaultValue={value}
       placeholder={placeholder}
       className="bg-background/40 border-border/60"
+      disabled={disabled}
     />
   </div>
 );
@@ -96,6 +99,7 @@ export default function PerfilProveedorPage() {
     userAvatar?.imageUrl || null
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -106,6 +110,20 @@ export default function PerfilProveedorPage() {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleSave = () => {
+    // Here you would typically save the form data
+    setIsEditing(false);
+  };
+
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleCancel = () => {
+    // Optionally reset form data to initial state here
+    setIsEditing(false);
   };
 
   return (
@@ -127,8 +145,8 @@ export default function PerfilProveedorPage() {
         <CardContent className="space-y-8">
           <div className="flex items-center gap-6">
             <div
-              className="relative group cursor-pointer"
-              onClick={() => fileInputRef.current?.click()}
+              className={cn("relative group", isEditing && "cursor-pointer")}
+              onClick={() => isEditing && fileInputRef.current?.click()}
             >
               <Avatar className="h-24 w-24">
                 {avatarPreview && (
@@ -142,41 +160,52 @@ export default function PerfilProveedorPage() {
                 )}
                 <AvatarFallback>SH</AvatarFallback>
               </Avatar>
-              <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <Camera className="h-8 w-8 text-white" />
-              </div>
+              {isEditing && (
+                <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Camera className="h-8 w-8 text-white" />
+                </div>
+              )}
               <Input
                 type="file"
                 ref={fileInputRef}
                 className="hidden"
                 accept="image/*"
                 onChange={handleAvatarChange}
+                disabled={!isEditing}
               />
             </div>
             <div className="grid flex-1 gap-6 md:grid-cols-2">
-              <InfoField label="Nombre" value="Shirley Hendricks" />
+              <InfoField label="Nombre" value="Shirley Hendricks" disabled={!isEditing} />
               <InfoField
                 label="Razón Social"
                 value="Soluciones Industriales SH S.A. de C.V."
+                disabled={!isEditing}
               />
-              <InfoField label="RFC" value="SISH890101ABC" />
-              <InfoField label="Email" value="shirley.h@proveedor.com" />
+              <InfoField label="RFC" value="SISH890101ABC" disabled={!isEditing} />
+              <InfoField label="Email" value="shirley.h@proveedor.com" disabled={!isEditing} />
             </div>
           </div>
           <div className="grid gap-6 md:grid-cols-2">
-            <InfoField label="Dirección" value="Av. Siempre Viva 742, Springfield" />
-            <InfoField label="Teléfono" value="55 1234 5678" />
+            <InfoField label="Dirección" value="Av. Siempre Viva 742, Springfield" disabled={!isEditing} />
+            <InfoField label="Teléfono" value="55 1234 5678" disabled={!isEditing} />
           </div>
            <div className="grid gap-6 md:grid-cols-2">
-             <InfoField label="Representante" value="Shirley Hendricks" />
+             <InfoField label="Representante" value="Shirley Hendricks" disabled={!isEditing} />
           </div>
           <div className="grid gap-6 md:grid-cols-3">
-            <InfoField label="Banco" value="BBVA Bancomer" />
-            <InfoField label="CLABE" value="012180012345678901" />
-            <InfoField label="Número de cuenta" value="0123456789" />
+            <InfoField label="Banco" value="BBVA Bancomer" disabled={!isEditing} />
+            <InfoField label="CLABE" value="012180012345678901" disabled={!isEditing} />
+            <InfoField label="Número de cuenta" value="0123456789" disabled={!isEditing} />
           </div>
-          <div className="flex justify-end">
-            <Button>Guardar cambios</Button>
+          <div className="flex justify-end gap-2">
+            {isEditing ? (
+              <>
+                <Button variant="outline" onClick={handleCancel}>Cancelar</Button>
+                <Button onClick={handleSave}>Guardar cambios</Button>
+              </>
+            ) : (
+              <Button onClick={handleEdit}>Editar</Button>
+            )}
           </div>
         </CardContent>
       </Card>
