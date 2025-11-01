@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/table';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
-import { Eye, Upload, Camera, FileCheck, FileClock, FileX, FileQuestion } from 'lucide-react';
+import { Eye, Upload, Camera, FileCheck, FileClock, FileX, AlertCircle } from 'lucide-react';
 import Image from 'next/image';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -91,7 +91,7 @@ const docStatusConfig = {
     className: 'bg-red-500/20 text-red-200 border-red-500/30',
   },
   vencido: {
-    icon: <FileQuestion className="h-5 w-5 text-orange-500" />,
+    icon: <AlertCircle className="h-5 w-5 text-orange-500" />,
     label: 'Vencido',
     className: 'bg-orange-500/20 text-orange-200 border-orange-500/30',
   },
@@ -141,9 +141,10 @@ export default function PerfilProveedorPage() {
     <main className="flex-1 space-y-8 p-4 md:p-8">
       <h1 className="text-3xl font-bold tracking-tight">Perfil del Proveedor</h1>
        <Tabs defaultValue="general">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="general">Información General</TabsTrigger>
-            <TabsTrigger value="documentation">Documentación</TabsTrigger>
+            <TabsTrigger value="documents">Documentos</TabsTrigger>
+            <TabsTrigger value="bank">Información bancaria</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
             <Card>
@@ -151,7 +152,7 @@ export default function PerfilProveedorPage() {
                   <div>
                     <CardTitle>Información General</CardTitle>
                     <CardDescription>
-                      Mantenga su información personal, fiscal y bancaria actualizada.
+                      Mantenga su información personal y fiscal actualizada.
                     </CardDescription>
                   </div>
                   <div className="flex justify-end gap-2">
@@ -224,25 +225,13 @@ export default function PerfilProveedorPage() {
                      <InfoField label="Email" value="shirley.h@proveedor.com" isEditing={isEditing} />
                   </div>
                 </div>
-
-                <Separator />
-
-                <div>
-                   <h3 className="text-lg font-semibold mb-4">Información Bancaria</h3>
-                   <div className="space-y-4">
-                     <InfoField label="Banco" value="BBVA Bancomer" isEditing={isEditing} />
-                     <InfoField label="CLABE" value="012180012345678901" isEditing={isEditing} />
-                     <InfoField label="Número de cuenta" value="0123456789" isEditing={isEditing} />
-                   </div>
-                </div>
-
               </CardContent>
             </Card>
           </TabsContent>
-          <TabsContent value="documentation">
+          <TabsContent value="documents">
             <Card>
               <CardHeader>
-                <CardTitle>Documentación</CardTitle>
+                <CardTitle>Documentos</CardTitle>
                 <CardDescription>
                   Gestione y valide los documentos requeridos para mantener su perfil activo.
                 </CardDescription>
@@ -287,6 +276,21 @@ export default function PerfilProveedorPage() {
                     })}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+           <TabsContent value="bank">
+            <Card>
+              <CardHeader>
+                <CardTitle>Información Bancaria</CardTitle>
+                 <CardDescription>
+                      Aquí puede ver y editar su información bancaria.
+                    </CardDescription>
+              </CardHeader>
+               <CardContent className="space-y-4">
+                 <InfoField label="Banco" value="BBVA Bancomer" isEditing={isEditing} />
+                 <InfoField label="CLABE" value="012180012345678901" isEditing={isEditing} />
+                 <InfoField label="Número de cuenta" value="0123456789" isEditing={isEditing} />
               </CardContent>
             </Card>
           </TabsContent>
