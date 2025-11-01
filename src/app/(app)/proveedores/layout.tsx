@@ -1,4 +1,3 @@
-
 import { Nav } from '@/components/proveedores/nav';
 import {
   SidebarProvider,

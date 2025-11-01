@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useRef } from 'react';
@@ -69,10 +68,10 @@ const documents: {
     { name: 'Fotografía a color del exterior del domicilio fiscal/comercial', status: 'vencido', updateDate: '2024-06-30', types: ['supplies', 'services', 'leasing', 'transport'] },
     { name: 'Referencias comerciales', status: 'aprobado', updateDate: '2024-07-18', types: ['supplies', 'services', 'leasing', 'transport'] },
     { name: 'Carta firmada de aceptación al código de ética', status: 'pendiente', updateDate: 'N/A', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Registro en el REPSE', status: 'aprobado', updateDate: '2024-05-20', types: ['services'] },
-    { name: 'Título de propiedad del inmueble arrendado o documento que acredite propiedad', status: 'aprobado', updateDate: '2023-11-10', types: ['leasing'] },
-    { name: 'Comprobante de pago de predial vigente', status: 'vencido', updateDate: '2024-03-31', types: ['leasing'] },
-    { name: 'Póliza de seguro de responsabilidad civil vigente', status: 'pendiente', updateDate: 'N/A', types: ['transport'] },
+    { name: 'Registro en el REPSE (Solo si aplica)', status: 'aprobado', updateDate: '2024-05-20', types: ['services'] },
+    { name: 'Título de propiedad del inmueble arrendado o documento que acredite propiedad (Solo si aplica)', status: 'aprobado', updateDate: '2023-11-10', types: ['leasing'] },
+    { name: 'Comprobante de pago de predial vigente (Solo si aplica)', status: 'vencido', updateDate: '2024-03-31', types: ['leasing'] },
+    { name: 'Póliza de seguro de responsabilidad civil vigente (Solo si aplica)', status: 'pendiente', updateDate: 'N/A', types: ['transport'] },
 ];
 
 const docStatusConfig = {
@@ -295,5 +294,3 @@ export default function PerfilProveedorPage() {
     </main>
   );
 }
-
-    
