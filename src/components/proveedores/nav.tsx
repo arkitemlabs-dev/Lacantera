@@ -14,7 +14,7 @@ import {
   SidebarMenuButton,
   SidebarFooter,
 } from '@/components/ui/sidebar';
-import { Home, User, ShoppingCart, FileText, MessageSquare, Bell, Shield, Building, CreditCard } from 'lucide-react';
+import { Home, User, ShoppingCart, FileText, MessageSquare, Bell, Shield, Building } from 'lucide-react';
 
 
 const navItems = [
@@ -22,7 +22,6 @@ const navItems = [
     { href: '/proveedores/perfil', icon: User, title: 'Perfil' },
     { href: '/proveedores/ordenes-de-compra', icon: ShoppingCart, title: 'Órdenes de compra' },
     { href: '/proveedores/facturacion', icon: FileText, title: 'Facturación' },
-    { href: '/proveedores/pagos', icon: CreditCard, title: 'Pagos' },
     { href: '/proveedores/mensajeria', icon: MessageSquare, title: 'Mensajería' },
     { href: '/proveedores/notificaciones', icon: Bell, title: 'Notificaciones' },
     { href: '/proveedores/seguridad', icon: Shield, title: 'Seguridad' },
