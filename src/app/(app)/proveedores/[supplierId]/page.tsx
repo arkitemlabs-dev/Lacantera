@@ -93,10 +93,10 @@ const docStatusConfig = {
   },
 };
 
-const InfoRow = ({ label, value }: { label: string; value: string | undefined }) => (
-  <div className="grid grid-cols-3 gap-2 text-sm">
-    <dt className="text-muted-foreground">{label}</dt>
-    <dd className="col-span-2 font-medium">{value || '-'}</dd>
+const InfoRow = ({ label, value }: { label: string; value: string | undefined | React.ReactNode }) => (
+  <div className="grid grid-cols-3 gap-4 items-center">
+    <dt className="text-muted-foreground text-sm">{label}</dt>
+    <dd className="col-span-2 font-medium text-sm">{value || '-'}</dd>
   </div>
 );
 
@@ -137,14 +137,14 @@ export default function SupplierProfilePage({
           </TabsList>
           <TabsContent value="general">
             <Card>
-              <CardHeader className="flex flex-row justify-between items-start">
-                <div>
+              <CardHeader>
                   <CardTitle>Información General del Proveedor</CardTitle>
                   <CardDescription>
                     Detalles fiscales, de contacto y estado de la cuenta.
                   </CardDescription>
-                </div>
-                <div className="flex gap-2">
+              </CardHeader>
+              <CardContent className="space-y-8 pt-6">
+                <div className="flex justify-end gap-2 -mt-16">
                   <Button variant="outline">Editar</Button>
                   <Button
                     variant={
@@ -156,12 +156,10 @@ export default function SupplierProfilePage({
                       : 'Activar'}
                   </Button>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-8">
                 {/* Datos Fiscales */}
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Datos Fiscales</h3>
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <InfoRow label="Razón Social" value={supplier.name} />
                     <InfoRow label="RFC / Tax ID" value={supplier.taxId} />
                     <InfoRow
@@ -174,7 +172,7 @@ export default function SupplierProfilePage({
                 {/* Datos de Contacto */}
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Datos de Contacto</h3>
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <InfoRow
                       label="Contacto Principal"
                       value={supplier.contactName}
@@ -190,7 +188,7 @@ export default function SupplierProfilePage({
                 {/* Representante legal */}
                  <div>
                   <h3 className="text-lg font-semibold mb-4">Representante Legal</h3>
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <InfoRow
                       label="Nombre"
                       value="Lic. Ernesto de la Cruz"
@@ -209,17 +207,14 @@ export default function SupplierProfilePage({
                 {/* Estado de la cuenta */}
                 <div>
                    <h3 className="text-lg font-semibold mb-4">Estado de la Cuenta</h3>
-                   <div className="space-y-2">
+                   <div className="space-y-4">
                      <InfoRow label="Código de Proveedor" value={`PROV-${supplier.id.padStart(3, '0')}`} />
                      <InfoRow label="Fecha de Registro" value={supplier.registrationDate} />
-                     <div className="grid grid-cols-3 gap-2 text-sm items-center">
-                        <dt className="text-muted-foreground">Estado Actual</dt>
-                        <dd className="col-span-2">
-                            <Badge variant={supplier.status === 'active' ? 'default' : 'destructive'} className={supplier.status === 'active' ? 'bg-green-500/20 text-green-200' : 'bg-red-500/20 text-red-200'}>
-                                {supplier.status === 'active' ? 'Activo' : 'Inactivo'}
-                            </Badge>
-                        </dd>
-                     </div>
+                      <InfoRow label="Estado Actual" value={
+                        <Badge variant={supplier.status === 'active' ? 'default' : 'destructive'} className={cn(supplier.status === 'active' ? 'bg-green-500/20 text-green-200' : 'bg-red-500/20 text-red-200', 'hover:bg-transparent')}>
+                            {supplier.status === 'active' ? 'Activo' : 'Inactivo'}
+                        </Badge>
+                      } />
                    </div>
                 </div>
 
