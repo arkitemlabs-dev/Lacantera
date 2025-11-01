@@ -1,5 +1,7 @@
+
 'use client';
 
+import { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,7 +24,7 @@ import {
 } from '@/components/ui/table';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
-import { Eye, Upload } from 'lucide-react';
+import { Eye, Upload, Camera } from 'lucide-react';
 import Image from 'next/image';
 
 const InfoField = ({
@@ -90,6 +92,21 @@ export default function PerfilProveedorPage() {
   const userAvatar = PlaceHolderImages.find(
     (img) => img.id === 'user-avatar-1'
   );
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(
+    userAvatar?.imageUrl || null
+  );
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   return (
     <main className="flex-1 space-y-8 p-4 md:p-8">
@@ -109,18 +126,33 @@ export default function PerfilProveedorPage() {
         </CardHeader>
         <CardContent className="space-y-8">
           <div className="flex items-center gap-6">
-            <Avatar className="h-24 w-24">
-              {userAvatar && (
-                <Image
-                  src={userAvatar.imageUrl}
-                  alt={userAvatar.description}
-                  width={96}
-                  height={96}
-                  className="rounded-full"
-                />
-              )}
-              <AvatarFallback>SH</AvatarFallback>
-            </Avatar>
+            <div
+              className="relative group cursor-pointer"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Avatar className="h-24 w-24">
+                {avatarPreview && (
+                  <Image
+                    src={avatarPreview}
+                    alt="User avatar"
+                    width={96}
+                    height={96}
+                    className="rounded-full object-cover"
+                  />
+                )}
+                <AvatarFallback>SH</AvatarFallback>
+              </Avatar>
+              <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Camera className="h-8 w-8 text-white" />
+              </div>
+              <Input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handleAvatarChange}
+              />
+            </div>
             <div className="grid flex-1 gap-6 md:grid-cols-2">
               <InfoField label="Nombre" value="Shirley Hendricks" />
               <InfoField
