@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import {
   FileText,
   MessageSquare,
-  Bell,
+  CreditCard,
   ShoppingCart,
   ArrowRight,
 } from 'lucide-react';
@@ -39,11 +39,11 @@ export function KpiCards() {
       link: '/proveedores/mensajeria'
     },
      {
-      title: 'Notificaciones',
-      value: '8',
-      description: 'Alertas recientes',
-      icon: <Bell className="h-5 w-5 text-muted-foreground" />,
-      link: '/proveedores/notificaciones'
+      title: 'Complementos de Pago Pendientes',
+      value: '2',
+      description: 'Pagos esperando complemento',
+      icon: <CreditCard className="h-5 w-5 text-muted-foreground" />,
+      link: '/proveedores/pagos'
     },
   ];
 
