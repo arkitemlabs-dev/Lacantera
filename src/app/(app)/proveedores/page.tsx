@@ -3,7 +3,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { MoreHorizontal, PlusCircle, Search, Eye } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Search, Eye, ListFilter } from 'lucide-react';
 import { suppliers } from '@/lib/data';
 import type { Supplier, SupplierStatus, SupplierType } from '@/lib/types';
 
@@ -86,6 +86,12 @@ export default function ProveedoresPage() {
       });
   }, [searchTerm, statusFilter, typeFilter]);
 
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setTypeFilter('all');
+  };
+
   return (
     <>
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -141,9 +147,9 @@ export default function ProveedoresPage() {
                   <SelectItem value="transport">Transporte</SelectItem>
                 </SelectContent>
               </Select>
-              <Button>
-                <Search className="mr-2 h-4 w-4" />
-                Buscar
+              <Button variant="outline" onClick={clearFilters}>
+                <ListFilter className="mr-2 h-4 w-4" />
+                Limpiar Filtros
               </Button>
             </div>
           </CardHeader>
