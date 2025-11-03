@@ -12,6 +12,18 @@ import {
 import { Input } from '@/components/ui/input';
 import { Paperclip, Send } from 'lucide-react';
 import Link from 'next/link';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+    DialogClose
+  } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 const conversations = [
   {
@@ -63,13 +75,16 @@ const messages = [
 
 export default function MensajeriaProveedorPage() {
   return (
+    <Dialog>
     <div className="grid h-[calc(100vh_-_theme(spacing.16))] grid-cols-1 md:grid-cols-[350px_1fr]">
       {/* Conversation List */}
       <div className="flex flex-col border-r bg-card/70">
         <div className="p-4 border-b">
            <div className="flex items-center justify-between">
              <h1 className="text-2xl font-bold">Mensajes</h1>
-             <Button>Nuevo Ticket</Button>
+             <DialogTrigger asChild>
+                <Button>Nuevo Ticket</Button>
+            </DialogTrigger>
            </div>
            <p className="text-sm text-muted-foreground mt-2">Comunícate con el equipo de La Cantera.</p>
         </div>
@@ -157,6 +172,39 @@ export default function MensajeriaProveedorPage() {
           </CardFooter>
         </Card>
       </div>
+
+      <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Nuevo Ticket de Soporte</DialogTitle>
+                <DialogDescription>
+                    Crea un nuevo ticket para comunicarte con el equipo de La Cantera.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="asunto" className="text-right">
+                        Asunto
+                    </Label>
+                    <Input id="asunto" placeholder="Ej. Duda sobre la orden de compra OC-128" className="col-span-3" />
+                </div>
+                 <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="mensaje" className="text-right">
+                        Mensaje
+                    </Label>
+                    <Textarea id="mensaje" placeholder="Escribe tu mensaje aquí..." className="col-span-3" />
+                </div>
+            </div>
+            <DialogFooter>
+                <DialogClose asChild>
+                    <Button type="button" variant="secondary">
+                        Cancelar
+                    </Button>
+                </DialogClose>
+                <Button type="submit">Enviar Mensaje</Button>
+            </DialogFooter>
+        </DialogContent>
+
     </div>
+    </Dialog>
   );
 }
