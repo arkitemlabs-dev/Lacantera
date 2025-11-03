@@ -58,27 +58,20 @@ const documents: {
   status: DocStatus;
   updateDate: string;
 }[] = [
-  {
-    name: 'Constancia de Situación Fiscal',
-    status: 'Vigente',
-    updateDate: '2024-06-15',
-  },
-  {
-    name: 'Opinión de Cumplimiento',
-    status: 'Por vencer',
-    updateDate: '2023-08-01',
-  },
-  {
-    name: 'Identificación Oficial del Representante',
-    status: 'Vigente',
-    updateDate: '2024-01-20',
-  },
-  { name: 'Acta Constitutiva', status: 'Expirado', updateDate: '2022-03-10' },
-  {
-    name: 'Comprobante de Domicilio',
-    status: 'Vigente',
-    updateDate: '2024-05-30',
-  },
+  { name: 'Poder notarial del representante legal', status: 'Vigente', updateDate: '2024-07-15' },
+  { name: 'Constancia de Situación Fiscal (vigencia semestral)', status: 'Por vencer', updateDate: '2024-01-15' },
+  { name: 'Opinión de cumplimiento positiva del SAT (vigencia mensual)', status: 'Vigente', updateDate: '2024-07-20' },
+  { name: 'Identificación Oficial del Representante', status: 'Vigente', updateDate: '2024-01-20' },
+  { name: 'Acta constitutiva y sus modificaciones', status: 'Expirado', updateDate: '2023-01-20' },
+  { name: 'Comprobante de domicilio fiscal (no mayor a 3 meses)', status: 'Vigente', updateDate: '2024-06-01' },
+  { name: 'Carátula del estado de cuenta bancaria (preferentemente del nombre del titular coincidente)', status: 'Vigente', updateDate: '2024-07-10' },
+  { name: 'Fotografía a color del exterior del domicilio fiscal/comercial', status: 'Por vencer', updateDate: '2024-06-30' },
+  { name: 'Referencias comerciales', status: 'Vigente', updateDate: '2024-07-18' },
+  { name: 'Carta firmada de aceptación al código de ética', status: 'Vigente', updateDate: '2024-07-18' },
+  { name: 'Registro en el REPSE (Sólo proveedores de servicios)', status: 'Vigente', updateDate: '2024-05-20' },
+  { name: 'Título de propiedad del inmueble arrendado o documento que acredite propiedad (Sólo proveedores de arrendamiento)', status: 'Vigente', updateDate: '2023-11-10' },
+  { name: 'Comprobante de pago de predial vigente (Solo proveedores de arrendamiento)', status: 'Expirado', updateDate: '2024-03-31' },
+  { name: 'Póliza de seguro de responsabilidad civil vigente (Sólo proveedores de transporte)', status: 'Por vencer', updateDate: '2024-07-01' },
 ];
 
 const getStatusBadgeClass = (status: DocStatus) => {
@@ -139,15 +132,16 @@ export default function PerfilProveedorPage() {
       <h1 className="text-3xl font-bold tracking-tight">Perfil del Proveedor</h1>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="general">Información General</TabsTrigger>
           <TabsTrigger value="documents">Documentos</TabsTrigger>
+          <TabsTrigger value="banking">Información Bancaria</TabsTrigger>
         </TabsList>
         <TabsContent value="general">
           <Card className="bg-card/70 mt-6">
             <CardHeader>
               <CardDescription>
-                Mantenga su información personal, fiscal y bancaria actualizada.
+                Mantenga su información personal y fiscal actualizada.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
@@ -200,11 +194,6 @@ export default function PerfilProveedorPage() {
               <div className="grid gap-6 md:grid-cols-2">
                 <InfoField label="Representante" value="Shirley Hendricks" disabled={true} />
               </div>
-              <div className="grid gap-6 md:grid-cols-3">
-                <InfoField label="Banco" value="BBVA Bancomer" disabled={!isEditing} />
-                <InfoField label="CLABE" value="012180012345678901" disabled={!isEditing} />
-                <InfoField label="Número de cuenta" value="0123456789" disabled={!isEditing} />
-              </div>
               <div className="flex justify-end gap-2">
                 {isEditing ? (
                   <>
@@ -239,7 +228,7 @@ export default function PerfilProveedorPage() {
                 <TableBody>
                   {documents.map((doc, index) => (
                     <TableRow key={index}>
-                      <TableCell className="font-medium">{doc.name}</TableCell>
+                      <TableCell className="font-medium text-sm">{doc.name}</TableCell>
                       <TableCell>
                         <Badge className={cn('font-normal', getStatusBadgeClass(doc.status))}>
                           {doc.status}
@@ -262,7 +251,36 @@ export default function PerfilProveedorPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        <TabsContent value="banking">
+          <Card className="bg-card/70 mt-6">
+            <CardHeader>
+              <CardTitle>Información Bancaria</CardTitle>
+              <CardDescription>
+                Gestione sus datos bancarios para recibir pagos.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-6 md:grid-cols-3">
+                <InfoField label="Banco" value="BBVA Bancomer" disabled={!isEditing} />
+                <InfoField label="CLABE" value="012180012345678901" disabled={!isEditing} />
+                <InfoField label="Número de cuenta" value="0123456789" disabled={!isEditing} />
+              </div>
+              <div className="flex justify-end gap-2">
+                 {isEditing ? (
+                  <>
+                    <Button variant="outline" onClick={handleCancel}>Cancelar</Button>
+                    <Button onClick={handleSave}>Guardar cambios</Button>
+                  </>
+                ) : (
+                  <Button onClick={handleEdit}>Editar</Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </main>
   );
 }
+
+    
