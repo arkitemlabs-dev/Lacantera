@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Eye, Search, Upload, FileDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type InvoiceStatus = 'En revisión' | 'Pagada' | 'Pendiente pago' | 'Rechazada';
 
@@ -111,58 +112,81 @@ export default function FacturacionProveedorPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Folio</TableHead>
-                <TableHead>CFDI</TableHead>
-                <TableHead>Orden Asociada</TableHead>
-                <TableHead>Fecha Emisión</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Monto</TableHead>
-                <TableHead className="text-center">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {invoices.map((invoice) => (
-                <TableRow key={invoice.folio}>
-                  <TableCell className="font-medium">{invoice.folio}</TableCell>
-                  <TableCell>{invoice.cfdi}</TableCell>
-                  <TableCell>
-                     <Link href={`/proveedores/ordenes-de-compra/${invoice.ordenAsociada}`} className="hover:underline text-blue-400">
-                        {invoice.ordenAsociada}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{invoice.fechaEmision}</TableCell>
-                  <TableCell>
-                    <Badge className={cn('font-normal', getStatusBadgeClass(invoice.estado as InvoiceStatus))}>
-                      {invoice.estado}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {new Intl.NumberFormat('es-MX', {
-                      style: 'currency',
-                      currency: 'MXN',
-                    }).format(invoice.monto)}
-                  </TableCell>
-                  <TableCell className="text-center space-x-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <Eye className="h-4 w-4" />
-                      <span className="sr-only">Ver</span>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <Upload className="h-4 w-4" />
-                      <span className="sr-only">Subir</span>
-                    </Button>
-                     <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <FileDown className="h-4 w-4" />
-                      <span className="sr-only">Descargar</span>
-                    </Button>
-                  </TableCell>
+          <TooltipProvider>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Folio</TableHead>
+                  <TableHead>CFDI</TableHead>
+                  <TableHead>Orden Asociada</TableHead>
+                  <TableHead>Fecha Emisión</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Monto</TableHead>
+                  <TableHead className="text-center">Acciones</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {invoices.map((invoice) => (
+                  <TableRow key={invoice.folio}>
+                    <TableCell className="font-medium">{invoice.folio}</TableCell>
+                    <TableCell>{invoice.cfdi}</TableCell>
+                    <TableCell>
+                      <Link href={`/proveedores/ordenes-de-compra/${invoice.ordenAsociada}`} className="hover:underline text-blue-400">
+                          {invoice.ordenAsociada}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{invoice.fechaEmision}</TableCell>
+                    <TableCell>
+                      <Badge className={cn('font-normal', getStatusBadgeClass(invoice.estado as InvoiceStatus))}>
+                        {invoice.estado}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {new Intl.NumberFormat('es-MX', {
+                        style: 'currency',
+                        currency: 'MXN',
+                      }).format(invoice.monto)}
+                    </TableCell>
+                    <TableCell className="text-center space-x-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Eye className="h-4 w-4" />
+                            <span className="sr-only">Ver</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Ver</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Upload className="h-4 w-4" />
+                            <span className="sr-only">Subir</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Subir</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <FileDown className="h-4 w-4" />
+                            <span className="sr-only">Descargar</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Descargar</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TooltipProvider>
         </CardContent>
       </Card>
     </main>
