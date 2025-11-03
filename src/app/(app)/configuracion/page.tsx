@@ -19,7 +19,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
 import {
   MoreHorizontal,
   PlusCircle,
@@ -41,7 +40,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+    DialogClose,
+  } from '@/components/ui/dialog';
 
 const users = [
   {
@@ -79,7 +87,7 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } 
   Inactivo: 'secondary',
 };
 
-const rolePermissions = {
+const rolePermissions: { [key: string]: string[] } = {
   'Super Admin': ['Todo'],
   Compras: ['Gestión de proveedores', 'Órdenes de Compra', 'Facturación'],
   Contabilidad: ['Facturación', 'Pagos'],
@@ -230,79 +238,129 @@ export default function ConfiguracionPage() {
             </div>
           </TabsContent>
           <TabsContent value="users">
-             <Card className='mt-6'>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Usuarios y Roles</CardTitle>
-                    <CardDescription>
-                      Gestione los usuarios internos y sus permisos en el sistema.
-                    </CardDescription>
-                  </div>
-                  <Button size="sm" className="gap-1">
-                    <PlusCircle className="h-4 w-4" />
-                    Nuevo Usuario
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nombre</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Rol</TableHead>
-                      <TableHead>Permisos</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>
-                        <span className="sr-only">Acciones</span>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.name}</TableCell>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell>
-                            <Badge variant="outline">{user.role}</Badge>
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                            {rolePermissions[user.role as keyof typeof rolePermissions].join(', ')}
-                        </TableCell>
-                        <TableCell>
-                           <Badge variant={statusVariant[user.status]}>
-                            {user.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                aria-haspopup="true"
-                                size="icon"
-                                variant="ghost"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Toggle menu</span>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                              <DropdownMenuItem>Editar</DropdownMenuItem>
-                              <DropdownMenuItem>Cambiar Rol</DropdownMenuItem>
-                               <DropdownMenuItem className="text-red-500">
-                                {user.status === 'Activo' ? 'Desactivar' : 'Activar'}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            <Dialog>
+                 <Card className='mt-6'>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Usuarios y Roles</CardTitle>
+                            <CardDescription>
+                            Gestione los usuarios internos y sus permisos en el sistema.
+                            </CardDescription>
+                        </div>
+                        <DialogTrigger asChild>
+                            <Button size="sm" className="gap-1">
+                                <PlusCircle className="h-4 w-4" />
+                                Nuevo Usuario
+                            </Button>
+                        </DialogTrigger>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                        <TableHeader>
+                            <TableRow>
+                            <TableHead>Nombre</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Rol</TableHead>
+                            <TableHead>Permisos</TableHead>
+                            <TableHead>Estado</TableHead>
+                            <TableHead>
+                                <span className="sr-only">Acciones</span>
+                            </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {users.map((user) => (
+                            <TableRow key={user.id}>
+                                <TableCell className="font-medium">{user.name}</TableCell>
+                                <TableCell>{user.email}</TableCell>
+                                <TableCell>
+                                    <Badge variant="outline">{user.role}</Badge>
+                                </TableCell>
+                                <TableCell className="text-xs text-muted-foreground">
+                                    {rolePermissions[user.role as keyof typeof rolePermissions].join(', ')}
+                                </TableCell>
+                                <TableCell>
+                                <Badge variant={statusVariant[user.status]}>
+                                    {user.status}
+                                </Badge>
+                                </TableCell>
+                                <TableCell>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                    <Button
+                                        aria-haspopup="true"
+                                        size="icon"
+                                        variant="ghost"
+                                    >
+                                        <MoreHorizontal className="h-4 w-4" />
+                                        <span className="sr-only">Toggle menu</span>
+                                    </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                    <DropdownMenuItem>Editar</DropdownMenuItem>
+                                    <DropdownMenuItem>Cambiar Rol</DropdownMenuItem>
+                                    <DropdownMenuItem className="text-red-500">
+                                        {user.status === 'Activo' ? 'Desactivar' : 'Activar'}
+                                    </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                                </TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                        </Table>
+                    </CardContent>
+                    </Card>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+                            <DialogDescription>
+                                Completa la información para agregar un nuevo usuario al sistema.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="name" className="text-right">
+                                    Nombre
+                                </Label>
+                                <Input id="name" placeholder="Ej. Juan Pérez" className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="email" className="text-right">
+                                    Email
+                                </Label>
+                                <Input id="email" type="email" placeholder="juan.perez@example.com" className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="role" className="text-right">
+                                    Rol
+                                </Label>
+                                <Select>
+                                    <SelectTrigger className="col-span-3">
+                                        <SelectValue placeholder="Seleccione un rol" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="super-admin">Super Admin</SelectItem>
+                                        <SelectItem value="compras">Compras</SelectItem>
+                                        <SelectItem value="contabilidad">Contabilidad</SelectItem>
+                                        <SelectItem value="solo-lectura">Solo lectura</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <DialogClose asChild>
+                                <Button type="button" variant="secondary">
+                                    Cancelar
+                                </Button>
+                            </DialogClose>
+                            <Button type="submit">Crear Usuario</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
           </TabsContent>
         </Tabs>
       </div>
