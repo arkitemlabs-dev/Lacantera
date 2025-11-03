@@ -7,6 +7,8 @@ import {
   FileX,
   FileQuestion,
   Eye,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -33,6 +35,18 @@ import { cn } from '@/lib/utils';
 import type { Supplier, SupplierType } from '@/lib/types';
 import { notFound } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 type DocStatus = 'aprobado' | 'pendiente' | 'rechazado' | 'vencido' | 'no aplica';
 
@@ -106,6 +120,9 @@ export default function SupplierProfilePage({
 }: {
   params: { supplierId: string };
 }) {
+  const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+
   const supplier = suppliers.find((s) => s.id === params.supplierId);
 
   if (!supplier) {
@@ -119,7 +136,13 @@ export default function SupplierProfilePage({
       return { ...doc, status: 'no aplica' as DocStatus };
   });
 
+  const handleOpenDocumentDialog = (doc: Document) => {
+    setSelectedDocument(doc);
+    setIsDocumentDialogOpen(true);
+  };
+
   return (
+    <Dialog open={isDocumentDialogOpen} onOpenChange={setIsDocumentDialogOpen}>
     <main className="flex min-h-[calc(100vh_-_theme(spacing.16))] flex-1 flex-col gap-4 bg-muted/40 p-4 md:gap-8 md:p-10">
       <div className="mx-auto grid w-full max-w-6xl items-start gap-6">
         <div className="flex items-center gap-4">
@@ -262,14 +285,18 @@ export default function SupplierProfilePage({
                                     </Badge>
                                 </TableCell>
                                 <TableCell>{doc.date || 'N/A'}</TableCell>
-                                <TableCell className="text-right space-x-2">
-                                    <Button variant="outline" size="icon" disabled={!isActionable}>
-                                        <Eye className="h-4 w-4" />
-                                        <span className="sr-only">Ver</span>
-                                    </Button>
-                                    <Button variant="outline" size="sm" disabled={!isActionable}>Aprobar</Button>
-                                    <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" disabled={!isActionable}>Rechazar</Button>
-                                    <Button variant="link" size="sm" disabled={!isActionable}>Solicitar Actualización</Button>
+                                <TableCell className="text-right">
+                                    <DialogTrigger asChild>
+                                        <Button 
+                                            variant="outline" 
+                                            size="icon" 
+                                            disabled={!isActionable}
+                                            onClick={() => handleOpenDocumentDialog(doc)}
+                                        >
+                                            <Eye className="h-4 w-4" />
+                                            <span className="sr-only">Ver</span>
+                                        </Button>
+                                    </DialogTrigger>
                                 </TableCell>
                                 </TableRow>
                             );
@@ -281,8 +308,85 @@ export default function SupplierProfilePage({
             </TabsContent>
         </Tabs>
       </div>
+
+       {selectedDocument && (
+        <DialogContent className="max-w-4xl grid-rows-[auto_1fr_auto]">
+          <DialogHeader>
+            <DialogTitle>Revisión de Documento</DialogTitle>
+            <DialogDescription>
+              {selectedDocument.name} - {supplier.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid md:grid-cols-2 gap-6 overflow-y-auto max-h-[60vh] p-1">
+            {/* Document Viewer */}
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Visualizador de Documento</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="bg-muted h-[500px] flex items-center justify-center rounded-md border-2 border-dashed">
+                    <p className="text-muted-foreground">
+                      Vista previa del documento no disponible.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            {/* Validation & Actions */}
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Validaciones</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className={cn("flex items-center justify-between p-3 rounded-md", selectedDocument.status !== 'vencido' ? "bg-green-500/10" : "bg-red-500/10")}>
+                    <p className={cn("text-sm", selectedDocument.status !== 'vencido' ? "text-green-200" : "text-red-200")}>
+                      Verificación de vigencia
+                    </p>
+                    {selectedDocument.status !== 'vencido' ? <CheckCircle className="h-5 w-5 text-green-400" /> : <XCircle className="h-5 w-5 text-red-400" />}
+                  </div>
+                   <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-md">
+                    <p className="text-sm text-green-200">
+                      Coincide con RFC y Razón Social
+                    </p>
+                    <CheckCircle className="h-5 w-5 text-green-400" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Acciones de Revisión</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="rejectionReason">
+                      Motivo de Rechazo (si aplica)
+                    </Label>
+                    <Textarea
+                      id="rejectionReason"
+                      placeholder="Describe el motivo del rechazo..."
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="destructive" onClick={() => setIsDocumentDialogOpen(false)}>Rechazar</Button>
+                    <Button onClick={() => setIsDocumentDialogOpen(false)}>Aprobar Documento</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDocumentDialogOpen(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      )}
+
     </main>
+    </Dialog>
   );
 }
+
+    
 
     
