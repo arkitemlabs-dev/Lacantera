@@ -25,13 +25,6 @@ import Link from 'next/link';
 
 type InvoiceStatus = 'En revisión' | 'Pagada' | 'Aprobada' | 'Rechazada';
 
-const kpis = [
-  { title: 'En revisión', value: 1, color: 'text-yellow-400' },
-  { title: 'Aprobada', value: 1, color: 'text-blue-400' },
-  { title: 'Pagada', value: 1, color: 'text-green-400' },
-  { title: 'Rechazada', value: 1, color: 'text-red-400' },
-];
-
 const invoices = [
   {
     folio: 'A-5832',
@@ -89,22 +82,6 @@ export default function FacturacionProveedorPage() {
         <Link href="/proveedores/dashboard" className="hover:text-foreground">Inicio</Link>
         <span>&gt;</span>
         <span className="text-foreground">Facturación</span>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {kpis.map((kpi) => (
-          <Card key={kpi.title} className="bg-card/70">
-            <CardHeader className="pb-2">
-              <CardTitle className={cn('text-sm font-medium', kpi.color)}>
-                {kpi.title}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{kpi.value}</div>
-              <p className="text-xs text-muted-foreground">factura(s)</p>
-            </CardContent>
-          </Card>
-        ))}
       </div>
 
       <Card className="bg-card/70">
