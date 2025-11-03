@@ -154,7 +154,7 @@ export default function FacturasPage() {
             </Button>
             <Button>
               <Search className="mr-2 h-4 w-4" />
-              Aplicar Filtros
+              Buscar
             </Button>
           </CardFooter>
         </Card>
