@@ -43,13 +43,15 @@ export type PurchaseOrder = {
   budget: number;
 };
 
+export type PaymentStatus = 'Completo' | 'Realizado en espera de complemento' | 'Programado' | 'Cancelado';
+
 export type Payment = {
   id: string;
   invoiceId: string;
   supplierName: string;
   amount: number;
   executionDate: string;
-  status: 'Realizado' | 'Programado' | 'Cancelado';
+  status: PaymentStatus;
   method: 'Transferencia' | 'Tarjeta de Crédito';
   paymentProof: boolean;
   paymentComplement: boolean;

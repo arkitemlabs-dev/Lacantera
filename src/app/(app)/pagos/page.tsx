@@ -38,7 +38,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { payments, suppliers } from '@/lib/data';
 import { cn } from '@/lib/utils';
-import type { Payment } from '@/lib/types';
+import type { Payment, PaymentStatus } from '@/lib/types';
 import {
   Dialog,
   DialogContent,
@@ -58,10 +58,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-const getStatusVariant = (status: Payment['status']) => {
+const getStatusVariant = (status: PaymentStatus) => {
   switch (status) {
-    case 'Realizado':
+    case 'Completo':
       return 'bg-green-500/20 text-green-200 border-green-500/30';
+    case 'Realizado en espera de complemento':
+      return 'bg-blue-500/20 text-blue-200 border-blue-500/30';
     case 'Programado':
       return 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30';
     case 'Cancelado':
@@ -90,7 +92,7 @@ export default function PagosPage() {
         const paymentDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
 
         const dateFilter = !dateRange?.from || (paymentDate >= dateRange.from && (!dateRange.to || paymentDate <= dateRange.to));
-        const statusFilter = status === 'todas' || payment.status.toLowerCase().replace(' ', '-') === status;
+        const statusFilter = status === 'todas' || payment.status.toLowerCase().replace(/ /g, '-') === status;
         const supplierFilter = supplier === 'todos' || payment.supplierName === suppliers.find(s => s.id === supplier)?.name;
         const searchFilter =
             payment.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -180,7 +182,8 @@ export default function PagosPage() {
                     </SelectTrigger>
                     <SelectContent>
                     <SelectItem value="todas">Todos los estados</SelectItem>
-                    <SelectItem value="realizado">Realizado</SelectItem>
+                    <SelectItem value="completo">Completo</SelectItem>
+                    <SelectItem value="realizado-en-espera-de-complemento">Realizado en espera de complemento</SelectItem>
                     <SelectItem value="programado">Programado</SelectItem>
                     <SelectItem value="cancelado">Cancelado</SelectItem>
                     </SelectContent>
