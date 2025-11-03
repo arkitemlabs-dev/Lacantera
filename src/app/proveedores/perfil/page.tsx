@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/table';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
-import { Eye, Upload, Camera } from 'lucide-react';
+import { Eye, Upload, Camera, FileDown } from 'lucide-react';
 import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
@@ -281,13 +281,18 @@ export default function PerfilProveedorPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>{doc.updateDate}</TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button variant="outline" size="sm" onClick={handleDocumentUploadClick}>
-                            <Upload className="mr-2 h-4 w-4" />
-                            Subir
-                        </Button>
+                      <TableCell className="text-right space-x-1">
                         <Button variant="ghost" size="icon">
                             <Eye className="h-4 w-4" />
+                            <span className="sr-only">Ver</span>
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={handleDocumentUploadClick}>
+                            <Upload className="h-4 w-4" />
+                            <span className="sr-only">Subir</span>
+                        </Button>
+                        <Button variant="ghost" size="icon">
+                            <FileDown className="h-4 w-4" />
+                            <span className="sr-only">Descargar</span>
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -302,5 +307,3 @@ export default function PerfilProveedorPage() {
     </>
   );
 }
-
-    
