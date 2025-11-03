@@ -1,6 +1,7 @@
 
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -50,8 +51,27 @@ import {
     DialogTrigger,
     DialogClose,
   } from '@/components/ui/dialog';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
-const users = [
+type User = {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    status: 'Activo' | 'Inactivo';
+};
+
+const initialUsers: User[] = [
   {
     id: '1',
     name: 'Juan Pérez',
@@ -95,6 +115,29 @@ const rolePermissions: { [key: string]: string[] } = {
 };
 
 export default function ConfiguracionPage() {
+    const [users, setUsers] = useState<User[]>(initialUsers);
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+    const [isNewUserDialogOpen, setIsNewUserDialogOpen] = useState(false);
+    const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
+    const [isChangeRoleDialogOpen, setIsChangeRoleDialogOpen] = useState(false);
+    const [isToggleStatusAlertOpen, setIsToggleStatusAlertOpen] = useState(false);
+
+    const handleActionClick = (user: User) => {
+        setSelectedUser(user);
+    };
+
+    const handleToggleStatus = () => {
+        if (selectedUser) {
+            setUsers(users.map(u => 
+                u.id === selectedUser.id 
+                ? { ...u, status: u.status === 'Activo' ? 'Inactivo' : 'Activo' }
+                : u
+            ));
+        }
+        setIsToggleStatusAlertOpen(false);
+    };
+
   return (
     <main className="flex min-h-[calc(100vh_-_theme(spacing.16))] flex-1 flex-col gap-4 bg-muted/40 p-4 md:gap-8 md:p-10">
       <div className="mx-auto grid w-full max-w-6xl gap-2">
@@ -238,7 +281,7 @@ export default function ConfiguracionPage() {
             </div>
           </TabsContent>
           <TabsContent value="users">
-            <Dialog>
+            <Dialog open={isNewUserDialogOpen} onOpenChange={setIsNewUserDialogOpen}>
                  <Card className='mt-6'>
                     <CardHeader>
                         <div className="flex items-center justify-between">
@@ -293,6 +336,7 @@ export default function ConfiguracionPage() {
                                         aria-haspopup="true"
                                         size="icon"
                                         variant="ghost"
+                                        onClick={() => handleActionClick(user)}
                                     >
                                         <MoreHorizontal className="h-4 w-4" />
                                         <span className="sr-only">Toggle menu</span>
@@ -300,9 +344,9 @@ export default function ConfiguracionPage() {
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                     <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                    <DropdownMenuItem>Editar</DropdownMenuItem>
-                                    <DropdownMenuItem>Cambiar Rol</DropdownMenuItem>
-                                    <DropdownMenuItem className="text-red-500">
+                                    <DropdownMenuItem onSelect={() => setIsEditUserDialogOpen(true)}>Editar</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => setIsChangeRoleDialogOpen(true)}>Cambiar Rol</DropdownMenuItem>
+                                    <DropdownMenuItem className="text-red-500" onSelect={() => setIsToggleStatusAlertOpen(true)}>
                                         {user.status === 'Activo' ? 'Desactivar' : 'Activar'}
                                     </DropdownMenuItem>
                                     </DropdownMenuContent>
@@ -364,6 +408,87 @@ export default function ConfiguracionPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+       {/* Edit User Dialog */}
+       <Dialog open={isEditUserDialogOpen} onOpenChange={setIsEditUserDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Usuario</DialogTitle>
+            <DialogDescription>
+              Modifique la información del usuario.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-name" className="text-right">
+                Nombre
+              </Label>
+              <Input id="edit-name" defaultValue={selectedUser?.name} className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-email" className="text-right">
+                Email
+              </Label>
+              <Input id="edit-email" type="email" defaultValue={selectedUser?.email} className="col-span-3" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setIsEditUserDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={() => setIsEditUserDialogOpen(false)}>Guardar Cambios</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Role Dialog */}
+      <Dialog open={isChangeRoleDialogOpen} onOpenChange={setIsChangeRoleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cambiar Rol de Usuario</DialogTitle>
+            <DialogDescription>
+              Seleccione el nuevo rol para <span className="font-semibold">{selectedUser?.name}</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="change-role">Nuevo Rol</Label>
+            <Select defaultValue={selectedUser?.role}>
+              <SelectTrigger id="change-role">
+                <SelectValue placeholder="Seleccione un rol" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Super Admin">Super Admin</SelectItem>
+                <SelectItem value="Compras">Compras</SelectItem>
+                <SelectItem value="Contabilidad">Contabilidad</SelectItem>
+                <SelectItem value="Solo lectura">Solo lectura</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setIsChangeRoleDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={() => setIsChangeRoleDialogOpen(false)}>Actualizar Rol</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Toggle Status Alert Dialog */}
+      <AlertDialog open={isToggleStatusAlertOpen} onOpenChange={setIsToggleStatusAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción cambiará el estado del usuario <span className="font-semibold">{selectedUser?.name}</span> a <span className="font-semibold">{selectedUser?.status === 'Activo' ? 'Inactivo' : 'Activo'}</span>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleToggleStatus}>
+              {selectedUser?.status === 'Activo' ? 'Desactivar' : 'Activar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </main>
   );
 }
+
+    
