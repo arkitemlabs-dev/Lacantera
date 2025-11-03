@@ -130,14 +130,8 @@ export default function SupplierProfilePage({
           </Button>
           <h1 className="text-3xl font-semibold">{supplier.name}</h1>
         </div>
-
-        <Tabs defaultValue="general">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="general">Información General</TabsTrigger>
-            <TabsTrigger value="documents">Documentación</TabsTrigger>
-          </TabsList>
-          <TabsContent value="general">
-            <Card className="mt-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
                 <CardHeader>
                     <div className="flex justify-between items-start">
                         <div>
@@ -224,9 +218,7 @@ export default function SupplierProfilePage({
                     </div>
                 </CardContent>
             </Card>
-          </TabsContent>
-          <TabsContent value="documents">
-             <Card className="mt-6">
+             <Card>
                 <CardHeader>
                     <CardTitle>Documentación</CardTitle>
                     <CardDescription>
@@ -279,8 +271,7 @@ export default function SupplierProfilePage({
                     </Table>
                 </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
+        </div>
       </div>
     </main>
   );
