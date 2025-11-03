@@ -58,24 +58,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-const kpiCards = [
-  {
-    title: 'Total por Pagar (Mes)',
-    value: '$45,231.89',
-    icon: <DollarSign className="h-6 w-6 text-muted-foreground" />,
-  },
-  {
-    title: 'Pagos Realizados (Mes)',
-    value: '$120,789.00',
-    icon: <CheckCircle className="h-6 w-6 text-muted-foreground" />,
-  },
-  {
-    title: 'Complementos de Pago (Pendientes)',
-    value: '8',
-    icon: <FilePlus2 className="h-6 w-6 text-muted-foreground" />,
-  },
-];
-
 const getStatusVariant = (status: Payment['status']) => {
   switch (status) {
     case 'Realizado':
@@ -145,23 +127,6 @@ export default function PagosPage() {
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <div className="mx-auto grid w-full max-w-7xl items-start gap-6">
-          {/* KPI Cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {kpiCards.map((kpi) => (
-              <Card key={kpi.title}>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    {kpi.title}
-                  </CardTitle>
-                  {kpi.icon}
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{kpi.value}</div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          
            <Card>
             <CardHeader>
                 <CardTitle>Filtros de Búsqueda</CardTitle>
