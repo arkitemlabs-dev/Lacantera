@@ -1,9 +1,11 @@
+
 'use client';
 
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { MoreHorizontal, PlusCircle, Search, Eye } from 'lucide-react';
 import { suppliers } from '@/lib/data';
-import type { SupplierStatus } from '@/lib/types';
+import type { Supplier, SupplierStatus, SupplierType } from '@/lib/types';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -59,7 +61,7 @@ const statusText: Record<SupplierStatus, string> = {
   review: 'En revisión',
 };
 
-const typeText = {
+const typeText: Record<SupplierType, string> = {
   supplies: 'Suministros',
   services: 'Servicios',
   leasing: 'Arrendamiento',
@@ -67,7 +69,23 @@ const typeText = {
 };
 
 export default function ProveedoresPage() {
-  const displayedSuppliers = suppliers.filter(s => s.status !== 'pending');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  
+  const displayedSuppliers = useMemo(() => {
+    return suppliers
+      .filter(s => s.status !== 'pending')
+      .filter((supplier) => {
+        const searchFilter =
+          supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          supplier.taxId.toLowerCase().includes(searchTerm.toLowerCase());
+        const status = statusFilter === 'all' || supplier.status === statusFilter;
+        const type = typeFilter === 'all' || supplier.type === typeFilter;
+        return searchFilter && status && type;
+      });
+  }, [searchTerm, statusFilter, typeFilter]);
+
   return (
     <>
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -96,8 +114,10 @@ export default function ProveedoresPage() {
               <Input
                 placeholder="Buscar por nombre o RFC..."
                 className="max-w-xs"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
-              <Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-full md:w-[180px]">
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
@@ -106,9 +126,10 @@ export default function ProveedoresPage() {
                   <SelectItem value="active">Activo</SelectItem>
                   <SelectItem value="inactive">Inactivo</SelectItem>
                   <SelectItem value="attention">Requiere atención</SelectItem>
+                  <SelectItem value="review">En revisión</SelectItem>
                 </SelectContent>
               </Select>
-               <Select>
+               <Select value={typeFilter} onValueChange={setTypeFilter}>
                 <SelectTrigger className="w-full md:w-[180px]">
                   <SelectValue placeholder="Tipo de proveedor" />
                 </SelectTrigger>
