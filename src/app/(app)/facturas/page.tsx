@@ -3,7 +3,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Calendar as CalendarIcon, ListFilter, Search } from 'lucide-react';
+import { Calendar as CalendarIcon, ListFilter, Search, Eye, FileDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { DateRange } from 'react-day-picker';
@@ -50,6 +50,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import type { Invoice } from '@/lib/types';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const getBadgeVariant = (status: Invoice['status']) => {
   switch (status) {
@@ -89,9 +90,8 @@ export default function FacturasPage() {
     });
   }, [dateRange, status, supplier, invoiceNumber]);
 
-  const handleApproveClick = (invoice: Invoice) => {
+  const handleReviewClick = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
-    setPaymentDate(undefined);
     setIsDialogOpen(true);
   };
 
@@ -202,6 +202,7 @@ export default function FacturasPage() {
         </Card>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+         <TooltipProvider>
           <Table>
             <TableHeader>
               <TableRow>
@@ -241,23 +242,48 @@ export default function FacturasPage() {
                       currency: 'MXN',
                     }).format(invoice.amount)}
                   </TableCell>
-                  <TableCell className="text-center">
-                    {invoice.actionable && (
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleApproveClick(invoice)}
-                        >
-                          Aprobar
-                        </Button>
-                      </DialogTrigger>
-                    )}
+                  <TableCell className="text-center space-x-1">
+                    <DialogTrigger asChild>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleReviewClick(invoice)}>
+                              <Eye className="h-4 w-4" />
+                              <span className="sr-only">Ver/Revisar Factura</span>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Ver/Revisar Factura</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </DialogTrigger>
+                     <Tooltip>
+                      <TooltipTrigger asChild>
+                         <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <FileDown className="h-4 w-4" />
+                            <span className="sr-only">Descargar PDF</span>
+                          </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Descargar PDF</p>
+                      </TooltipContent>
+                    </Tooltip>
+                     <Tooltip>
+                      <TooltipTrigger asChild>
+                         <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <FileDown className="h-4 w-4" />
+                            <span className="sr-only">Descargar XML</span>
+                          </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Descargar XML</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          </TooltipProvider>
           {selectedInvoice && (
             <DialogContent className="max-w-4xl grid-rows-[auto_1fr_auto]">
               <DialogHeader>
