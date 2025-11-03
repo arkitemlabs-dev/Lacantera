@@ -1,6 +1,7 @@
 
 'use client';
 
+import { useState, useMemo } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -75,6 +76,16 @@ const messages = [
 ];
 
 export default function MensajeriaPage() {
+  const [supplierFilter, setSupplierFilter] = useState('todos');
+
+  const filteredConversations = useMemo(() => {
+    if (supplierFilter === 'todos') {
+      return conversations;
+    }
+    const supplierName = suppliers.find(s => s.id === supplierFilter)?.name;
+    return conversations.filter(conv => conv.name === supplierName);
+  }, [supplierFilter]);
+
   return (
     <div className="grid h-[calc(100vh_-_theme(spacing.16))] grid-cols-1 md:grid-cols-[350px_1fr]">
       {/* Conversation List */}
@@ -82,11 +93,12 @@ export default function MensajeriaPage() {
         <div className="p-4">
           <h1 className="text-2xl font-bold">Mensajes</h1>
           <div className="flex items-center gap-2 mt-4">
-            <Select>
+            <Select value={supplierFilter} onValueChange={setSupplierFilter}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Seleccionar por proveedor" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="todos">Todos los proveedores</SelectItem>
                 {suppliers.map((supplier) => (
                     <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>
                 ))}
@@ -97,7 +109,7 @@ export default function MensajeriaPage() {
         </div>
         <div className="flex-1 overflow-y-auto">
           <div className="flex flex-col gap-1 p-2">
-            {conversations.map((conv) => (
+            {filteredConversations.map((conv) => (
               <div
                 key={conv.id}
                 className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-muted bg-background/50"
