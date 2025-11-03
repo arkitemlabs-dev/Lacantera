@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 import { Eye, Upload, Camera } from 'lucide-react';
 import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 
 const InfoField = ({
   label,
@@ -132,16 +133,15 @@ export default function PerfilProveedorPage() {
       <h1 className="text-3xl font-bold tracking-tight">Perfil del Proveedor</h1>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="general">Información General</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="general">Información General y Bancaria</TabsTrigger>
           <TabsTrigger value="documents">Documentos</TabsTrigger>
-          <TabsTrigger value="banking">Información Bancaria</TabsTrigger>
         </TabsList>
         <TabsContent value="general">
           <Card className="bg-card/70 mt-6">
             <CardHeader>
               <CardDescription>
-                Mantenga su información personal y fiscal actualizada.
+                Mantenga su información personal, fiscal y bancaria actualizada.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
@@ -194,6 +194,19 @@ export default function PerfilProveedorPage() {
               <div className="grid gap-6 md:grid-cols-2">
                 <InfoField label="Representante" value="Shirley Hendricks" disabled={true} />
               </div>
+
+              <Separator />
+
+              <div>
+                <h3 className="text-lg font-medium mb-4">Información Bancaria</h3>
+                <div className="grid gap-6 md:grid-cols-3">
+                    <InfoField label="Banco" value="BBVA Bancomer" disabled={!isEditing} />
+                    <InfoField label="CLABE" value="012180012345678901" disabled={!isEditing} />
+                    <InfoField label="Número de cuenta" value="0123456789" disabled={!isEditing} />
+                </div>
+              </div>
+
+
               <div className="flex justify-end gap-2">
                 {isEditing ? (
                   <>
@@ -251,36 +264,7 @@ export default function PerfilProveedorPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="banking">
-          <Card className="bg-card/70 mt-6">
-            <CardHeader>
-              <CardTitle>Información Bancaria</CardTitle>
-              <CardDescription>
-                Gestione sus datos bancarios para recibir pagos.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-6 md:grid-cols-3">
-                <InfoField label="Banco" value="BBVA Bancomer" disabled={!isEditing} />
-                <InfoField label="CLABE" value="012180012345678901" disabled={!isEditing} />
-                <InfoField label="Número de cuenta" value="0123456789" disabled={!isEditing} />
-              </div>
-              <div className="flex justify-end gap-2">
-                 {isEditing ? (
-                  <>
-                    <Button variant="outline" onClick={handleCancel}>Cancelar</Button>
-                    <Button onClick={handleSave}>Guardar cambios</Button>
-                  </>
-                ) : (
-                  <Button onClick={handleEdit}>Editar</Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </main>
   );
 }
-
-    
