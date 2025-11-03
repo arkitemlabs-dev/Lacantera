@@ -28,6 +28,7 @@ import { Eye, Upload, Camera } from 'lucide-react';
 import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
 
 const InfoField = ({
   label,
@@ -87,13 +88,15 @@ const getStatusBadgeClass = (status: DocStatus) => {
 };
 
 export default function PerfilProveedorPage() {
+  const { toast } = useToast();
   const userAvatar = PlaceHolderImages.find(
     (img) => img.id === 'user-avatar-1'
   );
   const [avatarPreview, setAvatarPreview] = useState<string | null>(
     userAvatar?.imageUrl || null
   );
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
   const [isEditing, setIsEditing] = useState(false);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,6 +107,22 @@ export default function PerfilProveedorPage() {
         setAvatarPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDocumentUploadClick = () => {
+    documentInputRef.current?.click();
+  };
+
+  const handleDocumentFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      toast({
+        title: "Archivo seleccionado",
+        description: `Has seleccionado: ${file.name}`,
+      });
+      // Here you would typically handle the file upload logic
+      console.log("Selected document:", file);
     }
   };
 
@@ -123,6 +142,13 @@ export default function PerfilProveedorPage() {
   };
 
   return (
+    <>
+    <input
+        type="file"
+        ref={documentInputRef}
+        onChange={handleDocumentFileChange}
+        className="hidden"
+      />
     <main className="flex-1 space-y-8 p-4 md:p-8">
       <div className="flex items-center space-x-2 text-sm text-muted-foreground">
         <span>Inicio</span>
@@ -148,7 +174,7 @@ export default function PerfilProveedorPage() {
               <div className="flex items-center gap-6">
                 <div
                   className={cn("relative group", isEditing && "cursor-pointer")}
-                  onClick={() => isEditing && fileInputRef.current?.click()}
+                  onClick={() => isEditing && avatarInputRef.current?.click()}
                 >
                   <Avatar className="h-24 w-24">
                     {avatarPreview && (
@@ -169,7 +195,7 @@ export default function PerfilProveedorPage() {
                   )}
                   <Input
                     type="file"
-                    ref={fileInputRef}
+                    ref={avatarInputRef}
                     className="hidden"
                     accept="image/*"
                     onChange={handleAvatarChange}
@@ -249,7 +275,7 @@ export default function PerfilProveedorPage() {
                       </TableCell>
                       <TableCell>{doc.updateDate}</TableCell>
                       <TableCell className="text-right space-x-2">
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={handleDocumentUploadClick}>
                             <Upload className="mr-2 h-4 w-4" />
                             Subir
                         </Button>
@@ -266,5 +292,6 @@ export default function PerfilProveedorPage() {
         </TabsContent>
       </Tabs>
     </main>
+    </>
   );
 }
