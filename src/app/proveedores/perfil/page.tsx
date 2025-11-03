@@ -123,6 +123,7 @@ export default function PerfilProveedorPage() {
 
   const handleCancel = () => {
     // Optionally reset form data to initial state here
+    setAvatarPreview(userAvatar?.imageUrl || null);
     setIsEditing(false);
   };
 
@@ -179,9 +180,9 @@ export default function PerfilProveedorPage() {
               <InfoField
                 label="Razón Social"
                 value="Soluciones Industriales SH S.A. de C.V."
-                disabled={!isEditing}
+                disabled={true}
               />
-              <InfoField label="RFC" value="SISH890101ABC" disabled={!isEditing} />
+              <InfoField label="RFC" value="SISH890101ABC" disabled={true} />
               <InfoField label="Email" value="shirley.h@proveedor.com" disabled={!isEditing} />
             </div>
           </div>
@@ -190,7 +191,7 @@ export default function PerfilProveedorPage() {
             <InfoField label="Teléfono" value="55 1234 5678" disabled={!isEditing} />
           </div>
            <div className="grid gap-6 md:grid-cols-2">
-             <InfoField label="Representante" value="Shirley Hendricks" disabled={!isEditing} />
+             <InfoField label="Representante" value="Shirley Hendricks" disabled={true} />
           </div>
           <div className="grid gap-6 md:grid-cols-3">
             <InfoField label="Banco" value="BBVA Bancomer" disabled={!isEditing} />
