@@ -155,7 +155,6 @@ export default function PagosProveedorPage() {
                   <TableHead className="text-right">Monto</TableHead>
                   <TableHead>Fecha de Pago</TableHead>
                   <TableHead>Método</TableHead>
-                  <TableHead className="text-center">Comprobante de pago</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-center">Complemento de pago</TableHead>
                 </TableRow>
@@ -180,16 +179,6 @@ export default function PagosProveedorPage() {
                     </TableCell>
                     <TableCell>{payment.date}</TableCell>
                     <TableCell>{payment.method}</TableCell>
-                    <TableCell className="text-center space-x-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Eye className="h-4 w-4" />
-                        <span className="sr-only">Ver</span>
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Download className="h-4 w-4" />
-                        <span className="sr-only">Descargar</span>
-                      </Button>
-                    </TableCell>
                     <TableCell>
                       <Badge
                         className={cn(
@@ -202,10 +191,16 @@ export default function PagosProveedorPage() {
                     </TableCell>
                     <TableCell className="text-center">
                       {payment.hasComplement ? (
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <Eye className="h-4 w-4" />
-                          <span className="sr-only">Ver Complemento</span>
-                        </Button>
+                        <div className="flex items-center justify-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Eye className="h-4 w-4" />
+                            <span className="sr-only">Ver Complemento</span>
+                          </Button>
+                           <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Download className="h-4 w-4" />
+                            <span className="sr-only">Descargar Complemento</span>
+                          </Button>
+                        </div>
                       ) : (
                         <DialogTrigger asChild>
                           <Button
