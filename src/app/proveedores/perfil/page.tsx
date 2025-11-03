@@ -129,6 +129,10 @@ export default function PerfilProveedorPage() {
   const handleSave = () => {
     // Here you would typically save the form data
     setIsEditing(false);
+    toast({
+      title: "Perfil Actualizado",
+      description: "Su información ha sido guardada exitosamente.",
+    });
   };
 
   const handleEdit = () => {
@@ -166,9 +170,24 @@ export default function PerfilProveedorPage() {
         <TabsContent value="general">
           <Card className="bg-card/70 mt-6">
             <CardHeader>
-              <CardDescription>
-                Mantenga su información personal, fiscal y bancaria actualizada.
-              </CardDescription>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle>Información General</CardTitle>
+                  <CardDescription>
+                    Mantenga su información personal, fiscal y bancaria actualizada.
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  {isEditing ? (
+                    <>
+                      <Button variant="outline" onClick={handleCancel}>Cancelar</Button>
+                      <Button onClick={handleSave}>Guardar cambios</Button>
+                    </>
+                  ) : (
+                    <Button onClick={handleEdit}>Editar</Button>
+                  )}
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-8">
               <div className="flex items-center gap-6">
@@ -231,18 +250,6 @@ export default function PerfilProveedorPage() {
                     <InfoField label="Número de cuenta" value="0123456789" disabled={!isEditing} />
                 </div>
               </div>
-
-
-              <div className="flex justify-end gap-2">
-                {isEditing ? (
-                  <>
-                    <Button variant="outline" onClick={handleCancel}>Cancelar</Button>
-                    <Button onClick={handleSave}>Guardar cambios</Button>
-                  </>
-                ) : (
-                  <Button onClick={handleEdit}>Editar</Button>
-                )}
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -295,3 +302,5 @@ export default function PerfilProveedorPage() {
     </>
   );
 }
+
+    
