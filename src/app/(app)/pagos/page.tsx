@@ -140,7 +140,7 @@ export default function PagosPage() {
   return (
     <main className="flex flex-1 flex-col gap-4 bg-muted/40 p-4 md:gap-8 md:p-8">
       <div className="mx-auto grid w-full max-w-7xl gap-2">
-        <h1 className="text-3xl font-semibold">Dashboard de Pagos</h1>
+        <h1 className="text-3xl font-semibold">Pagos</h1>
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
