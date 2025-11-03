@@ -198,10 +198,6 @@ export default function FacturasPage() {
               <ListFilter className="mr-2 h-4 w-4" />
               Limpiar Filtros
             </Button>
-            <Button>
-              <Search className="mr-2 h-4 w-4" />
-              Buscar
-            </Button>
           </CardFooter>
         </Card>
 
