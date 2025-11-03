@@ -87,31 +87,68 @@ export const purchaseOrders: PurchaseOrder[] = [
 ]
 
 export const notifications: Notification[] = [
-    {
-      id: 1,
-      type: 'new_supplier',
-      title: 'Nuevo proveedor registrado',
-      description: 'El proveedor "Aceros del Norte" ha completado su registro.',
-      date: 'Hace 5 minutos',
-      read: false,
-    },
-    {
-      id: 2,
-      type: 'doc_update',
-      title: 'Documento actualizado',
-      description: '"Logística Express" ha subido su constancia fiscal actualizada.',
-      date: 'Hace 20 minutos',
-      read: false,
-    },
-    {
-      id: 3,
-      type: 'invoice_status',
-      title: 'Factura Aprobada',
-      description: 'La factura #INV-001 por $25,500.00 ha sido aprobada para pago.',
-      date: 'Hace 1 hora',
-      read: true,
-    },
-  ];
+  {
+    id: 1,
+    type: 'new_supplier',
+    title: 'Nuevo proveedor registrado',
+    description: 'El proveedor "Aceros del Norte" ha completado su registro.',
+    date: new Date().toISOString(),
+    read: false,
+    link: '/proveedores/1',
+    tag: 'Proveedores',
+  },
+  {
+    id: 2,
+    type: 'doc_update',
+    title: 'Documento por vencer',
+    description: '"Logística Express" tiene un documento que vence en 15 días.',
+    date: new Date().toISOString(),
+    read: false,
+    link: '/proveedores/2',
+    tag: 'Documentos',
+  },
+  {
+    id: 3,
+    type: 'invoice_status',
+    title: 'Factura Aprobada',
+    description: 'La factura #INV-002 por $12,300.50 ha sido aprobada para pago.',
+    date: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString(),
+    read: true,
+    link: '/facturas?search=INV-002',
+    tag: 'Facturación',
+  },
+  {
+    id: 4,
+    type: 'invoice_status',
+    title: 'Factura Rechazada',
+    description: 'La factura #INV-004 fue rechazada. Motivo: Conceptos no coinciden.',
+    date: new Date(new Date().setDate(new Date().getDate() - 2)).toISOString(),
+    read: true,
+    link: '/facturas?search=INV-004',
+    tag: 'Facturación',
+  },
+  {
+    id: 5,
+    type: 'new_message',
+    title: 'Nuevo Mensaje',
+    description: 'Tienes un nuevo mensaje de "Componentes Electrónicos Globales".',
+    date: new Date(new Date().setDate(new Date().getDate() - 3)).toISOString(),
+    read: false,
+    link: '/mensajeria',
+    tag: 'Mensajería',
+  },
+  {
+    id: 6,
+    type: 'payment_done',
+    title: 'Pago Realizado',
+    description: 'Se ha realizado el pago de la factura #INV-001.',
+    date: new Date(new Date().setDate(new Date().getDate() - 5)).toISOString(),
+    read: true,
+    link: '/pagos?search=PAY-001',
+    tag: 'Pagos',
+  },
+];
+
 
 export const spendingData = [
   { month: 'Enero', 'Aceros del Norte': 2000, 'Materiales ABC': 1500, 'Constructora Rápida': 1000 },

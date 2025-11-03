@@ -57,14 +57,19 @@ export type Payment = {
   paymentComplement: boolean;
 };
 
+export type NotificationType = 'new_supplier' | 'doc_update' | 'invoice_status' | 'new_message' | 'payment_done';
+
 export type Notification = {
   id: number;
-  type: 'new_supplier' | 'doc_update' | 'invoice_status';
+  type: NotificationType;
   title: string;
   description: string;
-  date: string;
+  date: string; // ISO 8601 string
   read: boolean;
+  link: string;
+  tag: string;
 };
+
 
 export type NavItem = {
   href: string;
