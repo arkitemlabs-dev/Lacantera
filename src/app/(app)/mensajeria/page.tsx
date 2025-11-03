@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { suppliers } from '@/lib/data';
 import { Paperclip, Send } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const conversations = [
   {
@@ -29,6 +30,32 @@ const conversations = [
     time: '10:30 AM',
     unread: true,
     avatar: 'A',
+    messages: [
+        {
+            id: 1,
+            author: 'Aceros del Norte S.A. de C.V.',
+            avatar: 'A',
+            text: 'Buenos días, tenemos una duda sobre la orden de compra OC-128.',
+            time: '10:30 AM',
+            isCurrentUser: false,
+        },
+        {
+            id: 2,
+            author: 'Juan Pérez (Admin)',
+            avatar: 'JP',
+            text: 'Buen día, ¿cuál es su duda?',
+            time: '10:31 AM',
+            isCurrentUser: true,
+        },
+        {
+            id: 3,
+            author: 'Aceros del Norte S.A. de C.V.',
+            avatar: 'A',
+            text: 'El precio del item "Resma de papel" no coincide con nuestra cotización.',
+            time: '10:32 AM',
+            isCurrentUser: false,
+        },
+    ]
   },
   {
     id: 2,
@@ -37,6 +64,24 @@ const conversations = [
     time: 'Ayer',
     unread: false,
     avatar: 'L',
+    messages: [
+        {
+            id: 1,
+            author: 'Logística Express Mexicana',
+            avatar: 'L',
+            text: 'Buenas tardes, ¿hay alguna actualización sobre la factura A-5832?',
+            time: 'Ayer, 3:45 PM',
+            isCurrentUser: false,
+        },
+        {
+            id: 2,
+            author: 'Maria García (Admin)',
+            avatar: 'MG',
+            text: 'Hola, sí. Fue aprobada esta mañana. Deberían ver el cambio de estado en el portal.',
+            time: 'Ayer, 3:50 PM',
+            isCurrentUser: true,
+        },
+    ]
   },
   {
     id: 3,
@@ -45,38 +90,22 @@ const conversations = [
     time: '2d',
     unread: false,
     avatar: 'C',
-  },
-];
-
-const messages = [
-  {
-    id: 1,
-    author: 'Aceros del Norte S.A. de C.V.',
-    avatar: 'A',
-    text: 'Buenos días, tenemos una duda sobre la orden de compra OC-128.',
-    time: '10:30 AM',
-    isCurrentUser: false,
-  },
-  {
-    id: 2,
-    author: 'Juan Pérez (Admin)',
-    avatar: 'JP',
-    text: 'Buen día, ¿cuál es su duda?',
-    time: '10:31 AM',
-    isCurrentUser: true,
-  },
-  {
-    id: 3,
-    author: 'Aceros del Norte S.A. de C.V.',
-    avatar: 'A',
-    text: 'El precio del item "Resma de papel" no coincide con nuestra cotización.',
-    time: '10:32 AM',
-    isCurrentUser: false,
+    messages: [
+        {
+            id: 1,
+            author: 'Componentes Electrónicos Globales',
+            avatar: 'C',
+            text: 'Hola, estamos teniendo problemas para subir el acta constitutiva. El sistema muestra un error.',
+            time: 'Hace 2 días',
+            isCurrentUser: false,
+        }
+    ]
   },
 ];
 
 export default function MensajeriaPage() {
   const [supplierFilter, setSupplierFilter] = useState('todos');
+  const [selectedConversation, setSelectedConversation] = useState(conversations[0]);
 
   const filteredConversations = useMemo(() => {
     if (supplierFilter === 'todos') {
@@ -112,7 +141,11 @@ export default function MensajeriaPage() {
             {filteredConversations.map((conv) => (
               <div
                 key={conv.id}
-                className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-muted bg-background/50"
+                onClick={() => setSelectedConversation(conv)}
+                className={cn(
+                    "flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-muted",
+                    selectedConversation.id === conv.id ? 'bg-muted' : 'bg-background/50'
+                )}
               >
                 <Avatar className="h-10 w-10">
                   <AvatarFallback>{conv.avatar}</AvatarFallback>
@@ -139,11 +172,11 @@ export default function MensajeriaPage() {
       <div className="flex flex-col">
         <Card className="flex-1 flex flex-col rounded-none border-0 shadow-none">
           <CardHeader className="border-b">
-            <h2 className="text-xl font-semibold">Aceros del Norte S.A. de C.V.</h2>
-            <p className="text-sm text-muted-foreground">Ticket: Duda sobre OC-128</p>
+            <h2 className="text-xl font-semibold">{selectedConversation.name}</h2>
+            <p className="text-sm text-muted-foreground">Ticket: {selectedConversation.subject}</p>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto p-6 space-y-6">
-            {messages.map((message) => (
+            {selectedConversation.messages.map((message) => (
               <div
                 key={message.id}
                 className={`flex items-end gap-3 ${
@@ -167,6 +200,11 @@ export default function MensajeriaPage() {
                     {message.time}
                   </p>
                 </div>
+                {message.isCurrentUser && (
+                    <Avatar className="h-8 w-8">
+                        <AvatarFallback>{message.avatar}</AvatarFallback>
+                    </Avatar>
+                )}
               </div>
             ))}
           </CardContent>
