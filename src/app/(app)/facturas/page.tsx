@@ -54,7 +54,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 
 const getBadgeVariant = (status: Invoice['status']) => {
   switch (status) {
-    case 'Aprobada':
+    case 'Pendiente pago':
       return 'bg-green-500/20 text-green-200 border-green-500/30 hover:bg-green-500/30';
     case 'En Revisión':
       return 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30 hover:bg-yellow-500/30';
@@ -168,7 +168,7 @@ export default function FacturasPage() {
                 <SelectContent>
                   <SelectItem value="todas">Todos los estados</SelectItem>
                   <SelectItem value="en-revision">En Revisión</SelectItem>
-                  <SelectItem value="aprobada">Aprobada</SelectItem>
+                  <SelectItem value="pendiente-pago">Pendiente pago</SelectItem>
                   <SelectItem value="pagada">Pagada</SelectItem>
                   <SelectItem value="rechazada">Rechazada</SelectItem>
                 </SelectContent>

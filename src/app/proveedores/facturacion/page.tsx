@@ -23,7 +23,7 @@ import { Eye, Copy, Search, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
-type InvoiceStatus = 'En revisión' | 'Pagada' | 'Aprobada' | 'Rechazada';
+type InvoiceStatus = 'En revisión' | 'Pagada' | 'Pendiente pago' | 'Rechazada';
 
 const invoices = [
   {
@@ -47,7 +47,7 @@ const invoices = [
     cfdi: 'F-DEF-789',
     ordenAsociada: 'OC-123',
     fechaEmision: '2024-07-05',
-    estado: 'Aprobada',
+    estado: 'Pendiente pago',
     monto: 12500.0,
   },
   {
@@ -66,7 +66,7 @@ const getStatusBadgeClass = (status: InvoiceStatus) => {
       return 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30';
     case 'Pagada':
       return 'bg-green-500/20 text-green-200 border-green-500/30';
-    case 'Aprobada':
+    case 'Pendiente pago':
       return 'bg-blue-500/20 text-blue-200 border-blue-500/30';
     case 'Rechazada':
       return 'bg-red-500/20 text-red-200 border-red-500/30';
@@ -78,10 +78,11 @@ const getStatusBadgeClass = (status: InvoiceStatus) => {
 export default function FacturacionProveedorPage() {
   return (
     <main className="flex-1 space-y-8 p-4 md:p-8">
-      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-        <Link href="/proveedores/dashboard" className="hover:text-foreground">Inicio</Link>
-        <span>&gt;</span>
-        <span className="text-foreground">Facturación</span>
+       <div className="space-y-0.5">
+        <h1 className="text-2xl font-bold tracking-tight">Facturación</h1>
+        <p className="text-muted-foreground">
+          Cargue y de seguimiento a sus facturas.
+        </p>
       </div>
 
       <Card className="bg-card/70">

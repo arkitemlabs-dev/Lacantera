@@ -1,3 +1,4 @@
+
 import type { LucideIcon } from 'lucide-react';
 
 export type SupplierStatus = 'active' | 'pending' | 'attention' | 'inactive' | 'review';
@@ -22,7 +23,7 @@ export type Invoice = {
   supplierName: string;
   amount: number;
   entryDate: string;
-  status: 'Aprobada' | 'En Revisión' | 'Rechazada' | 'Pagada';
+  status: 'Pendiente pago' | 'En Revisión' | 'Rechazada' | 'Pagada';
   actionable: boolean;
   purchaseOrderId: string;
 };

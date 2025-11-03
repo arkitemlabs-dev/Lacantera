@@ -1,3 +1,4 @@
+
 import type { Supplier, Invoice, Notification, NavItem, PurchaseOrder, Payment } from '@/lib/types';
 import {
   Home,
@@ -66,7 +67,7 @@ export const suppliers: Supplier[] = [
 
 export const invoices: Invoice[] = [
   { id: 'INV-001', purchaseOrderId: 'OC-128', invoiceNumber: 'FACT-001', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 25500.00, entryDate: '01/07/2024', status: 'Pagada', actionable: false },
-  { id: 'INV-002', purchaseOrderId: 'OC-127', invoiceNumber: 'FACT-002', supplierName: 'Logística Express Mexicana', amount: 12300.50, entryDate: '03/07/2024', status: 'Aprobada', actionable: false },
+  { id: 'INV-002', purchaseOrderId: 'OC-127', invoiceNumber: 'FACT-002', supplierName: 'Logística Express Mexicana', amount: 12300.50, entryDate: '03/07/2024', status: 'Pendiente pago', actionable: false },
   { id: 'INV-003', purchaseOrderId: 'OC-126', invoiceNumber: 'FACT-003', supplierName: 'Componentes Electrónicos Globales', amount: 8750.00, entryDate: '05/07/2024', status: 'Pagada', actionable: false },
   { id: 'INV-004', purchaseOrderId: 'OC-125', invoiceNumber: 'FACT-004', supplierName: 'Arrendamientos y Maquinaria Pesada', amount: 4200.00, entryDate: '06/07/2024', status: 'Rechazada', actionable: false },
   { id: 'INV-005', purchaseOrderId: 'OC-124', invoiceNumber: 'FACT-005', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 31000.00, entryDate: '08/07/2024', status: 'En Revisión', actionable: true },
