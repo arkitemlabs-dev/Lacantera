@@ -19,7 +19,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Eye, Copy, Search, Upload } from 'lucide-react';
+import { Eye, Search, Upload, FileDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -145,14 +145,18 @@ export default function FacturacionProveedorPage() {
                       currency: 'MXN',
                     }).format(invoice.monto)}
                   </TableCell>
-                  <TableCell className="text-center space-x-2">
+                  <TableCell className="text-center space-x-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8">
                       <Eye className="h-4 w-4" />
                       <span className="sr-only">Ver</span>
                     </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <Copy className="h-4 w-4" />
-                      <span className="sr-only">Copiar</span>
+                      <Upload className="h-4 w-4" />
+                      <span className="sr-only">Subir</span>
+                    </Button>
+                     <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <FileDown className="h-4 w-4" />
+                      <span className="sr-only">Descargar</span>
                     </Button>
                   </TableCell>
                 </TableRow>
