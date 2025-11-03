@@ -60,10 +60,6 @@ export default function OrdenesDeCompraPage() {
                 Consulte y gestione todas sus órdenes de compra.
                 </p>
             </div>
-            <Button>
-                <FileDown className="mr-2 h-4 w-4" />
-                Descargar Reporte
-            </Button>
         </div>
     </div>
     <Tabs defaultValue="todas">
