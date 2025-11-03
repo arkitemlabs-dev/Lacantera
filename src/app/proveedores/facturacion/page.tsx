@@ -1,6 +1,7 @@
 
 'use client';
 
+import { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -22,7 +23,31 @@ import { Input } from '@/components/ui/input';
 import { Eye, Search, Upload, FileDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { purchaseOrders } from '@/lib/data';
+
 
 type InvoiceStatus = 'En revisión' | 'Pagada' | 'Pendiente pago' | 'Rechazada';
 
@@ -77,7 +102,9 @@ const getStatusBadgeClass = (status: InvoiceStatus) => {
 };
 
 export default function FacturacionProveedorPage() {
+    const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   return (
+    <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
     <main className="flex-1 space-y-8 p-4 md:p-8">
        <div className="space-y-0.5">
         <h1 className="text-2xl font-bold tracking-tight">Facturación</h1>
@@ -95,10 +122,12 @@ export default function FacturacionProveedorPage() {
                 Cargue y de seguimiento a sus facturas.
               </CardDescription>
             </div>
-            <Button>
-              <Upload className="mr-2 h-4 w-4" />
-              Subir Factura (PDF/XML)
-            </Button>
+            <DialogTrigger asChild>
+                <Button>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Subir Factura (PDF/XML)
+                </Button>
+            </DialogTrigger>
           </div>
           <div className="mt-4 flex max-w-lg items-center space-x-2">
             <div className="relative flex-1">
@@ -189,6 +218,56 @@ export default function FacturacionProveedorPage() {
           </TooltipProvider>
         </CardContent>
       </Card>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Subir Nueva Factura</DialogTitle>
+          <DialogDescription>
+            Adjunte los archivos de su factura (PDF y XML) y asóciela a una orden de compra.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="relative border-2 border-dashed border-muted rounded-lg p-6 flex flex-col items-center justify-center text-center h-48">
+            <Upload className="w-8 h-8 text-muted-foreground" />
+            <p className="mt-2 text-sm text-muted-foreground">
+              Arrastre sus archivos aquí o haga clic para seleccionar
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              PDF y XML requeridos
+            </p>
+            <Input
+              type="file"
+              multiple
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="purchaseOrder">Asociar a Orden de Compra</Label>
+            <Select>
+              <SelectTrigger id="purchaseOrder">
+                <SelectValue placeholder="Seleccione una orden de compra..." />
+              </SelectTrigger>
+              <SelectContent>
+                {purchaseOrders.filter(po => po.status !== 'Cancelada' && po.status !== 'Completa').map(po => (
+                  <SelectItem key={po.id} value={po.id}>
+                    {po.id} - {po.name} ({new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(po.amount)})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+           <div className="space-y-2">
+            <Label htmlFor="invoiceId">Folio de Factura</Label>
+            <Input id="invoiceId" placeholder="Ej. A-5833" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setIsUploadDialogOpen(false)}>Cancelar</Button>
+          <Button onClick={() => setIsUploadDialogOpen(false)}>Subir y Enviar a Revisión</Button>
+        </DialogFooter>
+      </DialogContent>
     </main>
+    </Dialog>
   );
 }
+
+    
