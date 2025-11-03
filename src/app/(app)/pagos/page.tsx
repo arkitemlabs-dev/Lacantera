@@ -1,7 +1,12 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import Link from 'next/link';
+import type { DateRange } from 'react-day-picker';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+
 import {
   Card,
   CardContent,
@@ -14,11 +19,11 @@ import {
   DollarSign,
   CheckCircle,
   FilePlus2,
-  Search,
   Download,
   FileText,
-  X,
   Eye,
+  Calendar as CalendarIcon,
+  ListFilter,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,10 +36,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { payments } from '@/lib/data';
+import { payments, suppliers } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import type { Payment } from '@/lib/types';
-import Link from 'next/link';
 import {
   Dialog,
   DialogContent,
@@ -44,6 +48,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const kpiCards = [
   {
@@ -83,6 +96,30 @@ export default function PagosPage() {
     type: DocumentType;
   } | null>(null);
 
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [status, setStatus] = useState('todas');
+  const [supplier, setSupplier] = useState('todos');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredPayments = useMemo(() => {
+    return payments.filter((payment) => {
+        // Normalizing date for comparison. Assuming 'DD/MM/YYYY' format.
+        const parts = payment.executionDate.split('/');
+        const paymentDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+
+        const dateFilter = !dateRange?.from || (paymentDate >= dateRange.from && (!dateRange.to || paymentDate <= dateRange.to));
+        const statusFilter = status === 'todas' || payment.status.toLowerCase().replace(' ', '-') === status;
+        const supplierFilter = supplier === 'todos' || payment.supplierName === suppliers.find(s => s.id === supplier)?.name;
+        const searchFilter =
+            payment.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            payment.invoiceId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            payment.supplierName.toLowerCase().includes(searchTerm.toLowerCase());
+
+        return dateFilter && statusFilter && supplierFilter && searchFilter;
+    });
+  }, [dateRange, status, supplier, searchTerm]);
+
+
   const handleOpenDialog = (payment: Payment, type: DocumentType) => {
     setSelectedDocument({ payment, type });
     setIsDialogOpen(true);
@@ -91,6 +128,13 @@ export default function PagosPage() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setSelectedDocument(null);
+  };
+
+  const clearFilters = () => {
+    setDateRange(undefined);
+    setStatus('todas');
+    setSupplier('todos');
+    setSearchTerm('');
   };
 
   return (
@@ -117,6 +161,92 @@ export default function PagosPage() {
               </Card>
             ))}
           </div>
+          
+           <Card>
+            <CardHeader>
+                <CardTitle>Filtros de Búsqueda</CardTitle>
+                <CardDescription>
+                Refine los resultados de los pagos.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="relative">
+                    <Popover>
+                    <PopoverTrigger asChild>
+                        <Button
+                        variant={'outline'}
+                        className={cn(
+                            'w-full justify-start text-left font-normal',
+                            !dateRange && 'text-muted-foreground'
+                        )}
+                        >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dateRange?.from ? (
+                            dateRange.to ? (
+                            <>
+                                {format(dateRange.from, 'LLL dd, y', { locale: es })} -{' '}
+                                {format(dateRange.to, 'LLL dd, y', { locale: es })}
+                            </>
+                            ) : (
+                            format(dateRange.from, 'LLL dd, y', { locale: es })
+                            )
+                        ) : (
+                            <span>Rango de Fechas</span>
+                        )}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={dateRange?.from}
+                        selected={dateRange}
+                        onSelect={setDateRange}
+                        numberOfMonths={2}
+                        locale={es}
+                        />
+                    </PopoverContent>
+                    </Popover>
+                </div>
+                <Select value={status} onValueChange={setStatus}>
+                    <SelectTrigger>
+                    <SelectValue placeholder="Estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                    <SelectItem value="todas">Todos los estados</SelectItem>
+                    <SelectItem value="realizado">Realizado</SelectItem>
+                    <SelectItem value="programado">Programado</SelectItem>
+                    <SelectItem value="cancelado">Cancelado</SelectItem>
+                    </SelectContent>
+                </Select>
+                <Select value={supplier} onValueChange={setSupplier}>
+                    <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar proveedor..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                    <SelectItem value="todos">Todos los proveedores</SelectItem>
+                    {suppliers.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                        </SelectItem>
+                    ))}
+                    </SelectContent>
+                </Select>
+                <Input
+                    placeholder="Buscar por ID, factura, proveedor..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                </div>
+            </CardContent>
+            <CardFooter className="justify-end gap-2">
+                <Button variant="outline" onClick={clearFilters}>
+                <ListFilter className="mr-2 h-4 w-4" />
+                Limpiar Filtros
+                </Button>
+            </CardFooter>
+        </Card>
 
           {/* Payments Table */}
           <Card>
@@ -125,15 +255,6 @@ export default function PagosPage() {
               <CardDescription>
                 Busca y gestiona todos los pagos registrados en el sistema.
               </CardDescription>
-              <div className="mt-4 flex items-center gap-2">
-                <Input
-                  placeholder="Buscar por ID de pago, factura o proveedor..."
-                  className="max-w-lg"
-                />
-                <Button>
-                  <Search className="mr-2 h-4 w-4" /> Buscar
-                </Button>
-              </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -151,7 +272,7 @@ export default function PagosPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {payments.map((payment) => (
+                  {filteredPayments.map((payment) => (
                     <TableRow key={payment.id}>
                       <TableCell className="font-medium">
                         {payment.id}
