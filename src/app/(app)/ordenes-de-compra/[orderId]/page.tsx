@@ -47,8 +47,6 @@ const getStatusBadge = (status: PurchaseOrder['status']) => {
       return 'bg-green-500/20 text-green-200 border-green-500/30';
     case 'Cancelada':
       return 'bg-red-500/20 text-red-200 border-red-500/30';
-    case 'Atrasada':
-      return 'bg-blue-500/20 text-blue-200 border-blue-500/30';
   }
 };
 

@@ -28,7 +28,7 @@ export type Invoice = {
   purchaseOrderId: string;
 };
 
-export type PurchaseOrderStatus = 'Pendiente' | 'Completa' | 'Atrasada' | 'Cancelada';
+export type PurchaseOrderStatus = 'Pendiente' | 'Completa' | 'Cancelada';
 
 export type PurchaseOrder = {
   id: string;

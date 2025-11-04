@@ -74,11 +74,6 @@ const statusStyles: Record<
     className:
       'bg-green-500/20 text-green-200 border-green-500/30 hover:bg-green-500/30',
   },
-  Atrasada: {
-    variant: 'outline',
-    className:
-      'bg-blue-500/20 text-blue-200 border-blue-500/30 hover:bg-blue-500/30',
-  },
   Cancelada: {
     variant: 'destructive',
     className:
@@ -180,7 +175,6 @@ export default function OrdenesDeCompraPage() {
                   <SelectItem value="todas">Todos los estados</SelectItem>
                   <SelectItem value="pendiente">Pendiente</SelectItem>
                   <SelectItem value="completa">Completa</SelectItem>
-                  <SelectItem value="atrasada">Atrasada</SelectItem>
                   <SelectItem value="cancelada">Cancelada</SelectItem>
                 </SelectContent>
               </Select>
