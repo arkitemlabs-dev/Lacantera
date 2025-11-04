@@ -57,7 +57,7 @@ const invoices = [
   {
     folio: 'A-5832',
     cfdi: 'F-XYZ-123',
-    ordenAsociada: 'OC-127',
+    ordenesAsociadas: ['OC-127', 'OC-128'],
     fechaEmision: '2024-07-19',
     estado: 'En revisión',
     monto: 8500.5,
@@ -65,7 +65,7 @@ const invoices = [
   {
     folio: 'A-5831',
     cfdi: 'F-ABC-456',
-    ordenAsociada: 'OC-124',
+    ordenesAsociadas: ['OC-124'],
     fechaEmision: '2024-07-11',
     estado: 'Pagada',
     monto: 3200.75,
@@ -73,7 +73,7 @@ const invoices = [
   {
     folio: 'A-5830',
     cfdi: 'F-DEF-789',
-    ordenAsociada: 'OC-123',
+    ordenesAsociadas: ['OC-123'],
     fechaEmision: '2024-07-05',
     estado: 'Pendiente pago',
     monto: 12500.0,
@@ -81,7 +81,7 @@ const invoices = [
   {
     folio: 'A-5829',
     cfdi: 'F-GHI-012',
-    ordenAsociada: 'OC-122',
+    ordenesAsociadas: ['OC-122'],
     fechaEmision: '2024-07-02',
     estado: 'Rechazada',
     monto: 1800.0,
@@ -162,9 +162,19 @@ export default function FacturacionProveedorPage() {
                     <TableCell className="font-medium">{invoice.folio}</TableCell>
                     <TableCell>{invoice.cfdi}</TableCell>
                     <TableCell>
-                      <Link href={`/proveedores/ordenes-de-compra/${invoice.ordenAsociada}`} className="hover:underline text-blue-400">
-                          {invoice.ordenAsociada}
-                      </Link>
+                      <div className="flex flex-wrap gap-1">
+                        {invoice.ordenesAsociadas.length > 1 ? (
+                          invoice.ordenesAsociadas.map(orderId => (
+                             <Link key={orderId} href={`/proveedores/ordenes-de-compra/${orderId}`}>
+                                <Badge variant="outline" className="cursor-pointer hover:bg-muted">{orderId}</Badge>
+                             </Link>
+                          ))
+                        ) : (
+                          <Link href={`/proveedores/ordenes-de-compra/${invoice.ordenesAsociadas[0]}`} className="hover:underline text-blue-400">
+                              {invoice.ordenesAsociadas[0]}
+                          </Link>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>{invoice.fechaEmision}</TableCell>
                     <TableCell>
@@ -276,3 +286,5 @@ export default function FacturacionProveedorPage() {
     </Dialog>
   );
 }
+
+    
