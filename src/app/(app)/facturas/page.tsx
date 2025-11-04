@@ -399,7 +399,7 @@ export default function FacturasPage() {
                       </div>
                     </CardContent>
                   </Card>
-                   {(selectedInvoice.status !== 'Pagada' && selectedInvoice.status !== 'Pendiente pago') && (
+                   {selectedInvoice.status === 'En Revisión' && (
                     <Card>
                         <CardHeader>
                         <CardTitle>Acciones de Revisión</CardTitle>
@@ -430,9 +430,9 @@ export default function FacturasPage() {
               </div>
               <DialogFooter className="gap-2">
                  <Button variant="outline" onClick={handleDialogClose}>
-                    {selectedInvoice.status === 'Pagada' || selectedInvoice.status === 'Pendiente pago' ? 'Cerrar' : 'Cancelar'}
+                    {selectedInvoice.status === 'En Revisión' ? 'Cancelar' : 'Cerrar'}
                 </Button>
-                {(selectedInvoice.status !== 'Pagada' && selectedInvoice.status !== 'Pendiente pago') && (
+                {selectedInvoice.status === 'En Revisión' && (
                   <>
                     <Button variant="destructive" onClick={handleDialogClose}>
                       Rechazar con Motivo
