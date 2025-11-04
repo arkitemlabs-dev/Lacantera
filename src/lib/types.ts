@@ -42,6 +42,7 @@ export type PurchaseOrder = {
   invoice?: string;
   createdBy: string;
   budget: number;
+  company: string;
 };
 
 export type PaymentStatus = 'Completo' | 'Pendiente complemento' | 'En Revisión' | 'Rechazada';

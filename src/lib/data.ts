@@ -82,11 +82,11 @@ export const payments: Payment[] = [
 ];
 
 export const purchaseOrders: PurchaseOrder[] = [
-    { id: 'OC-128', name: 'Material de oficina', supplierName: 'Aceros del Norte S.A. de C.V.', emissionDate: '2024-07-20', status: 'Pendiente', amount: 1500.00, deliveryDate: '2024-07-30', area: 'Administración', invoice: undefined, createdBy: 'Ana Lopez', budget: 2000 },
-    { id: 'OC-127', name: 'Equipo de seguridad', supplierName: 'Logística Express Mexicana', emissionDate: '2024-07-18', status: 'Completa', amount: 8500.50, deliveryDate: '2024-07-25', area: 'Operaciones', invoice: 'INV-005', createdBy: 'Carlos Vera', budget: 10000 },
-    { id: 'OC-126', name: 'Refacciones para maquinaria', supplierName: 'Componentes Electrónicos Globales', emissionDate: '2024-07-15', status: 'Pendiente', amount: 25000.00, deliveryDate: '2024-07-22', area: 'Mantenimiento', invoice: undefined, createdBy: 'Maria Garcia', budget: 25000 },
-    { id: 'OC-125', name: 'Servicio de catering', supplierName: 'Servicios de Consultoría Integral', emissionDate: '2024-07-12', status: 'Cancelada', amount: 5000.00, deliveryDate: '2024-07-14', area: 'Eventos', invoice: undefined, createdBy: 'Juan Pérez', budget: 5000 },
-    { id: 'OC-124', name: 'Herramientas manuales', supplierName: 'Suministros Industriales de la Costa', emissionDate: '2024-07-10', status: 'Completa', amount: 3200.75, deliveryDate: '2024-07-18', area: 'Taller', invoice: 'INV-004', createdBy: 'Pedro Gomez', budget: 4000 },
+    { id: 'OC-128', name: 'Material de oficina', supplierName: 'Aceros del Norte S.A. de C.V.', emissionDate: '2024-07-20', status: 'Pendiente', amount: 1500.00, deliveryDate: '2024-07-30', area: 'Administración', invoice: undefined, createdBy: 'Ana Lopez', budget: 2000, company: 'La Cantera Desarrollos Mineros' },
+    { id: 'OC-127', name: 'Equipo de seguridad', supplierName: 'Logística Express Mexicana', emissionDate: '2024-07-18', status: 'Completa', amount: 8500.50, deliveryDate: '2024-07-25', area: 'Operaciones', invoice: 'INV-005', createdBy: 'Carlos Vera', budget: 10000, company: 'La Cantera Desarrollos Mineros' },
+    { id: 'OC-126', name: 'Refacciones para maquinaria', supplierName: 'Componentes Electrónicos Globales', emissionDate: '2024-07-15', status: 'Pendiente', amount: 25000.00, deliveryDate: '2024-07-22', area: 'Mantenimiento', invoice: undefined, createdBy: 'Maria Garcia', budget: 25000, company: 'La Cantera Desarrollos Mineros' },
+    { id: 'OC-125', name: 'Servicio de catering', supplierName: 'Servicios de Consultoría Integral', emissionDate: '2024-07-12', status: 'Cancelada', amount: 5000.00, deliveryDate: '2024-07-14', area: 'Eventos', invoice: undefined, createdBy: 'Juan Pérez', budget: 5000, company: 'La Cantera Desarrollos Mineros' },
+    { id: 'OC-124', name: 'Herramientas manuales', supplierName: 'Suministros Industriales de la Costa', emissionDate: '2024-07-10', status: 'Completa', amount: 3200.75, deliveryDate: '2024-07-18', area: 'Taller', invoice: 'INV-004', createdBy: 'Pedro Gomez', budget: 4000, company: 'La Cantera Desarrollos Mineros' },
 ]
 
 export const notifications: Notification[] = [

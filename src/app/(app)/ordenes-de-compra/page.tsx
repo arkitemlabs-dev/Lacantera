@@ -214,6 +214,7 @@ export default function OrdenesDeCompraPage() {
                   <TableHead>ID</TableHead>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Proveedor</TableHead>
+                  <TableHead>Empresa</TableHead>
                   <TableHead>Fecha Emisión</TableHead>
                   <TableHead>Estatus</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
@@ -238,6 +239,7 @@ export default function OrdenesDeCompraPage() {
                     </TableCell>
                     <TableCell>{order.name}</TableCell>
                     <TableCell>{order.supplierName}</TableCell>
+                    <TableCell>{order.company}</TableCell>
                     <TableCell>{new Date(order.emissionDate).toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' })}</TableCell>
                     <TableCell>
                       <Badge
