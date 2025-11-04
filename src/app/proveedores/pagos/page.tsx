@@ -209,7 +209,7 @@ export default function PagosProveedorPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        {payment.hasComplement ? (
+                        {payment.hasComplement || payment.status === 'En revisión' ? (
                           <div className="flex items-center justify-center gap-1">
                             <Tooltip>
                               <TooltipTrigger asChild>
