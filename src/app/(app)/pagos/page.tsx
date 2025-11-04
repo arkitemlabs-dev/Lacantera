@@ -291,7 +291,24 @@ export default function PagosPage() {
                             </Button>
                           </>
                         ) : payment.status === 'Pendiente complemento' || payment.status === 'Rechazada' ? (
-                          <Button variant="outline" size="sm"><Upload className="mr-2 h-4 w-4" />Subir</Button>
+                           <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className='h-8 w-8'
+                              disabled
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className='h-8 w-8'
+                              disabled
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </>
                         ) : payment.paymentComplement ? (
                           <>
                              <DialogTrigger asChild>
