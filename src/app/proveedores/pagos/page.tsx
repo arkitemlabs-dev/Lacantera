@@ -51,7 +51,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-type PaymentStatus = 'Completado' | 'Pagado' | 'En revisión';
+type PaymentStatus = 'Completado' | 'Pagado' | 'En revisión' | 'Rechazado';
 
 const payments = [
   {
@@ -108,6 +108,15 @@ const payments = [
     status: 'Completado',
     hasComplement: true,
   },
+  {
+    id: 'PAY-007',
+    invoice: 'A-5810',
+    amount: 420.0,
+    date: '2024-06-28',
+    method: 'Transferencia SPEI',
+    status: 'Rechazado',
+    hasComplement: false,
+  },
 ];
 
 const getStatusBadgeClass = (status: PaymentStatus) => {
@@ -118,6 +127,8 @@ const getStatusBadgeClass = (status: PaymentStatus) => {
       return 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30';
     case 'En revisión':
       return 'bg-blue-500/20 text-blue-200 border-blue-500/30';
+    case 'Rechazado':
+      return 'bg-red-500/20 text-red-200 border-red-500/30';
     default:
       return 'secondary';
   }
@@ -160,6 +171,7 @@ export default function PagosProveedorPage() {
                   <SelectItem value="completado">Completado</SelectItem>
                   <SelectItem value="pagado">Pagado</SelectItem>
                   <SelectItem value="en-revision">En revisión</SelectItem>
+                  <SelectItem value="rechazado">Rechazado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
