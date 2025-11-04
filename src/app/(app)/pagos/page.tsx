@@ -62,12 +62,8 @@ const getStatusVariant = (status: PaymentStatus) => {
   switch (status) {
     case 'Completo':
       return 'bg-green-500/20 text-green-200 border-green-500/30';
-    case 'Realizado en espera de complemento':
+    case 'Pendiente complemento':
       return 'bg-blue-500/20 text-blue-200 border-blue-500/30';
-    case 'Programado':
-      return 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30';
-    case 'Cancelado':
-      return 'bg-red-500/20 text-red-200 border-red-500/30';
   }
 };
 
@@ -183,9 +179,7 @@ export default function PagosPage() {
                     <SelectContent>
                     <SelectItem value="todas">Todos los estados</SelectItem>
                     <SelectItem value="completo">Completo</SelectItem>
-                    <SelectItem value="realizado-en-espera-de-complemento">Realizado en espera de complemento</SelectItem>
-                    <SelectItem value="programado">Programado</SelectItem>
-                    <SelectItem value="cancelado">Cancelado</SelectItem>
+                    <SelectItem value="pendiente-complemento">Pendiente complemento</SelectItem>
                     </SelectContent>
                 </Select>
                 <Select value={supplier} onValueChange={setSupplier}>

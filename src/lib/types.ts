@@ -44,7 +44,7 @@ export type PurchaseOrder = {
   budget: number;
 };
 
-export type PaymentStatus = 'Completo' | 'Realizado en espera de complemento' | 'Programado' | 'Cancelado';
+export type PaymentStatus = 'Completo' | 'Pendiente complemento';
 
 export type Payment = {
   id: string;
