@@ -187,7 +187,8 @@ export default function PagosProveedorPage() {
                     <TableHead>Fecha de Pago</TableHead>
                     <TableHead>Método</TableHead>
                     <TableHead>Estado</TableHead>
-                    <TableHead className="text-center">Complemento de pago</TableHead>
+                    <TableHead className="text-center">Comprobante de Pago</TableHead>
+                    <TableHead className="text-center">Complemento de Pago</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -219,6 +220,24 @@ export default function PagosProveedorPage() {
                         >
                           {payment.status}
                         </Badge>
+                      </TableCell>
+                       <TableCell className="text-center">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              disabled={payment.status !== 'Completado'}
+                            >
+                              <Download className="h-4 w-4" />
+                              <span className="sr-only">Descargar Comprobante</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Descargar Comprobante</p>
+                          </TooltipContent>
+                        </Tooltip>
                       </TableCell>
                       <TableCell className="text-center">
                         {payment.hasComplement || payment.status === 'En revisión' ? (
