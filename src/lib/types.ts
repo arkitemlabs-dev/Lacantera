@@ -54,7 +54,6 @@ export type Payment = {
   executionDate: string;
   status: PaymentStatus;
   method: 'Transferencia' | 'Tarjeta de Crédito';
-  paymentProof: boolean;
   paymentComplement: boolean;
 };
 

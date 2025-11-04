@@ -229,7 +229,6 @@ export default function PagosPage() {
                     <TableHead>Fecha Ejecución</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Método</TableHead>
-                    <TableHead className="text-center">Comprobante de Pago</TableHead>
                     <TableHead className="text-center">Complemento de Pago</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -261,29 +260,6 @@ export default function PagosPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>{payment.method}</TableCell>
-                      <TableCell className="text-center space-x-1">
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            disabled={!payment.paymentProof}
-                            onClick={() => handleOpenDialog(payment, 'Pago')}
-                            className='h-8 w-8 bg-transparent hover:bg-primary/90'
-                          >
-                            <Eye className="h-4 w-4" />
-                            <span className="sr-only">Ver Pago</span>
-                          </Button>
-                        </DialogTrigger>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          disabled={!payment.paymentProof}
-                          className='h-8 w-8 bg-transparent hover:bg-primary/90'
-                        >
-                          <Download className="h-4 w-4" />
-                          <span className="sr-only">Descargar Pago</span>
-                        </Button>
-                      </TableCell>
                       <TableCell className="text-center space-x-1">
                         <DialogTrigger asChild>
                           <Button

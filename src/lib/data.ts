@@ -74,9 +74,9 @@ export const invoices: Invoice[] = [
 ];
 
 export const payments: Payment[] = [
-    { id: 'PAY-001', invoiceId: 'FACT-001', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 25500.00, executionDate: '15/07/2024', status: 'Completo', method: 'Transferencia', paymentProof: true, paymentComplement: true },
-    { id: 'PAY-002', invoiceId: 'FACT-003', supplierName: 'Componentes Electrónicos Globales', amount: 8750.00, executionDate: '18/07/2024', status: 'Pendiente complemento', method: 'Transferencia', paymentProof: true, paymentComplement: false },
-    { id: 'PAY-003', invoiceId: 'FACT-002', supplierName: 'Logística Express Mexicana', amount: 12300.50, executionDate: '20/07/2024', status: 'Pendiente complemento', method: 'Transferencia', paymentProof: false, paymentComplement: false },
+    { id: 'PAY-001', invoiceId: 'FACT-001', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 25500.00, executionDate: '15/07/2024', status: 'Completo', method: 'Transferencia', paymentComplement: true },
+    { id: 'PAY-002', invoiceId: 'FACT-003', supplierName: 'Componentes Electrónicos Globales', amount: 8750.00, executionDate: '18/07/2024', status: 'Pendiente complemento', method: 'Transferencia', paymentComplement: false },
+    { id: 'PAY-003', invoiceId: 'FACT-002', supplierName: 'Logística Express Mexicana', amount: 12300.50, executionDate: '20/07/2024', status: 'Pendiente complemento', method: 'Transferencia', paymentComplement: false },
 ];
 
 export const purchaseOrders: PurchaseOrder[] = [
