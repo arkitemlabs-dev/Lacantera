@@ -63,7 +63,7 @@ const getStatusVariant = (status: PaymentStatus) => {
     case 'Completo':
       return 'bg-green-500/20 text-green-200 border-green-500/30';
     case 'Pendiente complemento':
-      return 'bg-blue-500/20 text-blue-200 border-blue-500/30';
+      return 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30';
   }
 };
 
