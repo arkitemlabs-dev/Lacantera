@@ -61,6 +61,7 @@ const invoices = [
     fechaEmision: '2024-07-19',
     estado: 'En revisión',
     monto: 8500.5,
+    empresa: 'La Cantera Desarrollos Mineros',
   },
   {
     folio: 'A-5831',
@@ -69,6 +70,7 @@ const invoices = [
     fechaEmision: '2024-07-11',
     estado: 'Pagada',
     monto: 3200.75,
+    empresa: 'La Cantera Desarrollos Mineros',
   },
   {
     folio: 'A-5830',
@@ -77,6 +79,7 @@ const invoices = [
     fechaEmision: '2024-07-05',
     estado: 'Pendiente pago',
     monto: 12500.0,
+    empresa: 'La Cantera Desarrollos Mineros',
   },
   {
     folio: 'A-5829',
@@ -85,6 +88,7 @@ const invoices = [
     fechaEmision: '2024-07-02',
     estado: 'Rechazada',
     monto: 1800.0,
+    empresa: 'La Cantera Desarrollos Mineros',
   },
 ];
 
@@ -150,6 +154,7 @@ export default function FacturacionProveedorPage() {
                   <TableHead>Folio</TableHead>
                   <TableHead>CFDI</TableHead>
                   <TableHead>Orden Asociada</TableHead>
+                  <TableHead>Empresa</TableHead>
                   <TableHead>Fecha Emisión</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
@@ -176,6 +181,7 @@ export default function FacturacionProveedorPage() {
                         )}
                       </div>
                     </TableCell>
+                    <TableCell>{invoice.empresa}</TableCell>
                     <TableCell>{invoice.fechaEmision}</TableCell>
                     <TableCell>
                       <Badge className={cn('font-normal', getStatusBadgeClass(invoice.estado as InvoiceStatus))}>
@@ -286,5 +292,7 @@ export default function FacturacionProveedorPage() {
     </Dialog>
   );
 }
+
+    
 
     
