@@ -359,7 +359,7 @@ export default function PagosPage() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>ID Factura</TableHead>
-                                        <TableHead>Monto</TableHead>
+                                        <TableHead className="text-right">Monto</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -368,7 +368,7 @@ export default function PagosPage() {
                                         return (
                                              <TableRow key={invoiceId}>
                                                 <TableCell className="font-medium">{invoiceId}</TableCell>
-                                                <TableCell>{invoice ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(invoice.amount) : 'N/A'}</TableCell>
+                                                <TableCell className="text-right">{invoice ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(invoice.amount) : 'N/A'}</TableCell>
                                             </TableRow>
                                         )
                                     })}
