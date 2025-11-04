@@ -55,13 +55,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 const getBadgeVariant = (status: Invoice['status']) => {
   switch (status) {
     case 'Pendiente pago':
-      return 'bg-green-500/20 text-green-200 border-green-500/30 hover:bg-green-500/30';
+      return 'bg-blue-500/20 text-blue-200 border-blue-500/30 hover:bg-blue-500/30';
     case 'En Revisión':
       return 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30 hover:bg-yellow-500/30';
     case 'Rechazada':
       return 'bg-red-500/20 text-red-200 border-red-500/30 hover:bg-red-500/30';
     case 'Pagada':
-      return 'bg-blue-500/20 text-blue-200 border-blue-500/30 hover:bg-blue-500/30';
+      return 'bg-green-500/20 text-green-200 border-green-500/30 hover:bg-green-500/30';
     default:
       return 'secondary';
   }
