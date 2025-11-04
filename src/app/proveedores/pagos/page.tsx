@@ -44,6 +44,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 type PaymentStatus = 'Completado' | 'Pagado';
 
@@ -147,78 +153,94 @@ export default function PagosProveedorPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID Pago</TableHead>
-                  <TableHead>Factura</TableHead>
-                  <TableHead className="text-right">Monto</TableHead>
-                  <TableHead>Fecha de Pago</TableHead>
-                  <TableHead>Método</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-center">Complemento de pago</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {payments.map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell className="font-medium">{payment.id}</TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/proveedores/facturacion?search=${payment.invoice}`}
-                        className="hover:underline text-blue-400"
-                      >
-                        {payment.invoice}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {new Intl.NumberFormat('es-MX', {
-                        style: 'currency',
-                        currency: 'MXN',
-                      }).format(payment.amount)}
-                    </TableCell>
-                    <TableCell>{payment.date}</TableCell>
-                    <TableCell>{payment.method}</TableCell>
-                    <TableCell>
-                      <Badge
-                        className={cn(
-                          'font-normal',
-                          getStatusBadgeClass(payment.status as PaymentStatus)
-                        )}
-                      >
-                        {payment.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {payment.hasComplement ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <Eye className="h-4 w-4" />
-                            <span className="sr-only">Ver Complemento</span>
-                          </Button>
-                           <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <Download className="h-4 w-4" />
-                            <span className="sr-only">Descargar Complemento</span>
-                          </Button>
-                        </div>
-                      ) : (
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8"
-                            onClick={() => setSelectedPayment(payment)}
-                          >
-                            <Upload className="mr-2 h-3 w-3" />
-                            Subir
-                          </Button>
-                        </DialogTrigger>
-                      )}
-                    </TableCell>
+            <TooltipProvider>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ID Pago</TableHead>
+                    <TableHead>Factura</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                    <TableHead>Fecha de Pago</TableHead>
+                    <TableHead>Método</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-center">Complemento de pago</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {payments.map((payment) => (
+                    <TableRow key={payment.id}>
+                      <TableCell className="font-medium">{payment.id}</TableCell>
+                      <TableCell>
+                        <Link
+                          href={`/proveedores/facturacion?search=${payment.invoice}`}
+                          className="hover:underline text-blue-400"
+                        >
+                          {payment.invoice}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {new Intl.NumberFormat('es-MX', {
+                          style: 'currency',
+                          currency: 'MXN',
+                        }).format(payment.amount)}
+                      </TableCell>
+                      <TableCell>{payment.date}</TableCell>
+                      <TableCell>{payment.method}</TableCell>
+                      <TableCell>
+                        <Badge
+                          className={cn(
+                            'font-normal',
+                            getStatusBadgeClass(payment.status as PaymentStatus)
+                          )}
+                        >
+                          {payment.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {payment.hasComplement ? (
+                          <div className="flex items-center justify-center gap-1">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <Eye className="h-4 w-4" />
+                                  <span className="sr-only">Ver Complemento</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Ver Complemento</p>
+                              </TooltipContent>
+                            </Tooltip>
+                             <Tooltip>
+                               <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <Download className="h-4 w-4" />
+                                  <span className="sr-only">Descargar Complemento</span>
+                                </Button>
+                               </TooltipTrigger>
+                               <TooltipContent>
+                                 <p>Descargar Complemento</p>
+                               </TooltipContent>
+                             </Tooltip>
+                          </div>
+                        ) : (
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => setSelectedPayment(payment)}
+                            >
+                              <Upload className="mr-2 h-3 w-3" />
+                              Subir
+                            </Button>
+                          </DialogTrigger>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TooltipProvider>
           </CardContent>
         </Card>
 
