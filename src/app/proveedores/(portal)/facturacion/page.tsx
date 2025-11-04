@@ -47,6 +47,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { purchaseOrders } from '@/lib/data';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 type InvoiceStatus = 'En revisión' | 'Pagada' | 'Pendiente pago' | 'Rechazada';
@@ -222,7 +224,7 @@ export default function FacturacionProveedorPage() {
         <DialogHeader>
           <DialogTitle>Subir Nueva Factura</DialogTitle>
           <DialogDescription>
-            Adjunte los archivos de su factura (PDF y XML) y asóciela a una orden de compra.
+            Adjunte los archivos de su factura (PDF y XML) y asóciela a una o más órdenes de compra.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
@@ -241,19 +243,24 @@ export default function FacturacionProveedorPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="purchaseOrder">Asociar a Orden de Compra</Label>
-            <Select>
-              <SelectTrigger id="purchaseOrder">
-                <SelectValue placeholder="Seleccione una orden de compra..." />
-              </SelectTrigger>
-              <SelectContent>
-                {purchaseOrders.filter(po => po.status !== 'Cancelada' && po.status !== 'Completa').map(po => (
-                  <SelectItem key={po.id} value={po.id}>
-                    {po.id} - {po.name} ({new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(po.amount)})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Asociar a Órdenes de Compra</Label>
+            <ScrollArea className="h-40 rounded-md border p-2">
+              <div className="space-y-2">
+                {purchaseOrders
+                  .filter((po) => po.status !== 'Cancelada' && po.status !== 'Completa')
+                  .map((po) => (
+                    <div key={po.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted">
+                      <Checkbox id={`po-${po.id}`} />
+                      <Label htmlFor={`po-${po.id}`} className="flex flex-col flex-1 cursor-pointer">
+                        <span className="font-medium">{po.id} - {po.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(po.amount)}
+                        </span>
+                      </Label>
+                    </div>
+                  ))}
+              </div>
+            </ScrollArea>
           </div>
            <div className="space-y-2">
             <Label htmlFor="invoiceId">Folio de Factura</Label>
@@ -269,5 +276,3 @@ export default function FacturacionProveedorPage() {
     </Dialog>
   );
 }
-
-    
