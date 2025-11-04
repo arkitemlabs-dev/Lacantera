@@ -24,6 +24,8 @@ import {
   Eye,
   Calendar as CalendarIcon,
   ListFilter,
+  Upload,
+  XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,6 +59,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 const getStatusVariant = (status: PaymentStatus) => {
   switch (status) {
@@ -75,10 +79,7 @@ type DocumentType = 'Pago' | 'Complemento';
 
 export default function PagosPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<{
-    payment: Payment;
-    type: DocumentType;
-  } | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [status, setStatus] = useState('todas');
@@ -104,14 +105,14 @@ export default function PagosPage() {
   }, [dateRange, status, supplier, searchTerm]);
 
 
-  const handleOpenDialog = (payment: Payment, type: DocumentType) => {
-    setSelectedDocument({ payment, type });
+  const handleOpenDialog = (payment: Payment) => {
+    setSelectedPayment(payment);
     setIsDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
-    setSelectedDocument(null);
+    setSelectedPayment(null);
   };
 
   const clearFilters = () => {
@@ -267,27 +268,55 @@ export default function PagosPage() {
                       </TableCell>
                       <TableCell>{payment.method}</TableCell>
                       <TableCell className="text-center space-x-1">
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            disabled={!payment.paymentComplement}
-                             onClick={() => handleOpenDialog(payment, 'Complemento')}
-                             className='h-8 w-8 bg-transparent hover:bg-primary/90'
-                          >
-                            <Eye className="h-4 w-4" />
-                            <span className="sr-only">Ver Complemento</span>
-                          </Button>
-                        </DialogTrigger>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          disabled={!payment.paymentComplement}
-                          className='h-8 w-8 bg-transparent hover:bg-primary/90'
-                        >
-                          <Download className="h-4 w-4" />
-                          <span className="sr-only">Descargar Complemento</span>
-                        </Button>
+                        {payment.status === 'En Revisión' ? (
+                          <>
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleOpenDialog(payment)}
+                                className='h-8 w-8 bg-transparent hover:bg-primary/90'
+                              >
+                                <Eye className="h-4 w-4" />
+                                <span className="sr-only">Revisar Complemento</span>
+                              </Button>
+                            </DialogTrigger>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className='h-8 w-8 bg-transparent hover:bg-primary/90'
+                            >
+                              <Download className="h-4 w-4" />
+                              <span className="sr-only">Descargar Complemento</span>
+                            </Button>
+                          </>
+                        ) : payment.status === 'Pendiente complemento' || payment.status === 'Rechazada' ? (
+                          <Button variant="outline" size="sm"><Upload className="mr-2 h-4 w-4" />Subir</Button>
+                        ) : payment.paymentComplement ? (
+                          <>
+                             <DialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleOpenDialog(payment)}
+                                className='h-8 w-8 bg-transparent hover:bg-primary/90'
+                              >
+                                <Eye className="h-4 w-4" />
+                                <span className="sr-only">Ver Complemento</span>
+                              </Button>
+                            </DialogTrigger>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className='h-8 w-8 bg-transparent hover:bg-primary/90'
+                            >
+                              <Download className="h-4 w-4" />
+                              <span className="sr-only">Descargar Complemento</span>
+                            </Button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">N/A</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -299,38 +328,94 @@ export default function PagosPage() {
             </CardFooter>
           </Card>
         </div>
-        {selectedDocument && (
-          <DialogContent className="max-w-3xl">
+        {selectedPayment && (
+          <DialogContent className="max-w-4xl grid-rows-[auto_1fr_auto]">
             <DialogHeader>
               <DialogTitle>
-                Visualizador de Documento: {selectedDocument.type}
+                Revisión de Complemento de Pago: {selectedPayment.id}
               </DialogTitle>
               <DialogDescription>
-                Comprobante para el pago {selectedDocument.payment.id} al proveedor{' '}
-                {selectedDocument.payment.supplierName}.
+                Proveedor: {selectedPayment.supplierName} | Factura:{' '}
+                {selectedPayment.invoiceId}
               </DialogDescription>
             </DialogHeader>
-            <div className="my-4">
-               <Card>
-                <CardContent className="p-4">
-                    <div className="bg-muted/50 h-[500px] flex items-center justify-center rounded-md border-2 border-dashed">
-                        <div className="text-center text-muted-foreground">
-                            <FileText className="mx-auto h-12 w-12" />
-                            <p className="mt-2">Vista previa del documento no disponible.</p>
-                            <p className="text-xs">Este es un marcador de posición.</p>
-                        </div>
+            <div className="grid md:grid-cols-2 gap-6 overflow-y-auto max-h-[60vh] p-1">
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Visualizador de Documento</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="bg-muted h-[500px] flex items-center justify-center rounded-md border-2 border-dashed">
+                      <div className="text-center text-muted-foreground">
+                        <FileText className="mx-auto h-12 w-12" />
+                        <p className="mt-2">
+                          Vista previa del complemento no disponible.
+                        </p>
+                      </div>
                     </div>
-                </CardContent>
-               </Card>
+                  </CardContent>
+                </Card>
+              </div>
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Validaciones Automáticas</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-md">
+                      <p className="text-sm text-green-200">
+                        UUID del complemento coincide
+                      </p>
+                      <CheckCircle className="h-5 w-5 text-green-400" />
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-md">
+                      <p className="text-sm text-red-200">
+                        Monto del pago no coincide
+                      </p>
+                      <XCircle className="h-5 w-5 text-red-400" />
+                    </div>
+                  </CardContent>
+                </Card>
+                {selectedPayment.status === 'En Revisión' && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Acciones de Revisión</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="rejectionReason">
+                          Motivo de Rechazo (si aplica)
+                        </Label>
+                        <Textarea
+                          id="rejectionReason"
+                          placeholder="Describe el motivo del rechazo..."
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </div>
-            <DialogFooter>
-               <Button variant="outline" onClick={handleCloseDialog}>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={handleCloseDialog}>
                 Cerrar
               </Button>
-              <Button>
-                <Download className="mr-2 h-4 w-4" />
-                Descargar Documento
-              </Button>
+              {selectedPayment.status === 'En Revisión' ? (
+                <>
+                  <Button variant="destructive" onClick={handleCloseDialog}>
+                    Rechazar
+                  </Button>
+                  <Button onClick={handleCloseDialog}>
+                    Aprobar Complemento
+                  </Button>
+                </>
+              ) : (
+                <Button>
+                  <Download className="mr-2 h-4 w-4" />
+                  Descargar
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         )}
