@@ -66,11 +66,11 @@ export const suppliers: Supplier[] = [
 ];
 
 export const invoices: Invoice[] = [
-  { id: 'INV-001', purchaseOrderId: 'OC-128', invoiceNumber: 'FACT-001', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 25500.00, entryDate: '01/07/2024', status: 'Pagada', actionable: false },
-  { id: 'INV-002', purchaseOrderId: 'OC-127', invoiceNumber: 'FACT-002', supplierName: 'Logística Express Mexicana', amount: 12300.50, entryDate: '03/07/2024', status: 'Pendiente pago', actionable: false },
-  { id: 'INV-003', purchaseOrderId: 'OC-126', invoiceNumber: 'FACT-003', supplierName: 'Componentes Electrónicos Globales', amount: 8750.00, entryDate: '05/07/2024', status: 'Pagada', actionable: false },
-  { id: 'INV-004', purchaseOrderId: 'OC-125', invoiceNumber: 'FACT-004', supplierName: 'Arrendamientos y Maquinaria Pesada', amount: 4200.00, entryDate: '06/07/2024', status: 'Rechazada', actionable: false },
-  { id: 'INV-005', purchaseOrderId: 'OC-124', invoiceNumber: 'FACT-005', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 31000.00, entryDate: '08/07/2024', status: 'En Revisión', actionable: true },
+  { id: 'INV-001', purchaseOrderIds: ['OC-128'], invoiceNumber: 'FACT-001', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 25500.00, entryDate: '01/07/2024', status: 'Pagada', actionable: false },
+  { id: 'INV-002', purchaseOrderIds: ['OC-127'], invoiceNumber: 'FACT-002', supplierName: 'Logística Express Mexicana', amount: 12300.50, entryDate: '03/07/2024', status: 'Pendiente pago', actionable: false },
+  { id: 'INV-003', purchaseOrderIds: ['OC-126'], invoiceNumber: 'FACT-003', supplierName: 'Componentes Electrónicos Globales', amount: 8750.00, entryDate: '05/07/2024', status: 'Pagada', actionable: false },
+  { id: 'INV-004', purchaseOrderIds: ['OC-125'], invoiceNumber: 'FACT-004', supplierName: 'Arrendamientos y Maquinaria Pesada', amount: 4200.00, entryDate: '06/07/2024', status: 'Rechazada', actionable: false },
+  { id: 'INV-005', purchaseOrderIds: ['OC-124', 'OC-123'], invoiceNumber: 'FACT-005', supplierName: 'Aceros del Norte S.A. de C.V.', amount: 31000.00, entryDate: '08/07/2024', status: 'En Revisión', actionable: true },
 ];
 
 export const payments: Payment[] = [
@@ -87,6 +87,7 @@ export const purchaseOrders: PurchaseOrder[] = [
     { id: 'OC-126', name: 'Refacciones para maquinaria', supplierName: 'Componentes Electrónicos Globales', emissionDate: '2024-07-15', status: 'Pendiente', amount: 25000.00, deliveryDate: '2024-07-22', area: 'Mantenimiento', invoice: undefined, createdBy: 'Maria Garcia', budget: 25000, company: 'La Cantera Desarrollos Mineros' },
     { id: 'OC-125', name: 'Servicio de catering', supplierName: 'Servicios de Consultoría Integral', emissionDate: '2024-07-12', status: 'Cancelada', amount: 5000.00, deliveryDate: '2024-07-14', area: 'Eventos', invoice: undefined, createdBy: 'Juan Pérez', budget: 5000, company: 'La Cantera Desarrollos Mineros' },
     { id: 'OC-124', name: 'Herramientas manuales', supplierName: 'Suministros Industriales de la Costa', emissionDate: '2024-07-10', status: 'Completa', amount: 3200.75, deliveryDate: '2024-07-18', area: 'Taller', invoice: 'INV-004', createdBy: 'Pedro Gomez', budget: 4000, company: 'La Cantera Desarrollos Mineros' },
+    { id: 'OC-123', name: 'Material de construcción', supplierName: 'Aceros del Norte S.A. de C.V.', emissionDate: '2024-07-09', status: 'Completa', amount: 15000.00, deliveryDate: '2024-07-15', area: 'Construcción', invoice: 'INV-005', createdBy: 'Ana Lopez', budget: 15000, company: 'La Cantera Desarrollos Mineros' },
 ]
 
 export const notifications: Notification[] = [

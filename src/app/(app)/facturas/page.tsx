@@ -222,12 +222,17 @@ export default function FacturasPage() {
                     {invoice.supplierName}
                   </TableCell>
                   <TableCell>
-                    <Link
-                      href={`/ordenes-de-compra/${invoice.purchaseOrderId}`}
-                      className="hover:underline text-blue-400"
-                    >
-                      {invoice.purchaseOrderId}
-                    </Link>
+                     <div className="flex flex-col gap-1">
+                        {invoice.purchaseOrderIds.map(orderId => (
+                            <Link
+                                key={orderId}
+                                href={`/ordenes-de-compra/${orderId}`}
+                                className="hover:underline text-blue-400"
+                            >
+                                {orderId}
+                            </Link>
+                        ))}
+                      </div>
                   </TableCell>
                   <TableCell>{invoice.invoiceNumber}</TableCell>
                   <TableCell>{invoice.entryDate}</TableCell>
@@ -291,13 +296,18 @@ export default function FacturasPage() {
                   Revisión de Factura: {selectedInvoice.invoiceNumber}
                 </DialogTitle>
                 <DialogDescription>
-                  Proveedor: {selectedInvoice.supplierName} | Orden de Compra:{' '}
-                  <Link
-                    href={`/ordenes-de-compra/${selectedInvoice.purchaseOrderId}`}
-                    className="hover:underline text-blue-400"
-                  >
-                    {selectedInvoice.purchaseOrderId}
-                  </Link>
+                  Proveedor: {selectedInvoice.supplierName} | Órdenes de Compra:{' '}
+                  {selectedInvoice.purchaseOrderIds.map((orderId, index) => (
+                    <React.Fragment key={orderId}>
+                      <Link
+                        href={`/ordenes-de-compra/${orderId}`}
+                        className="hover:underline text-blue-400"
+                      >
+                        {orderId}
+                      </Link>
+                      {index < selectedInvoice.purchaseOrderIds.length - 1 && ', '}
+                    </React.Fragment>
+                  ))}
                 </DialogDescription>
               </DialogHeader>
               <div className="grid md:grid-cols-2 gap-6 overflow-y-auto max-h-[60vh] p-1">

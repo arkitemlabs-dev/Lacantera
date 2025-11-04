@@ -25,7 +25,7 @@ export type Invoice = {
   entryDate: string;
   status: 'Pendiente pago' | 'En Revisión' | 'Rechazada' | 'Pagada';
   actionable: boolean;
-  purchaseOrderId: string;
+  purchaseOrderIds: string[];
 };
 
 export type PurchaseOrderStatus = 'Pendiente' | 'Completa' | 'Cancelada';
