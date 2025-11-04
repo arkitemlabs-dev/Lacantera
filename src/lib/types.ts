@@ -49,7 +49,7 @@ export type PaymentStatus = 'Completo' | 'Pendiente complemento' | 'En Revisión
 
 export type Payment = {
   id: string;
-  invoiceId: string;
+  invoiceIds: string[];
   supplierName: string;
   amount: number;
   executionDate: string;

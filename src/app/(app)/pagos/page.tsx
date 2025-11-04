@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import type { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
@@ -26,7 +26,9 @@ import {
   ListFilter,
   Upload,
   XCircle,
-  PlusCircle,
+  Clock,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,9 +63,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 
 const getStatusVariant = (status: PaymentStatus) => {
   switch (status) {
@@ -78,11 +78,25 @@ const getStatusVariant = (status: PaymentStatus) => {
   }
 };
 
-type DocumentType = 'Pago' | 'Complemento';
+const getComplementStatus = (payment: Payment) => {
+    if (payment.status === 'Completo') {
+        return { text: 'Recibido y Aprobado', icon: <ThumbsUp className="h-4 w-4 mr-2 text-green-400"/>, color: 'text-green-400' };
+    }
+    if (payment.status === 'Pendiente complemento') {
+        return { text: 'Pendiente de Carga', icon: <Clock className="h-4 w-4 mr-2 text-yellow-400"/>, color: 'text-yellow-400' };
+    }
+    if (payment.status === 'En Revisión') {
+        return { text: 'En Revisión', icon: <Eye className="h-4 w-4 mr-2 text-blue-400"/>, color: 'text-blue-400' };
+    }
+    if (payment.status === 'Rechazada') {
+        return { text: 'Rechazado', icon: <ThumbsDown className="h-4 w-4 mr-2 text-red-400"/>, color: 'text-red-400' };
+    }
+    return { text: 'N/A', icon: null, color: 'text-muted-foreground' };
+};
+
 
 export default function PagosPage() {
-  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
-  const [isNewPaymentDialogOpen, setIsNewPaymentDialogOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
@@ -94,14 +108,14 @@ export default function PagosPage() {
     return payments.filter((payment) => {
         // Normalizing date for comparison. Assuming 'DD/MM/YYYY' format.
         const parts = payment.executionDate.split('/');
-        const paymentDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+        const paymentDate = new Date(`${parts[2]}-${parts[1]}-${[parts[0]]}`);
 
         const dateFilter = !dateRange?.from || (paymentDate >= dateRange.from && (!dateRange.to || paymentDate <= dateRange.to));
         const statusFilter = status === 'todas' || payment.status.toLowerCase().replace(/ /g, '-') === status;
         const supplierFilter = supplier === 'todos' || payment.supplierName === suppliers.find(s => s.id === supplier)?.name;
         const searchFilter =
             payment.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            payment.invoiceId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            payment.invoiceIds.some(id => id.toLowerCase().includes(searchTerm.toLowerCase())) ||
             payment.supplierName.toLowerCase().includes(searchTerm.toLowerCase());
 
         return dateFilter && statusFilter && supplierFilter && searchFilter;
@@ -111,11 +125,11 @@ export default function PagosPage() {
 
   const handleOpenDialog = (payment: Payment) => {
     setSelectedPayment(payment);
-    setIsReviewDialogOpen(true);
+    setIsDetailDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
-    setIsReviewDialogOpen(false);
+    setIsDetailDialogOpen(false);
     setSelectedPayment(null);
   };
 
@@ -125,6 +139,13 @@ export default function PagosPage() {
     setSupplier('todos');
     setSearchTerm('');
   };
+  
+  const InfoRow = ({ label, value, className }: { label: string, value: string | number, className?: string }) => (
+    <div className="grid grid-cols-2 gap-2">
+        <dt className="text-sm text-muted-foreground">{label}</dt>
+        <dd className={cn("text-sm font-medium", className)}>{value}</dd>
+    </div>
+  );
 
   return (
     <main className="flex flex-1 flex-col gap-4 bg-muted/40 p-4 md:gap-8 md:p-8">
@@ -132,8 +153,7 @@ export default function PagosPage() {
         <h1 className="text-3xl font-semibold">Pagos</h1>
       </div>
 
-      <Dialog>
-        <div className="mx-auto grid w-full max-w-7xl items-start gap-6">
+      <div className="mx-auto grid w-full max-w-7xl items-start gap-6">
            <Card>
             <CardHeader>
                 <CardTitle>Filtros de Búsqueda</CardTitle>
@@ -222,7 +242,7 @@ export default function PagosPage() {
         </Card>
 
           {/* Payments Table */}
-          <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
+          <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -231,19 +251,13 @@ export default function PagosPage() {
                     Busca y gestiona todos los pagos registrados en el sistema.
                 </CardDescription>
               </div>
-              <DialogTrigger asChild>
-                <Button onClick={() => setIsNewPaymentDialogOpen(true)}>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Nuevo Pago
-                </Button>
-              </DialogTrigger>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>ID Pago</TableHead>
-                    <TableHead>Factura</TableHead>
+                    <TableHead>Factura(s)</TableHead>
                     <TableHead>Proveedor</TableHead>
                     <TableHead className="text-right">Monto</TableHead>
                     <TableHead>Fecha Ejecución</TableHead>
@@ -256,15 +270,24 @@ export default function PagosPage() {
                   {filteredPayments.map((payment) => (
                     <TableRow key={payment.id}>
                       <TableCell className="font-medium">
-                        {payment.id}
+                        <DialogTrigger asChild>
+                            <Button variant="link" className="p-0 h-auto" onClick={() => handleOpenDialog(payment)}>
+                                {payment.id}
+                            </Button>
+                        </DialogTrigger>
                       </TableCell>
                       <TableCell>
-                        <Link
-                          href={`/facturas?search=${payment.invoiceId}`}
-                          className="hover:underline text-blue-400"
-                        >
-                          {payment.invoiceId}
-                        </Link>
+                        <div className="flex flex-col gap-1">
+                            {payment.invoiceIds.map(invoiceId => (
+                                <Link
+                                    key={invoiceId}
+                                    href={`/facturas?search=${invoiceId}`}
+                                    className="hover:underline text-blue-400"
+                                >
+                                    {invoiceId}
+                                </Link>
+                            ))}
+                        </div>
                       </TableCell>
                       <TableCell>{payment.supplierName}</TableCell>
                       <TableCell className="text-right">
@@ -281,71 +304,20 @@ export default function PagosPage() {
                       </TableCell>
                       <TableCell>{payment.method}</TableCell>
                       <TableCell className="text-center space-x-1">
-                        {payment.status === 'En Revisión' ? (
-                          <>
-                            <DialogTrigger asChild>
-                              <Button
+                        {payment.paymentComplement ? (
+                            <div className="flex items-center justify-center gap-2">
+                                <CheckCircle className="h-5 w-5 text-green-400"/>
+                                <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleOpenDialog(payment)}
-                                className='h-8 w-8 bg-transparent hover:bg-primary/90'
-                              >
-                                <Eye className="h-4 w-4" />
-                                <span className="sr-only">Revisar Complemento</span>
-                              </Button>
-                            </DialogTrigger>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className='h-8 w-8 bg-transparent hover:bg-primary/90'
-                            >
-                              <Download className="h-4 w-4" />
-                              <span className="sr-only">Descargar Complemento</span>
-                            </Button>
-                          </>
-                        ) : payment.status === 'Pendiente complemento' || payment.status === 'Rechazada' ? (
-                           <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className='h-8 w-8'
-                              disabled
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className='h-8 w-8'
-                              disabled
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </>
-                        ) : payment.paymentComplement ? (
-                          <>
-                             <DialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleOpenDialog(payment)}
-                                className='h-8 w-8 bg-transparent hover:bg-primary/90'
-                              >
-                                <Eye className="h-4 w-4" />
-                                <span className="sr-only">Ver Complemento</span>
-                              </Button>
-                            </DialogTrigger>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className='h-8 w-8 bg-transparent hover:bg-primary/90'
-                            >
-                              <Download className="h-4 w-4" />
-                              <span className="sr-only">Descargar Complemento</span>
-                            </Button>
-                          </>
+                                className='h-8 w-8 bg-transparent hover:bg-primary/10'
+                                >
+                                    <Download className="h-4 w-4" />
+                                    <span className="sr-only">Descargar Complemento</span>
+                                </Button>
+                           </div>
                         ) : (
-                          <span className="text-xs text-muted-foreground">N/A</span>
+                          <span className="text-xs text-muted-foreground">{getComplementStatus(payment).text}</span>
                         )}
                       </TableCell>
                     </TableRow>
@@ -358,195 +330,79 @@ export default function PagosPage() {
             </CardFooter>
           </Card>
             {selectedPayment && (
-            <DialogContent className="max-w-4xl grid-rows-[auto_1fr_auto]">
+            <DialogContent className="max-w-2xl">
                 <DialogHeader>
                 <DialogTitle>
-                    Revisión de Complemento de Pago: {selectedPayment.id}
+                    Detalle del Pago: {selectedPayment.id}
                 </DialogTitle>
                 <DialogDescription>
-                    Proveedor: {selectedPayment.supplierName} | Factura:{' '}
-                    {selectedPayment.invoiceId}
+                    Información detallada del pago y facturas asociadas.
                 </DialogDescription>
                 </DialogHeader>
-                <div className="grid md:grid-cols-2 gap-6 overflow-y-auto max-h-[60vh] p-1">
-                <div className="space-y-6">
-                    <Card>
-                    <CardHeader>
-                        <CardTitle>Visualizador de Documento</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="bg-muted h-[500px] flex items-center justify-center rounded-md border-2 border-dashed">
-                        <div className="text-center text-muted-foreground">
-                            <FileText className="mx-auto h-12 w-12" />
-                            <p className="mt-2">
-                            Vista previa del complemento no disponible.
-                            </p>
+                <div className="space-y-6 py-4">
+                    <div className="space-y-4">
+                        <h3 className="font-semibold">Información General</h3>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                           <InfoRow label="ID Pago" value={selectedPayment.id} />
+                           <InfoRow label="Proveedor" value={selectedPayment.supplierName} />
+                           <InfoRow label="Monto" value={new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(selectedPayment.amount)} />
+                           <InfoRow label="Fecha Ejecución" value={selectedPayment.executionDate} />
+                           <InfoRow label="Método" value={selectedPayment.method} />
+                           <InfoRow label="Estado" value={selectedPayment.status} />
                         </div>
+                    </div>
+                    <Separator/>
+                    <div className="space-y-4">
+                        <h3 className="font-semibold">Facturas Asociadas</h3>
+                        <div className="border rounded-md">
+                             <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>ID Factura</TableHead>
+                                        <TableHead>Monto</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {selectedPayment.invoiceIds.map(invoiceId => {
+                                        const invoice = invoices.find(inv => inv.invoiceNumber === invoiceId);
+                                        return (
+                                             <TableRow key={invoiceId}>
+                                                <TableCell className="font-medium">{invoiceId}</TableCell>
+                                                <TableCell>{invoice ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(invoice.amount) : 'N/A'}</TableCell>
+                                            </TableRow>
+                                        )
+                                    })}
+                                </TableBody>
+                            </Table>
                         </div>
-                    </CardContent>
-                    </Card>
-                </div>
-                <div className="space-y-6">
-                    <Card>
-                    <CardHeader>
-                        <CardTitle>Validaciones Automáticas</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-md">
-                        <p className="text-sm text-green-200">
-                            UUID del complemento coincide
-                        </p>
-                        <CheckCircle className="h-5 w-5 text-green-400" />
+                    </div>
+                    <Separator/>
+                    <div className="space-y-4">
+                        <h3 className="font-semibold">Complemento de Pago</h3>
+                        <div className="flex items-center">
+                            {getComplementStatus(selectedPayment).icon}
+                            <span className={cn('font-medium', getComplementStatus(selectedPayment).color)}>
+                                {getComplementStatus(selectedPayment).text}
+                            </span>
+                            {selectedPayment.paymentComplement && (
+                                 <Button variant="outline" size="sm" className="ml-auto">
+                                    <Download className="h-4 w-4 mr-2"/>
+                                    Descargar Archivos
+                                 </Button>
+                            )}
                         </div>
-                        <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-md">
-                        <p className="text-sm text-red-200">
-                            Monto del pago no coincide
-                        </p>
-                        <XCircle className="h-5 w-5 text-red-400" />
-                        </div>
-                    </CardContent>
-                    </Card>
-                    {selectedPayment.status === 'En Revisión' && (
-                    <Card>
-                        <CardHeader>
-                        <CardTitle>Acciones de Revisión</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="rejectionReason">
-                            Motivo de Rechazo (si aplica)
-                            </Label>
-                            <Textarea
-                            id="rejectionReason"
-                            placeholder="Describe el motivo del rechazo..."
-                            />
-                        </div>
-                        </CardContent>
-                    </Card>
-                    )}
-                </div>
+                    </div>
                 </div>
                 <DialogFooter className="gap-2">
                 <Button variant="outline" onClick={handleCloseDialog}>
                     Cerrar
                 </Button>
-                {selectedPayment.status === 'En Revisión' ? (
-                    <>
-                    <Button variant="destructive" onClick={handleCloseDialog}>
-                        Rechazar
-                    </Button>
-                    <Button onClick={handleCloseDialog}>
-                        Aprobar Complemento
-                    </Button>
-                    </>
-                ) : (
-                    <Button>
-                    <Download className="mr-2 h-4 w-4" />
-                    Descargar
-                    </Button>
-                )}
                 </DialogFooter>
             </DialogContent>
             )}
           </Dialog>
 
         </div>
-        <Dialog open={isNewPaymentDialogOpen} onOpenChange={setIsNewPaymentDialogOpen}>
-            <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                    <DialogTitle>Registrar Nuevo Pago</DialogTitle>
-                    <DialogDescription>
-                        Complete el formulario para registrar un nuevo pago y asociarlo a facturas.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-6 py-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="new-payment-supplier">Proveedor</Label>
-                            <Select>
-                                <SelectTrigger id="new-payment-supplier">
-                                    <SelectValue placeholder="Seleccione un proveedor" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {suppliers.map((s) => (
-                                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                         <div className="space-y-2">
-                            <Label htmlFor="new-payment-amount">Monto del Pago</Label>
-                            <Input id="new-payment-amount" type="number" placeholder="0.00" />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Asociar a Facturas</Label>
-                        <ScrollArea className="h-40 rounded-md border p-2">
-                        <div className="space-y-2">
-                            {invoices
-                            .filter((inv) => inv.status === 'Pendiente pago')
-                            .map((inv) => (
-                                <div key={inv.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted">
-                                <Checkbox id={`inv-${inv.id}`} />
-                                <Label htmlFor={`inv-${inv.id}`} className="flex flex-col flex-1 cursor-pointer">
-                                    <span className="font-medium">{inv.invoiceNumber} - {inv.supplierName}</span>
-                                    <span className="text-xs text-muted-foreground">
-                                    {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(inv.amount)}
-                                    </span>
-                                </Label>
-                                </div>
-                            ))}
-                        </div>
-                        </ScrollArea>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="new-payment-method">Método de Pago</Label>
-                            <Select>
-                                <SelectTrigger id="new-payment-method">
-                                    <SelectValue placeholder="Seleccione un método" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="transferencia">Transferencia</SelectItem>
-                                    <SelectItem value="tarjeta">Tarjeta de Crédito</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                           <Label htmlFor="new-payment-date">Fecha de Ejecución</Label>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !dateRange && 'text-muted-foreground')}>
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {dateRange?.from ? format(dateRange.from, 'PPP', { locale: es }) : <span>Seleccione una fecha</span>}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                    <Calendar mode="single" selected={dateRange?.from} onSelect={(day) => setDateRange({ from: day })} initialFocus />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                    </div>
-                     <div className="space-y-2">
-                        <Label>Comprobante de Pago</Label>
-                        <div className="relative border-2 border-dashed border-muted rounded-lg p-6 flex flex-col items-center justify-center text-center h-32">
-                            <Upload className="w-8 h-8 text-muted-foreground" />
-                            <p className="mt-2 text-sm text-muted-foreground">
-                                Arrastre un archivo o haga clic para seleccionar
-                            </p>
-                            <Input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                        </div>
-                    </div>
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsNewPaymentDialogOpen(false)}>Cancelar</Button>
-                    <Button onClick={() => setIsNewPaymentDialogOpen(false)}>Guardar Pago</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-      </Dialog>
     </main>
   );
 }
