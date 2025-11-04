@@ -29,6 +29,13 @@ import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+
 
 const InfoField = ({
   label,
@@ -262,43 +269,66 @@ export default function PerfilProveedorPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Documento</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Fecha de actualización</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {documents.map((doc, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium text-sm">{doc.name}</TableCell>
-                      <TableCell>
-                        <Badge className={cn('font-normal', getStatusBadgeClass(doc.status))}>
-                          {doc.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{doc.updateDate}</TableCell>
-                      <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="icon">
-                            <Eye className="h-4 w-4" />
-                            <span className="sr-only">Ver</span>
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={handleDocumentUploadClick}>
-                            <Upload className="h-4 w-4" />
-                            <span className="sr-only">Subir</span>
-                        </Button>
-                        <Button variant="ghost" size="icon">
-                            <FileDown className="h-4 w-4" />
-                            <span className="sr-only">Descargar</span>
-                        </Button>
-                      </TableCell>
+              <TooltipProvider>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Documento</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Fecha de actualización</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {documents.map((doc, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium text-sm">{doc.name}</TableCell>
+                        <TableCell>
+                          <Badge className={cn('font-normal', getStatusBadgeClass(doc.status))}>
+                            {doc.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{doc.updateDate}</TableCell>
+                        <TableCell className="text-right space-x-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                  <Eye className="h-4 w-4" />
+                                  <span className="sr-only">Ver</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Ver</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={handleDocumentUploadClick}>
+                                  <Upload className="h-4 w-4" />
+                                  <span className="sr-only">Subir</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Subir</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                  <FileDown className="h-4 w-4" />
+                                  <span className="sr-only">Descargar</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Descargar</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TooltipProvider>
             </CardContent>
           </Card>
         </TabsContent>
