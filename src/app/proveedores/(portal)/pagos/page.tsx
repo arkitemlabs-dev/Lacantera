@@ -136,9 +136,10 @@ const getStatusBadgeClass = (status: PaymentStatus) => {
 
 export default function PagosProveedorPage() {
   const [selectedPayment, setSelectedPayment] = useState<typeof payments[0] | null>(null);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
 
   return (
-    <Dialog onOpenChange={(isOpen) => !isOpen && setSelectedPayment(null)}>
+    <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
       <main className="flex-1 space-y-8 p-4 md:p-8">
         <div className="flex items-center space-x-2 text-sm text-muted-foreground">
           <Link href="/proveedores/dashboard" className="hover:text-foreground">
@@ -222,22 +223,40 @@ export default function PagosProveedorPage() {
                         </Badge>
                       </TableCell>
                        <TableCell className="text-center">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              disabled={payment.status !== 'Completado'}
-                            >
-                              <Download className="h-4 w-4" />
-                              <span className="sr-only">Descargar Comprobante</span>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Descargar Comprobante</p>
-                          </TooltipContent>
-                        </Tooltip>
+                        <div className="flex items-center justify-center gap-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                disabled={payment.status !== 'Completado'}
+                              >
+                                <Eye className="h-4 w-4" />
+                                <span className="sr-only">Ver Comprobante</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Ver Comprobante</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                disabled={payment.status !== 'Completado'}
+                              >
+                                <Download className="h-4 w-4" />
+                                <span className="sr-only">Descargar Comprobante</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Descargar Comprobante</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
                       </TableCell>
                       <TableCell className="text-center">
                         {payment.hasComplement || payment.status === 'En revisión' ? (
@@ -271,7 +290,10 @@ export default function PagosProveedorPage() {
                               variant="outline"
                               size="sm"
                               className="h-8"
-                              onClick={() => setSelectedPayment(payment)}
+                              onClick={() => {
+                                setSelectedPayment(payment)
+                                setIsUploadDialogOpen(true)
+                              }}
                             >
                               <Upload className="mr-2 h-3 w-3" />
                               Subir
@@ -286,40 +308,38 @@ export default function PagosProveedorPage() {
             </TooltipProvider>
           </CardContent>
         </Card>
-
-        {selectedPayment && (
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Subir Complemento de Pago</DialogTitle>
-              <DialogDescription>
-                Adjunte el archivo XML y PDF para el pago {selectedPayment.id}.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-               <div className="relative border-2 border-dashed border-muted rounded-lg p-6 flex flex-col items-center justify-center text-center h-48">
-                  <Upload className="w-8 h-8 text-muted-foreground" />
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Arrastra tus archivos aquí o haz clic para seleccionar
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    XML y PDF requeridos
-                  </p>
-                  <Input
-                    type="file"
-                    multiple
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                </div>
-            </div>
-            <DialogFooter>
-              <DialogTrigger asChild>
-                  <Button variant="outline">Cancelar</Button>
-              </DialogTrigger>
-              <Button>Subir Documento</Button>
-            </DialogFooter>
-          </DialogContent>
-        )}
       </main>
+      
+      {selectedPayment && (
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Subir Complemento de Pago</DialogTitle>
+            <DialogDescription>
+              Adjunte el archivo XML y PDF para el pago {selectedPayment.id}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+              <div className="relative border-2 border-dashed border-muted rounded-lg p-6 flex flex-col items-center justify-center text-center h-48">
+                <Upload className="w-8 h-8 text-muted-foreground" />
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Arrastra tus archivos aquí o haz clic para seleccionar
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  XML y PDF requeridos
+                </p>
+                <Input
+                  type="file"
+                  multiple
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+              </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsUploadDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={() => setIsUploadDialogOpen(false)}>Subir Documento</Button>
+          </DialogFooter>
+        </DialogContent>
+      )}
     </Dialog>
   );
 }
