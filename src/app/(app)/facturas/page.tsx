@@ -206,9 +206,9 @@ export default function FacturasPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>No. Factura</TableHead>
                 <TableHead>Proveedor</TableHead>
                 <TableHead>Orden de Compra</TableHead>
-                <TableHead>No. Factura</TableHead>
                 <TableHead>Fecha de Entrada</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Monto</TableHead>
@@ -218,6 +218,7 @@ export default function FacturasPage() {
             <TableBody>
               {filteredInvoices.map((invoice) => (
                 <TableRow key={invoice.id}>
+                  <TableCell>{invoice.invoiceNumber}</TableCell>
                   <TableCell className="font-medium">
                     {invoice.supplierName}
                   </TableCell>
@@ -234,7 +235,6 @@ export default function FacturasPage() {
                         ))}
                       </div>
                   </TableCell>
-                  <TableCell>{invoice.invoiceNumber}</TableCell>
                   <TableCell>{invoice.entryDate}</TableCell>
                   <TableCell>
                     <Badge className={cn(getBadgeVariant(invoice.status))}>
@@ -430,7 +430,7 @@ export default function FacturasPage() {
               </div>
               <DialogFooter className="gap-2">
                  <Button variant="outline" onClick={handleDialogClose}>
-                    {selectedInvoice.status === 'En Revisión' ? 'Cancelar' : 'Cerrar'}
+                    Cerrar
                 </Button>
                 {selectedInvoice.status === 'En Revisión' && (
                   <>
