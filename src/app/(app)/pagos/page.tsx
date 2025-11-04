@@ -64,6 +64,10 @@ const getStatusVariant = (status: PaymentStatus) => {
       return 'bg-green-500/20 text-green-200 border-green-500/30';
     case 'Pendiente complemento':
       return 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30';
+    case 'En Revisión':
+        return 'bg-blue-500/20 text-blue-200 border-blue-500/30';
+    case 'Rechazada':
+        return 'bg-red-500/20 text-red-200 border-red-500/30';
   }
 };
 
@@ -180,6 +184,8 @@ export default function PagosPage() {
                     <SelectItem value="todas">Todos los estados</SelectItem>
                     <SelectItem value="completo">Completo</SelectItem>
                     <SelectItem value="pendiente-complemento">Pendiente complemento</SelectItem>
+                    <SelectItem value="en-revision">En Revisión</SelectItem>
+                    <SelectItem value="rechazada">Rechazada</SelectItem>
                     </SelectContent>
                 </Select>
                 <Select value={supplier} onValueChange={setSupplier}>
