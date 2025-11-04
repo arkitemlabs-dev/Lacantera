@@ -26,6 +26,7 @@ import {
   ListFilter,
   Upload,
   XCircle,
+  PlusCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,7 +39,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { payments, suppliers } from '@/lib/data';
+import { payments, suppliers, invoices } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import type { Payment, PaymentStatus } from '@/lib/types';
 import {
@@ -61,6 +62,8 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const getStatusVariant = (status: PaymentStatus) => {
   switch (status) {
@@ -78,7 +81,8 @@ const getStatusVariant = (status: PaymentStatus) => {
 type DocumentType = 'Pago' | 'Complemento';
 
 export default function PagosPage() {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
+  const [isNewPaymentDialogOpen, setIsNewPaymentDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
@@ -107,11 +111,11 @@ export default function PagosPage() {
 
   const handleOpenDialog = (payment: Payment) => {
     setSelectedPayment(payment);
-    setIsDialogOpen(true);
+    setIsReviewDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
-    setIsDialogOpen(false);
+    setIsReviewDialogOpen(false);
     setSelectedPayment(null);
   };
 
@@ -128,7 +132,7 @@ export default function PagosPage() {
         <h1 className="text-3xl font-semibold">Pagos</h1>
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog>
         <div className="mx-auto grid w-full max-w-7xl items-start gap-6">
            <Card>
             <CardHeader>
@@ -218,12 +222,21 @@ export default function PagosPage() {
         </Card>
 
           {/* Payments Table */}
+          <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
           <Card>
-            <CardHeader>
-              <CardTitle>Gestión de Pagos</CardTitle>
-              <CardDescription>
-                Busca y gestiona todos los pagos registrados en el sistema.
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Gestión de Pagos</CardTitle>
+                <CardDescription>
+                    Busca y gestiona todos los pagos registrados en el sistema.
+                </CardDescription>
+              </div>
+              <DialogTrigger asChild>
+                <Button onClick={() => setIsNewPaymentDialogOpen(true)}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Nuevo Pago
+                </Button>
+              </DialogTrigger>
             </CardHeader>
             <CardContent>
               <Table>
@@ -344,98 +357,195 @@ export default function PagosPage() {
               <Button variant="outline">Cargar más</Button>
             </CardFooter>
           </Card>
-        </div>
-        {selectedPayment && (
-          <DialogContent className="max-w-4xl grid-rows-[auto_1fr_auto]">
-            <DialogHeader>
-              <DialogTitle>
-                Revisión de Complemento de Pago: {selectedPayment.id}
-              </DialogTitle>
-              <DialogDescription>
-                Proveedor: {selectedPayment.supplierName} | Factura:{' '}
-                {selectedPayment.invoiceId}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid md:grid-cols-2 gap-6 overflow-y-auto max-h-[60vh] p-1">
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Visualizador de Documento</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="bg-muted h-[500px] flex items-center justify-center rounded-md border-2 border-dashed">
-                      <div className="text-center text-muted-foreground">
-                        <FileText className="mx-auto h-12 w-12" />
-                        <p className="mt-2">
-                          Vista previa del complemento no disponible.
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Validaciones Automáticas</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-md">
-                      <p className="text-sm text-green-200">
-                        UUID del complemento coincide
-                      </p>
-                      <CheckCircle className="h-5 w-5 text-green-400" />
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-md">
-                      <p className="text-sm text-red-200">
-                        Monto del pago no coincide
-                      </p>
-                      <XCircle className="h-5 w-5 text-red-400" />
-                    </div>
-                  </CardContent>
-                </Card>
-                {selectedPayment.status === 'En Revisión' && (
-                  <Card>
+            {selectedPayment && (
+            <DialogContent className="max-w-4xl grid-rows-[auto_1fr_auto]">
+                <DialogHeader>
+                <DialogTitle>
+                    Revisión de Complemento de Pago: {selectedPayment.id}
+                </DialogTitle>
+                <DialogDescription>
+                    Proveedor: {selectedPayment.supplierName} | Factura:{' '}
+                    {selectedPayment.invoiceId}
+                </DialogDescription>
+                </DialogHeader>
+                <div className="grid md:grid-cols-2 gap-6 overflow-y-auto max-h-[60vh] p-1">
+                <div className="space-y-6">
+                    <Card>
                     <CardHeader>
-                      <CardTitle>Acciones de Revisión</CardTitle>
+                        <CardTitle>Visualizador de Documento</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="bg-muted h-[500px] flex items-center justify-center rounded-md border-2 border-dashed">
+                        <div className="text-center text-muted-foreground">
+                            <FileText className="mx-auto h-12 w-12" />
+                            <p className="mt-2">
+                            Vista previa del complemento no disponible.
+                            </p>
+                        </div>
+                        </div>
+                    </CardContent>
+                    </Card>
+                </div>
+                <div className="space-y-6">
+                    <Card>
+                    <CardHeader>
+                        <CardTitle>Validaciones Automáticas</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="rejectionReason">
-                          Motivo de Rechazo (si aplica)
-                        </Label>
-                        <Textarea
-                          id="rejectionReason"
-                          placeholder="Describe el motivo del rechazo..."
-                        />
-                      </div>
+                        <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-md">
+                        <p className="text-sm text-green-200">
+                            UUID del complemento coincide
+                        </p>
+                        <CheckCircle className="h-5 w-5 text-green-400" />
+                        </div>
+                        <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-md">
+                        <p className="text-sm text-red-200">
+                            Monto del pago no coincide
+                        </p>
+                        <XCircle className="h-5 w-5 text-red-400" />
+                        </div>
                     </CardContent>
-                  </Card>
-                )}
-              </div>
-            </div>
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={handleCloseDialog}>
-                Cerrar
-              </Button>
-              {selectedPayment.status === 'En Revisión' ? (
-                <>
-                  <Button variant="destructive" onClick={handleCloseDialog}>
-                    Rechazar
-                  </Button>
-                  <Button onClick={handleCloseDialog}>
-                    Aprobar Complemento
-                  </Button>
-                </>
-              ) : (
-                <Button>
-                  <Download className="mr-2 h-4 w-4" />
-                  Descargar
+                    </Card>
+                    {selectedPayment.status === 'En Revisión' && (
+                    <Card>
+                        <CardHeader>
+                        <CardTitle>Acciones de Revisión</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="rejectionReason">
+                            Motivo de Rechazo (si aplica)
+                            </Label>
+                            <Textarea
+                            id="rejectionReason"
+                            placeholder="Describe el motivo del rechazo..."
+                            />
+                        </div>
+                        </CardContent>
+                    </Card>
+                    )}
+                </div>
+                </div>
+                <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={handleCloseDialog}>
+                    Cerrar
                 </Button>
-              )}
-            </DialogFooter>
-          </DialogContent>
-        )}
+                {selectedPayment.status === 'En Revisión' ? (
+                    <>
+                    <Button variant="destructive" onClick={handleCloseDialog}>
+                        Rechazar
+                    </Button>
+                    <Button onClick={handleCloseDialog}>
+                        Aprobar Complemento
+                    </Button>
+                    </>
+                ) : (
+                    <Button>
+                    <Download className="mr-2 h-4 w-4" />
+                    Descargar
+                    </Button>
+                )}
+                </DialogFooter>
+            </DialogContent>
+            )}
+          </Dialog>
+
+        </div>
+        <Dialog open={isNewPaymentDialogOpen} onOpenChange={setIsNewPaymentDialogOpen}>
+            <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Registrar Nuevo Pago</DialogTitle>
+                    <DialogDescription>
+                        Complete el formulario para registrar un nuevo pago y asociarlo a facturas.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-6 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="new-payment-supplier">Proveedor</Label>
+                            <Select>
+                                <SelectTrigger id="new-payment-supplier">
+                                    <SelectValue placeholder="Seleccione un proveedor" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {suppliers.map((s) => (
+                                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                         <div className="space-y-2">
+                            <Label htmlFor="new-payment-amount">Monto del Pago</Label>
+                            <Input id="new-payment-amount" type="number" placeholder="0.00" />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Asociar a Facturas</Label>
+                        <ScrollArea className="h-40 rounded-md border p-2">
+                        <div className="space-y-2">
+                            {invoices
+                            .filter((inv) => inv.status === 'Pendiente pago')
+                            .map((inv) => (
+                                <div key={inv.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted">
+                                <Checkbox id={`inv-${inv.id}`} />
+                                <Label htmlFor={`inv-${inv.id}`} className="flex flex-col flex-1 cursor-pointer">
+                                    <span className="font-medium">{inv.invoiceNumber} - {inv.supplierName}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                    {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(inv.amount)}
+                                    </span>
+                                </Label>
+                                </div>
+                            ))}
+                        </div>
+                        </ScrollArea>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="new-payment-method">Método de Pago</Label>
+                            <Select>
+                                <SelectTrigger id="new-payment-method">
+                                    <SelectValue placeholder="Seleccione un método" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="transferencia">Transferencia</SelectItem>
+                                    <SelectItem value="tarjeta">Tarjeta de Crédito</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                           <Label htmlFor="new-payment-date">Fecha de Ejecución</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !dateRange && 'text-muted-foreground')}>
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {dateRange?.from ? format(dateRange.from, 'PPP', { locale: es }) : <span>Seleccione una fecha</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                    <Calendar mode="single" selected={dateRange?.from} onSelect={(day) => setDateRange({ from: day })} initialFocus />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                    </div>
+                     <div className="space-y-2">
+                        <Label>Comprobante de Pago</Label>
+                        <div className="relative border-2 border-dashed border-muted rounded-lg p-6 flex flex-col items-center justify-center text-center h-32">
+                            <Upload className="w-8 h-8 text-muted-foreground" />
+                            <p className="mt-2 text-sm text-muted-foreground">
+                                Arrastre un archivo o haga clic para seleccionar
+                            </p>
+                            <Input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                        </div>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsNewPaymentDialogOpen(false)}>Cancelar</Button>
+                    <Button onClick={() => setIsNewPaymentDialogOpen(false)}>Guardar Pago</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
       </Dialog>
     </main>
   );
