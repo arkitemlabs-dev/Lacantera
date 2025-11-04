@@ -230,7 +230,6 @@ export default function PagosProveedorPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8"
-                                disabled={payment.status !== 'Completado'}
                               >
                                 <Eye className="h-4 w-4" />
                                 <span className="sr-only">Ver Comprobante</span>
@@ -246,7 +245,6 @@ export default function PagosProveedorPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8"
-                                disabled={payment.status !== 'Completado'}
                               >
                                 <Download className="h-4 w-4" />
                                 <span className="sr-only">Descargar Comprobante</span>
