@@ -63,6 +63,9 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
+import { navItems } from '../nav';
+import { Separator } from '@/components/ui/separator';
 
 type User = {
     id: string;
@@ -71,6 +74,41 @@ type User = {
     role: string;
     status: 'Activo' | 'Inactivo';
 };
+
+type Permission = 'ver' | 'crear_editar' | 'eliminar';
+
+type Role = {
+    name: string;
+    permissions: {
+        [module: string]: Permission[];
+    };
+};
+
+const initialRoles: Role[] = [
+    {
+      name: 'Super Admin',
+      permissions: Object.fromEntries(navItems.map(item => [item.href, ['ver', 'crear_editar', 'eliminar']])),
+    },
+    {
+      name: 'Compras',
+      permissions: {
+        '/proveedores': ['ver', 'crear_editar'],
+        '/ordenes-de-compra': ['ver', 'crear_editar'],
+        '/facturas': ['ver'],
+      },
+    },
+    {
+      name: 'Contabilidad',
+      permissions: {
+        '/facturas': ['ver', 'crear_editar'],
+        '/pagos': ['ver', 'crear_editar'],
+      },
+    },
+    {
+      name: 'Solo lectura',
+      permissions: Object.fromEntries(navItems.map(item => [item.href, ['ver']])),
+    },
+  ];
 
 const initialUsers: User[] = [
   {
@@ -108,21 +146,22 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } 
   Inactivo: 'secondary',
 };
 
-const rolePermissions: { [key: string]: string[] } = {
-  'Super Admin': ['Todo'],
-  Compras: ['Gestión de proveedores', 'Órdenes de Compra', 'Facturación'],
-  Contabilidad: ['Facturación', 'Pagos'],
-  'Solo lectura': ['Ver todo'],
-};
+const availableModules = navItems.filter(item => item.href !== '/dashboard' && item.href !== '/perfil');
 
 export default function ConfiguracionPage() {
     const [users, setUsers] = useState<User[]>(initialUsers);
+    const [roles, setRoles] = useState<Role[]>(initialRoles);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 
     const [isNewUserDialogOpen, setIsNewUserDialogOpen] = useState(false);
     const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
     const [isChangeRoleDialogOpen, setIsChangeRoleDialogOpen] = useState(false);
     const [isToggleStatusAlertOpen, setIsToggleStatusAlertOpen] = useState(false);
+    const [isCreateRoleDialogOpen, setIsCreateRoleDialogOpen] = useState(false);
+    const [isEditRoleDialogOpen, setIsEditRoleDialogOpen] = useState(false);
+    const [currentRolePermissions, setCurrentRolePermissions] = useState<Role['permissions']>({});
+    const [currentRoleName, setCurrentRoleName] = useState('');
 
     const handleActionClick = (user: User) => {
         setSelectedUser(user);
@@ -139,14 +178,64 @@ export default function ConfiguracionPage() {
         setIsToggleStatusAlertOpen(false);
     };
 
+    const handleOpenEditRole = (role: Role) => {
+        setSelectedRole(role);
+        setCurrentRoleName(role.name);
+        setCurrentRolePermissions(JSON.parse(JSON.stringify(role.permissions))); // Deep copy
+        setIsEditRoleDialogOpen(true);
+    };
+
+    const handleOpenCreateRole = () => {
+        setSelectedRole(null);
+        setCurrentRoleName('');
+        setCurrentRolePermissions({});
+        setIsCreateRoleDialogOpen(true);
+    };
+
+    const handlePermissionChange = (module: string, permission: Permission, checked: boolean) => {
+        setCurrentRolePermissions(prev => {
+            const newPermissions = { ...prev };
+            if (!newPermissions[module]) {
+                newPermissions[module] = [];
+            }
+            if (checked) {
+                if (!newPermissions[module].includes(permission)) {
+                    newPermissions[module].push(permission);
+                }
+                // Si se marca cualquier permiso, 'ver' debe estar marcado
+                if (!newPermissions[module].includes('ver')) {
+                    newPermissions[module].push('ver');
+                }
+            } else {
+                newPermissions[module] = newPermissions[module].filter(p => p !== permission);
+                // Si 'ver' se desmarca, todos los demás también deben desmarcarse
+                if (permission === 'ver') {
+                    newPermissions[module] = [];
+                }
+            }
+            return newPermissions;
+        });
+    };
+
+    const handleSaveRole = () => {
+        if (selectedRole) { // Edit
+            setRoles(roles.map(r => r.name === selectedRole.name ? { name: currentRoleName, permissions: currentRolePermissions } : r));
+        } else { // Create
+            setRoles([...roles, { name: currentRoleName, permissions: currentRolePermissions }]);
+        }
+        setIsCreateRoleDialogOpen(false);
+        setIsEditRoleDialogOpen(false);
+    };
+
   return (
     <main className="flex min-h-[calc(100vh_-_theme(spacing.16))] flex-1 flex-col gap-4 bg-muted/40 p-4 md:gap-8 md:p-10">
       <div className="mx-auto grid w-full max-w-6xl gap-2">
         <h1 className="text-3xl font-semibold">Configuración</h1>
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="general">Configuración general</TabsTrigger>
-            <TabsTrigger value="users">Usuarios y Roles</TabsTrigger>
+            <TabsTrigger value="users">Usuarios</TabsTrigger>
+            <TabsTrigger value="roles">Roles y Permisos</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
             <div className="grid gap-6 mt-6">
@@ -275,31 +364,30 @@ export default function ConfiguracionPage() {
                    </div>
                 </CardContent>
               </Card>
-
               <Card>
                 <CardHeader>
-                  <CardTitle>Políticas y Documentos</CardTitle>
+                    <CardTitle>Políticas y Documentos</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
+                    <div className="space-y-2">
                     <Label>Políticas de Privacidad</Label>
                     <div className="relative border-2 border-dashed border-muted rounded-lg p-6 flex flex-col items-center justify-center text-center h-48">
-                      <Upload className="w-8 h-8 text-muted-foreground" />
-                      <p className="mt-2 text-sm text-muted-foreground">
+                        <Upload className="w-8 h-8 text-muted-foreground" />
+                        <p className="mt-2 text-sm text-muted-foreground">
                         Arrastra tu documento aquí o haz clic para seleccionar
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
                         Formato: PDF - Máx: 5MB
-                      </p>
-                      <Input
+                        </p>
+                        <Input
                         type="file"
                         accept=".pdf"
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
+                        />
                     </div>
-                  </div>
+                    </div>
                 </CardContent>
-              </Card>
+             </Card>
 
               <div className="flex justify-end mt-2">
                 <Button>Guardar Configuración</Button>
@@ -312,11 +400,15 @@ export default function ConfiguracionPage() {
                     <CardHeader>
                         <div className="flex items-center justify-between">
                         <div>
-                            <CardTitle>Usuarios y Roles</CardTitle>
+                            <CardTitle>Usuarios del Sistema</CardTitle>
                             <CardDescription>
-                            Gestione los usuarios internos y sus permisos en el sistema.
+                            Gestione los usuarios internos y sus roles en el sistema.
                             </CardDescription>
                         </div>
+                         <Button size="sm" className="gap-1" onClick={() => setIsNewUserDialogOpen(true)}>
+                            <PlusCircle className="h-4 w-4" />
+                            Nuevo Usuario
+                        </Button>
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -326,7 +418,7 @@ export default function ConfiguracionPage() {
                             <TableHead>Nombre</TableHead>
                             <TableHead>Email</TableHead>
                             <TableHead>Rol</TableHead>
-                            <TableHead>Permisos</TableHead>
+                            <TableHead>Módulos Permitidos</TableHead>
                             <TableHead>Estado</TableHead>
                             <TableHead>
                                 <span className="sr-only">Acciones</span>
@@ -334,46 +426,51 @@ export default function ConfiguracionPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {users.map((user) => (
-                            <TableRow key={user.id}>
-                                <TableCell className="font-medium">{user.name}</TableCell>
-                                <TableCell>{user.email}</TableCell>
-                                <TableCell>
-                                    <Badge variant="outline">{user.role}</Badge>
-                                </TableCell>
-                                <TableCell className="text-xs text-muted-foreground">
-                                    {rolePermissions[user.role as keyof typeof rolePermissions].join(', ')}
-                                </TableCell>
-                                <TableCell>
-                                <Badge variant={statusVariant[user.status]} className={cn(user.status === 'Activo' ? 'dark:text-green-950 text-green-800' : 'dark:text-red-950 text-red-800')}>
-                                    {user.status}
-                                </Badge>
-                                </TableCell>
-                                <TableCell>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                    <Button
-                                        aria-haspopup="true"
-                                        size="icon"
-                                        variant="ghost"
-                                        onClick={() => handleActionClick(user)}
-                                    >
-                                        <MoreHorizontal className="h-4 w-4" />
-                                        <span className="sr-only">Toggle menu</span>
-                                    </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                    <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                    <DropdownMenuItem onSelect={() => setIsEditUserDialogOpen(true)}>Editar</DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => setIsChangeRoleDialogOpen(true)}>Cambiar Rol</DropdownMenuItem>
-                                    <DropdownMenuItem className="text-red-500" onSelect={() => setIsToggleStatusAlertOpen(true)}>
-                                        {user.status === 'Activo' ? 'Desactivar' : 'Activar'}
-                                    </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                                </TableCell>
-                            </TableRow>
-                            ))}
+                            {users.map((user) => {
+                                const userRole = roles.find(r => r.name === user.role);
+                                const permittedModules = userRole ? Object.keys(userRole.permissions).map(href => navItems.find(item => item.href === href)?.title).filter(Boolean) : [];
+
+                                return (
+                                <TableRow key={user.id}>
+                                    <TableCell className="font-medium">{user.name}</TableCell>
+                                    <TableCell>{user.email}</TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline">{user.role}</Badge>
+                                    </TableCell>
+                                    <TableCell className="text-xs text-muted-foreground">
+                                        {permittedModules.join(', ')}
+                                    </TableCell>
+                                    <TableCell>
+                                    <Badge variant={statusVariant[user.status]} className={cn(user.status === 'Activo' ? 'dark:text-green-950 text-green-800' : 'dark:text-red-950 text-red-800')}>
+                                        {user.status}
+                                    </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                        <Button
+                                            aria-haspopup="true"
+                                            size="icon"
+                                            variant="ghost"
+                                            onClick={() => handleActionClick(user)}
+                                        >
+                                            <MoreHorizontal className="h-4 w-4" />
+                                            <span className="sr-only">Toggle menu</span>
+                                        </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                        <DropdownMenuItem onSelect={() => setIsEditUserDialogOpen(true)}>Editar</DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={() => setIsChangeRoleDialogOpen(true)}>Cambiar Rol</DropdownMenuItem>
+                                        <DropdownMenuItem className="text-red-500" onSelect={() => setIsToggleStatusAlertOpen(true)}>
+                                            {user.status === 'Activo' ? 'Desactivar' : 'Activar'}
+                                        </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                                )
+                            })}
                         </TableBody>
                         </Table>
                     </CardContent>
@@ -407,10 +504,9 @@ export default function ConfiguracionPage() {
                                         <SelectValue placeholder="Seleccione un rol" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="super-admin">Super Admin</SelectItem>
-                                        <SelectItem value="compras">Compras</SelectItem>
-                                        <SelectItem value="contabilidad">Contabilidad</SelectItem>
-                                        <SelectItem value="solo-lectura">Solo lectura</SelectItem>
+                                        {roles.map(role => (
+                                            <SelectItem key={role.name} value={role.name}>{role.name}</SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -425,6 +521,53 @@ export default function ConfiguracionPage() {
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
+          </TabsContent>
+          <TabsContent value="roles">
+            <Card className="mt-6">
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Roles y Permisos</CardTitle>
+                            <CardDescription>
+                                Cree y configure los roles de los usuarios en el sistema.
+                            </CardDescription>
+                        </div>
+                        <Button size="sm" className="gap-1" onClick={handleOpenCreateRole}>
+                            <PlusCircle className="h-4 w-4" />
+                            Crear Rol
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                     <Table>
+                        <TableHeader>
+                            <TableRow>
+                            <TableHead>Rol</TableHead>
+                            <TableHead>Módulos Permitidos</TableHead>
+                            <TableHead><span className="sr-only">Acciones</span></TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {roles.map((role) => (
+                                <TableRow key={role.name}>
+                                <TableCell className="font-medium">{role.name}</TableCell>
+                                <TableCell className="text-xs text-muted-foreground">
+                                    {Object.keys(role.permissions)
+                                        .map(href => navItems.find(item => item.href === href)?.title)
+                                        .filter(Boolean)
+                                        .join(', ')}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    <Button variant="outline" size="sm" onClick={() => handleOpenEditRole(role)}>
+                                        Editar
+                                    </Button>
+                                </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
@@ -475,10 +618,9 @@ export default function ConfiguracionPage() {
                 <SelectValue placeholder="Seleccione un rol" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Super Admin">Super Admin</SelectItem>
-                <SelectItem value="Compras">Compras</SelectItem>
-                <SelectItem value="Contabilidad">Contabilidad</SelectItem>
-                <SelectItem value="Solo lectura">Solo lectura</SelectItem>
+                {roles.map(role => (
+                    <SelectItem key={role.name} value={role.name}>{role.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -507,6 +649,68 @@ export default function ConfiguracionPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+       {/* Create/Edit Role Dialog */}
+      <Dialog open={isCreateRoleDialogOpen || isEditRoleDialogOpen} onOpenChange={isEditRoleDialogOpen ? setIsEditRoleDialogOpen : setIsCreateRoleDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{selectedRole ? 'Editar' : 'Crear'} Rol</DialogTitle>
+            <DialogDescription>
+              Defina el nombre y los permisos para este rol.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+                <Label htmlFor="roleName">Nombre del Rol</Label>
+                <Input id="roleName" value={currentRoleName} onChange={(e) => setCurrentRoleName(e.target.value)} placeholder="Ej. Gerente de Compras" />
+            </div>
+            <Separator />
+            <div className="space-y-2">
+                <Label>Permisos del Módulo</Label>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Módulo</TableHead>
+                            <TableHead className="text-center">Ver</TableHead>
+                            <TableHead className="text-center">Crear/Editar</TableHead>
+                            <TableHead className="text-center">Eliminar</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {availableModules.map(module => (
+                            <TableRow key={module.href}>
+                                <TableCell className="font-medium">{module.title}</TableCell>
+                                <TableCell className="text-center">
+                                    <Checkbox
+                                        checked={currentRolePermissions[module.href]?.includes('ver')}
+                                        onCheckedChange={(checked) => handlePermissionChange(module.href, 'ver', !!checked)}
+                                    />
+                                </TableCell>
+                                <TableCell className="text-center">
+                                     <Checkbox
+                                        checked={currentRolePermissions[module.href]?.includes('crear_editar')}
+                                        onCheckedChange={(checked) => handlePermissionChange(module.href, 'crear_editar', !!checked)}
+                                        disabled={!currentRolePermissions[module.href]?.includes('ver')}
+                                    />
+                                </TableCell>
+                                <TableCell className="text-center">
+                                     <Checkbox
+                                        checked={currentRolePermissions[module.href]?.includes('eliminar')}
+                                        onCheckedChange={(checked) => handlePermissionChange(module.href, 'eliminar', !!checked)}
+                                        disabled={!currentRolePermissions[module.href]?.includes('ver')}
+                                    />
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => { setIsCreateRoleDialogOpen(false); setIsEditRoleDialogOpen(false); }}>Cancelar</Button>
+            <Button onClick={handleSaveRole}>Guardar Rol</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
