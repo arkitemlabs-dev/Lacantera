@@ -56,6 +56,7 @@ export type Payment = {
   status: PaymentStatus;
   method: 'Transferencia' | 'Tarjeta de Crédito';
   paymentComplement: boolean;
+  paymentReceipt?: boolean;
 };
 
 export type NotificationType = 'new_supplier' | 'doc_update' | 'invoice_status' | 'new_message' | 'payment_done';

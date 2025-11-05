@@ -266,6 +266,7 @@ export default function PagosPage() {
                     <TableHead>Fecha Ejecución</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Método</TableHead>
+                    <TableHead className="text-center">Comprobante</TableHead>
                     <TableHead className="text-center">Complemento de Pago</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -304,6 +305,23 @@ export default function PagosPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>{payment.method}</TableCell>
+                       <TableCell className="text-center space-x-1">
+                        {payment.paymentReceipt ? (
+                          <>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <Button variant="outline" size="sm" className="h-8">
+                            <Upload className="h-3 w-3 mr-2" />
+                            Subir
+                          </Button>
+                        )}
+                      </TableCell>
                       <TableCell className="text-center space-x-1">
                         {payment.status === 'Completo' && (
                             <div className="flex items-center justify-center gap-2">
