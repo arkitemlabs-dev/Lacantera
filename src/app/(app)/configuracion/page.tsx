@@ -275,6 +275,31 @@ export default function ConfiguracionPage() {
                 </CardContent>
               </Card>
 
+              <Card>
+                <CardHeader>
+                  <CardTitle>Políticas y Documentos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <Label>Políticas de Privacidad</Label>
+                    <div className="relative border-2 border-dashed border-muted rounded-lg p-6 flex flex-col items-center justify-center text-center h-48">
+                      <Upload className="w-8 h-8 text-muted-foreground" />
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Arrastra tu documento aquí o haz clic para seleccionar
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Formato: PDF - Máx: 5MB
+                      </p>
+                      <Input
+                        type="file"
+                        accept=".pdf"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               <div className="flex justify-end mt-2">
                 <Button>Guardar Configuración</Button>
               </div>
@@ -325,7 +350,7 @@ export default function ConfiguracionPage() {
                                     {rolePermissions[user.role as keyof typeof rolePermissions].join(', ')}
                                 </TableCell>
                                 <TableCell>
-                                <Badge variant={statusVariant[user.status]}>
+                                <Badge variant={statusVariant[user.status]} className={cn(user.status === 'Activo' ? 'dark:text-green-950' : 'dark:text-red-950')}>
                                     {user.status}
                                 </Badge>
                                 </TableCell>
