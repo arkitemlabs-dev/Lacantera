@@ -45,11 +45,11 @@ const statusStyles: Record<
   SupplierStatus,
   { variant: 'default' | 'destructive' | 'secondary' | 'outline', className: string }
 > = {
-  active: { variant: 'default', className: 'bg-green-500/20 text-green-200 border-green-500/30 hover:bg-green-500/30' },
-  inactive: { variant: 'destructive', className: 'bg-red-500/20 text-red-200 border-red-500/30 hover:bg-red-500/30' },
+  active: { variant: 'default', className: 'dark:bg-green-500/20 dark:text-green-200 border-green-500/30 hover:bg-green-500/30 bg-green-100 text-green-800' },
+  inactive: { variant: 'destructive', className: 'dark:bg-red-500/20 dark:text-red-200 border-red-500/30 hover:bg-red-500/30 bg-red-100 text-red-800' },
   pending: { variant: 'secondary', className: '' },
-  attention: { variant: 'destructive', className: 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30 hover:bg-yellow-500/30' },
-  review: { variant: 'outline', className: 'bg-blue-500/20 text-blue-200 border-blue-500/30 hover:bg-blue-500/30' },
+  attention: { variant: 'destructive', className: 'dark:bg-yellow-500/20 dark:text-yellow-200 border-yellow-500/30 hover:bg-yellow-500/30 bg-yellow-100 text-yellow-800' },
+  review: { variant: 'outline', className: 'dark:bg-blue-500/20 dark:text-blue-200 border-blue-500/30 hover:bg-blue-500/30 bg-blue-100 text-blue-800' },
 };
 
 

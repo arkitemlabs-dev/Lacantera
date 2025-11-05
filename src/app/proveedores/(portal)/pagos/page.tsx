@@ -122,13 +122,13 @@ const payments = [
 const getStatusBadgeClass = (status: PaymentStatus) => {
   switch (status) {
     case 'Completado':
-      return 'bg-green-500/20 text-green-200 border-green-500/30';
+      return 'dark:bg-green-500/20 dark:text-green-200 border-green-500/30 bg-green-100 text-green-800';
     case 'Pagado':
-      return 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30';
+      return 'dark:bg-yellow-500/20 dark:text-yellow-200 border-yellow-500/30 bg-yellow-100 text-yellow-800';
     case 'En revisión':
-      return 'bg-blue-500/20 text-blue-200 border-blue-500/30';
+      return 'dark:bg-blue-500/20 dark:text-blue-200 border-blue-500/30 bg-blue-100 text-blue-800';
     case 'Rechazado':
-      return 'bg-red-500/20 text-red-200 border-red-500/30';
+      return 'dark:bg-red-500/20 dark:text-red-200 border-red-500/30 bg-red-100 text-red-800';
     default:
       return 'secondary';
   }
@@ -276,7 +276,7 @@ export default function PagosProveedorPage() {
                                   <Download className="h-4 w-4" />
                                   <span className="sr-only">Descargar Complemento</span>
                                 </Button>
-                               </TooltipTrigger>
+                               </GLTooltip>
                                <TooltipContent>
                                  <p>Descargar Complemento</p>
                                </TooltipContent>

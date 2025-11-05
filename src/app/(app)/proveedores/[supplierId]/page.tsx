@@ -80,25 +80,25 @@ const docStatusConfig = {
     icon: <FileCheck className="h-5 w-5 text-green-500" />,
     label: 'Aprobado',
     variant: 'default',
-    className: 'bg-green-500/20 text-green-200 border-green-500/30',
+    className: 'dark:bg-green-500/20 dark:text-green-200 border-green-500/30 bg-green-100 text-green-800',
   },
   pendiente: {
     icon: <FileClock className="h-5 w-5 text-yellow-500" />,
     label: 'Pendiente',
     variant: 'secondary',
-    className: 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30',
+    className: 'dark:bg-yellow-500/20 dark:text-yellow-200 border-yellow-500/30 bg-yellow-100 text-yellow-800',
   },
   rechazado: {
     icon: <FileX className="h-5 w-5 text-red-500" />,
     label: 'Rechazado',
     variant: 'destructive',
-    className: 'bg-red-500/20 text-red-200 border-red-500/30',
+    className: 'dark:bg-red-500/20 dark:text-red-200 border-red-500/30 bg-red-100 text-red-800',
   },
   vencido: {
     icon: <FileQuestion className="h-5 w-5 text-orange-500" />,
     label: 'Vencido',
     variant: 'destructive',
-    className: 'bg-orange-500/20 text-orange-200 border-orange-500/30',
+    className: 'dark:bg-orange-500/20 dark:text-orange-200 border-orange-500/30 bg-orange-100 text-orange-800',
   },
    'no aplica': {
     icon: <FileX className="h-5 w-5 text-muted-foreground" />,
@@ -238,7 +238,7 @@ export default function SupplierProfilePage({
                                 <InfoRow label="Código de Proveedor" value={`PROV-${supplier.id.padStart(3, '0')}`} />
                                 <InfoRow label="Fecha de Registro" value={supplier.registrationDate} />
                                 <InfoRow label="Estado Actual" value={
-                                <Badge variant={supplier.status === 'active' ? 'default' : 'destructive'} className={cn(supplier.status === 'active' ? 'bg-green-500/20 text-green-200' : 'bg-red-500/20 text-red-200', 'hover:bg-transparent')}>
+                                <Badge variant={supplier.status === 'active' ? 'default' : 'destructive'} className={cn(supplier.status === 'active' ? 'dark:bg-green-500/20 dark:text-green-200 bg-green-100 text-green-800' : 'dark:bg-red-500/20 dark:text-red-200 bg-red-100 text-red-800', 'hover:bg-transparent')}>
                                     {supplier.status === 'active' ? 'Activo' : 'Inactivo'}
                                 </Badge>
                                 } />
@@ -341,13 +341,13 @@ export default function SupplierProfilePage({
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className={cn("flex items-center justify-between p-3 rounded-md", selectedDocument.status !== 'vencido' ? "bg-green-500/10" : "bg-red-500/10")}>
-                    <p className={cn("text-sm", selectedDocument.status !== 'vencido' ? "text-green-200" : "text-red-200")}>
+                    <p className={cn("text-sm", selectedDocument.status !== 'vencido' ? "dark:text-green-200 text-green-800" : "dark:text-red-200 text-red-800")}>
                       Verificación de vigencia
                     </p>
                     {selectedDocument.status !== 'vencido' ? <CheckCircle className="h-5 w-5 text-green-400" /> : <XCircle className="h-5 w-5 text-red-400" />}
                   </div>
                    <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-md">
-                    <p className="text-sm text-green-200">
+                    <p className="text-sm dark:text-green-200 text-green-800">
                       Coincide con RFC y Razón Social
                     </p>
                     <CheckCircle className="h-5 w-5 text-green-400" />

@@ -55,13 +55,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 const getBadgeVariant = (status: Invoice['status']) => {
   switch (status) {
     case 'Pendiente pago':
-      return 'bg-blue-500/20 text-blue-200 border-blue-500/30 hover:bg-blue-500/30';
+      return 'dark:bg-blue-500/20 dark:text-blue-200 border-blue-500/30 hover:bg-blue-500/30 bg-blue-100 text-blue-800';
     case 'En Revisión':
-      return 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30 hover:bg-yellow-500/30';
+      return 'dark:bg-yellow-500/20 dark:text-yellow-200 border-yellow-500/30 hover:bg-yellow-500/30 bg-yellow-100 text-yellow-800';
     case 'Rechazada':
-      return 'bg-red-500/20 text-red-200 border-red-500/30 hover:bg-red-500/30';
+      return 'dark:bg-red-500/20 dark:text-red-200 border-red-500/30 hover:bg-red-500/30 bg-red-100 text-red-800';
     case 'Pagada':
-      return 'bg-green-500/20 text-green-200 border-green-500/30 hover:bg-green-500/30';
+      return 'dark:bg-green-500/20 dark:text-green-200 border-green-500/30 hover:bg-green-500/30 bg-green-100 text-green-800';
     default:
       return 'secondary';
   }
@@ -380,19 +380,19 @@ export default function FacturasPage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-md">
-                        <p className="text-sm text-green-200">
+                        <p className="text-sm dark:text-green-200 text-green-800">
                           RFC del emisor coincide
                         </p>
                         <span className="text-green-400">✔</span>
                       </div>
                       <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-md">
-                        <p className="text-sm text-green-200">
+                        <p className="text-sm dark:text-green-200 text-green-800">
                           Monto total coincide con la OC
                         </p>
                         <span className="text-green-400">✔</span>
                       </div>
                       <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-md">
-                        <p className="text-sm text-red-200">
+                        <p className="text-sm dark:text-red-200 text-red-800">
                           Conceptos no coinciden
                         </p>
                         <span className="text-red-400">✖</span>

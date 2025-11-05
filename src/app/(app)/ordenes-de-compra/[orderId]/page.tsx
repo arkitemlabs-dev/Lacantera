@@ -42,11 +42,11 @@ const InfoRow = ({
 const getStatusBadge = (status: PurchaseOrder['status']) => {
   switch (status) {
     case 'Pendiente':
-      return 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30';
+      return 'dark:bg-yellow-500/20 dark:text-yellow-200 border-yellow-500/30 bg-yellow-100 text-yellow-800';
     case 'Completa':
-      return 'bg-green-500/20 text-green-200 border-green-500/30';
+      return 'dark:bg-green-500/20 dark:text-green-200 border-green-500/30 bg-green-100 text-green-800';
     case 'Cancelada':
-      return 'bg-red-500/20 text-red-200 border-red-500/30';
+      return 'dark:bg-red-500/20 dark:text-red-200 border-red-500/30 bg-red-100 text-red-800';
   }
 };
 
