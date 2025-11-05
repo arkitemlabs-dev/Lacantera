@@ -62,6 +62,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
 
 type User = {
     id: string;
@@ -350,7 +351,7 @@ export default function ConfiguracionPage() {
                                     {rolePermissions[user.role as keyof typeof rolePermissions].join(', ')}
                                 </TableCell>
                                 <TableCell>
-                                <Badge variant={statusVariant[user.status]} className={cn(user.status === 'Activo' ? 'dark:text-green-950' : 'dark:text-red-950')}>
+                                <Badge variant={statusVariant[user.status]} className={cn(user.status === 'Activo' ? 'dark:text-green-950 text-green-800' : 'dark:text-red-950 text-red-800')}>
                                     {user.status}
                                 </Badge>
                                 </TableCell>
