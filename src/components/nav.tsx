@@ -25,10 +25,13 @@ export function Nav() {
   const { userRole } = useAuth();
 
   const filteredNavItems = navItems.filter(item => {
-    if (item.href === '/configuracion') {
-      return userRole === 'Super Admin';
+    if (userRole.name === 'Super Admin') {
+      return true;
     }
-    return true;
+    if (userRole.permissions[item.href]) {
+      return true;
+    }
+    return false;
   });
 
 

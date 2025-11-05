@@ -68,6 +68,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { navItems } from '../nav';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '../layout';
+import { initialRoles, type Role, type Permission } from '@/lib/roles';
+
 
 type User = {
     id: string;
@@ -76,41 +78,6 @@ type User = {
     role: string;
     status: 'Activo' | 'Inactivo';
 };
-
-type Permission = 'ver' | 'crear_editar' | 'eliminar';
-
-type Role = {
-    name: string;
-    permissions: {
-        [module: string]: Permission[];
-    };
-};
-
-const initialRoles: Role[] = [
-    {
-      name: 'Super Admin',
-      permissions: Object.fromEntries(navItems.map(item => [item.href, ['ver', 'crear_editar', 'eliminar']])),
-    },
-    {
-      name: 'Compras',
-      permissions: {
-        '/proveedores': ['ver', 'crear_editar'],
-        '/ordenes-de-compra': ['ver', 'crear_editar'],
-        '/facturas': ['ver'],
-      },
-    },
-    {
-      name: 'Contabilidad',
-      permissions: {
-        '/facturas': ['ver', 'crear_editar'],
-        '/pagos': ['ver', 'crear_editar'],
-      },
-    },
-    {
-      name: 'Solo lectura',
-      permissions: Object.fromEntries(navItems.map(item => [item.href, ['ver']])),
-    },
-  ];
 
 const initialUsers: User[] = [
   {
@@ -168,12 +135,12 @@ export default function ConfiguracionPage() {
     const [currentRoleName, setCurrentRoleName] = useState('');
 
     useEffect(() => {
-        if (userRole !== 'Super Admin') {
+        if (userRole.name !== 'Super Admin') {
             router.push('/dashboard');
         }
     }, [userRole, router]);
 
-    if (userRole !== 'Super Admin') {
+    if (userRole.name !== 'Super Admin') {
         return (
             <main className="flex min-h-[calc(100vh_-_theme(spacing.16))] flex-1 flex-col gap-4 bg-muted/40 p-4 md:gap-8 md:p-10">
                 <div className="mx-auto grid w-full max-w-6xl gap-2">
@@ -448,8 +415,8 @@ export default function ConfiguracionPage() {
                         </TableHeader>
                         <TableBody>
                             {users.map((user) => {
-                                const userRole = roles.find(r => r.name === user.role);
-                                const permittedModules = userRole ? Object.keys(userRole.permissions).map(href => navItems.find(item => item.href === href)?.title).filter(Boolean) : [];
+                                const userRoleData = roles.find(r => r.name === user.role);
+                                const permittedModules = userRoleData ? Object.keys(userRoleData.permissions).map(href => navItems.find(item => item.href === href)?.title).filter(Boolean) : [];
 
                                 return (
                                 <TableRow key={user.id}>
