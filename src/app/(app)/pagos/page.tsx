@@ -66,6 +66,8 @@ import {
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
 
 const getStatusVariant = (status: PaymentStatus) => {
   switch (status) {
@@ -264,10 +266,10 @@ export default function PagosPage() {
                     <TableHead>Proveedor</TableHead>
                     <TableHead className="text-right">Monto</TableHead>
                     <TableHead>Fecha Ejecución</TableHead>
-                    <TableHead>Estado</TableHead>
+                    <TableHead>Estado Pago</TableHead>
                     <TableHead>Método</TableHead>
                     <TableHead className="text-center">Comprobante de Pago</TableHead>
-                    <TableHead className="text-center">Complemento de Pago</TableHead>
+                    <TableHead className="text-center">Estado del Complemento</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -305,43 +307,81 @@ export default function PagosPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>{payment.method}</TableCell>
-                       <TableCell className="text-center space-x-1">
+                       <TableCell className="text-center">
                         {payment.paymentReceipt ? (
-                          <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                 <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Descargar Comprobante</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         ) : (
-                          <Button variant="outline" size="sm" className="h-8">
-                            <Upload className="h-3 w-3 mr-2" />
-                            Subir
-                          </Button>
+                           <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                  <Button variant="outline" size="sm" className="h-8">
+                                    <Upload className="h-3 w-3 mr-2" />
+                                    Subir
+                                  </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Subir Comprobante</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
                       </TableCell>
-                      <TableCell className="text-center space-x-1">
-                        {payment.status === 'Completo' && (
-                            <div className="flex items-center justify-center gap-2">
-                                <CheckCircle className="h-5 w-5 text-green-400"/>
-                                <Button variant="ghost" size="icon" className='h-8 w-8 bg-transparent hover:bg-primary/10'>
-                                    <Download className="h-4 w-4" />
-                                </Button>
-                           </div>
-                        )}
-                        {payment.status === 'En Revisión' && (
-                             <Button variant="ghost" size="icon" className='h-8 w-8' onClick={() => handleOpenComplementDialog(payment)}>
-                                <Eye className="h-4 w-4" />
-                            </Button>
-                        )}
-                         {(payment.status === 'Pendiente complemento' || payment.status === 'Rechazada') && (
-                          <div className="flex items-center justify-center gap-2 opacity-50">
-                                <Eye className="h-4 w-4"/>
-                                <Download className="h-4 w-4" />
-                           </div>
-                        )}
+                      <TableCell className="text-center">
+                        <div className='flex items-center justify-center gap-1'>
+                          {payment.status === 'Completo' && (
+                            <TooltipProvider>
+                              <div className='flex items-center gap-1'>
+                                <span className='text-xs text-green-400'>Recibido</span>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className='h-8 w-8 bg-transparent hover:bg-primary/10'>
+                                        <Download className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p>Descargar Complemento</p></TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </TooltipProvider>
+                          )}
+                          {payment.status === 'En Revisión' && (
+                            <TooltipProvider>
+                              <div className='flex items-center gap-1'>
+                                <span className='text-xs text-blue-400'>En Revisión</span>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className='h-8 w-8' onClick={() => handleOpenComplementDialog(payment)}>
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p>Revisar Complemento</p></TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </TooltipProvider>
+                          )}
+                          {payment.status === 'Pendiente complemento' && (
+                              <div className='flex items-center gap-1 text-yellow-400'>
+                                <Clock className="h-4 w-4"/>
+                                <span className='text-xs'>Pendiente</span>
+                              </div>
+                          )}
+                          {payment.status === 'Rechazada' && (
+                            <div className='flex items-center gap-1 text-red-400'>
+                              <XCircle className="h-4 w-4"/>
+                              <span className='text-xs'>Rechazado</span>
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -489,6 +529,3 @@ export default function PagosPage() {
     </main>
   );
 }
-
-    
-    
