@@ -14,7 +14,7 @@ import {
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
 import { Building } from 'lucide-react';
-import { useAuth } from '@/app/(app)/layout';
+import { useAuth } from '@/app/providers';
 
 const LaCanteraLogo = () => (
     <Building className="h-6 w-6 text-primary" />
@@ -25,6 +25,7 @@ export function Nav() {
   const { userRole } = useAuth();
 
   const filteredNavItems = navItems.filter(item => {
+    if (!userRole || !userRole.permissions) return false;
     if (userRole.name === 'Super Admin') {
       return true;
     }

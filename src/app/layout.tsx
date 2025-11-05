@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
-import { ThemeProvider } from '@/components/theme-provider';
+import { AppProviders } from './providers';
 
 export const metadata: Metadata = {
   title: 'La Cantera Admin Portal',
@@ -28,15 +28,10 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
+        <AppProviders>
           {children}
           <Toaster />
-        </ThemeProvider>
+        </AppProviders>
       </body>
     </html>
   );

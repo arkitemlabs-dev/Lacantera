@@ -6,42 +6,14 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar';
 import { UserNav } from '@/components/user-nav';
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { initialRoles, type Role } from '@/lib/roles';
-
-type AuthContextType = {
-  userRole: Role;
-  setUserRole: React.Dispatch<React.SetStateAction<Role>>;
-};
-
-export const AuthContext = createContext<AuthContextType | null>(null);
-
-export const useAuth = () => {
-    const context = useContext(AuthContext);
-    if (!context) {
-        throw new Error('useAuth must be used within an AuthProvider');
-    }
-    return context;
-};
-
 
 export default function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [userRole, setUserRole] = useState<Role>(initialRoles.find(r => r.name === 'Super Admin')!);
-
-  useEffect(() => {
-    const storedRoleName = sessionStorage.getItem('userRole');
-    const role = initialRoles.find(r => r.name === storedRoleName);
-    if (role) {
-      setUserRole(role);
-    }
-  }, []);
 
   return (
-    <AuthContext.Provider value={{ userRole, setUserRole }}>
       <SidebarProvider>
         <Nav />
         <SidebarInset>
@@ -55,6 +27,5 @@ export default function AppLayout({
           </div>
         </SidebarInset>
       </SidebarProvider>
-    </AuthContext.Provider>
   );
 }
