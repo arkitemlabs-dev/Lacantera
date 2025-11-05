@@ -25,10 +25,10 @@ const activities = [
 ];
 
 const statusVariant: { [key: string]: string } = {
-  'En revisión': 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30',
-  'Completa': 'bg-green-500/20 text-green-200 border-green-500/30',
-  'Vigente': 'bg-blue-500/20 text-blue-200 border-blue-500/30',
-  'Respondido': 'bg-primary/20 text-primary-foreground/80 border-primary/30'
+  'En revisión': 'dark:bg-yellow-500/20 dark:text-yellow-200 border-yellow-500/30 bg-yellow-100 text-yellow-800',
+  'Completa': 'dark:bg-green-500/20 dark:text-green-200 border-green-500/30 bg-green-100 text-green-800',
+  'Vigente': 'dark:bg-blue-500/20 dark:text-blue-200 border-blue-500/30 bg-blue-100 text-blue-800',
+  'Respondido': 'dark:bg-primary/20 dark:text-primary-foreground/80 border-primary/30 bg-primary/10 text-primary'
 };
 
 
