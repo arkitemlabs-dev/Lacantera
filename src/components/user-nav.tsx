@@ -128,6 +128,9 @@ export function UserNav() {
               <p className="text-xs leading-none text-muted-foreground">
                 admin@lacantora.com
               </p>
+              <p className="text-xs leading-none text-muted-foreground pt-1 font-semibold">
+                Super Admin
+              </p>
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
