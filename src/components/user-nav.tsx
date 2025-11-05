@@ -37,6 +37,7 @@ import { Separator } from '@/components/ui/separator';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ThemeToggle } from './theme-toggle';
+import { useAuth } from '@/app/(app)/layout';
 
 const notificationIcons: Record<string, React.ReactNode> = {
   new_supplier: <UserPlus className="h-5 w-5 text-blue-500" />,
@@ -48,6 +49,7 @@ const notificationIcons: Record<string, React.ReactNode> = {
 export function UserNav() {
   const userAvatar = PlaceHolderImages.find((img) => img.id === 'user-avatar-1');
   const pathname = usePathname();
+  const { userRole } = useAuth();
   const isProviderPortal = pathname.startsWith('/proveedores');
   const notificationsLink = isProviderPortal ? '/proveedores/notificaciones' : '/notificaciones';
   const profileLink = isProviderPortal ? '/proveedores/perfil' : '/perfil';
@@ -129,7 +131,7 @@ export function UserNav() {
                 admin@lacantora.com
               </p>
               <p className="text-xs leading-none text-muted-foreground pt-1 font-semibold">
-                Super Admin
+                {userRole.name}
               </p>
             </div>
           </DropdownMenuLabel>
