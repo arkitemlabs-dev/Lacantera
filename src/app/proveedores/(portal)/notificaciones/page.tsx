@@ -100,31 +100,31 @@ const notificationConfig = {
     icon: <AlertOctagon className="h-6 w-6 text-yellow-500" />,
     borderColor: 'border-yellow-500/50',
     bgColor: 'bg-yellow-500/10',
-    tagClass: 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30',
+    tagClass: 'dark:bg-yellow-500/20 dark:text-yellow-200 border-yellow-500/30 bg-yellow-100 text-yellow-800',
   },
   success: {
     icon: <CheckCircle2 className="h-6 w-6 text-green-500" />,
     borderColor: 'border-green-500/50',
     bgColor: 'bg-green-500/10',
-    tagClass: 'bg-green-500/20 text-green-200 border-green-500/30',
+    tagClass: 'dark:bg-green-500/20 dark:text-green-200 border-green-500/30 bg-green-100 text-green-800',
   },
   error: {
     icon: <XCircle className="h-6 w-6 text-red-500" />,
     borderColor: 'border-red-500/50',
     bgColor: 'bg-red-500/10',
-    tagClass: 'bg-red-500/20 text-red-200 border-red-500/30',
+    tagClass: 'dark:bg-red-500/20 dark:text-red-200 border-red-500/30 bg-red-100 text-red-800',
   },
   info: {
     icon: <FileText className="h-6 w-6 text-blue-500" />,
     borderColor: 'border-blue-500/50',
     bgColor: 'bg-blue-500/10',
-    tagClass: 'bg-blue-500/20 text-blue-200 border-blue-500/30',
+    tagClass: 'dark:bg-blue-500/20 dark:text-blue-200 border-blue-500/30 bg-blue-100 text-blue-800',
   },
   message: {
     icon: <MessageSquare className="h-6 w-6 text-purple-500" />,
     borderColor: 'border-purple-500/50',
     bgColor: 'bg-purple-500/10',
-    tagClass: 'bg-purple-500/20 text-purple-200 border-purple-500/30',
+    tagClass: 'dark:bg-purple-500/20 dark:text-purple-200 border-purple-500/30 bg-purple-100 text-purple-800',
   },
 } as const;
 
