@@ -266,7 +266,7 @@ export default function PagosPage() {
                     <TableHead>Fecha Ejecución</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Método</TableHead>
-                    <TableHead className="text-center">Comprobante</TableHead>
+                    <TableHead className="text-center">Comprobante de Pago</TableHead>
                     <TableHead className="text-center">Complemento de Pago</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -489,3 +489,5 @@ export default function PagosPage() {
     </main>
   );
 }
+
+    
