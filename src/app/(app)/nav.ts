@@ -1,3 +1,4 @@
+
 import {
   Home,
   Users,
@@ -7,6 +8,7 @@ import {
   Settings,
   ShoppingCart,
   CreditCard,
+  User
 } from 'lucide-react';
 
 export const navItems = [
@@ -14,6 +16,11 @@ export const navItems = [
     title: 'Inicio',
     href: '/dashboard',
     icon: Home,
+  },
+  {
+    title: 'Perfil',
+    href: '/perfil',
+    icon: User,
   },
   {
     title: 'Gestión de proveedores',

@@ -51,7 +51,9 @@ export function UserNav() {
   const pathname = usePathname();
   const isProviderPortal = pathname.startsWith('/proveedores');
   const notificationsLink = isProviderPortal ? '/proveedores/notificaciones' : '/notificaciones';
-  
+  const profileLink = isProviderPortal ? '/proveedores/perfil' : '/perfil';
+  const settingsLink = isProviderPortal ? '/proveedores/seguridad' : '/configuracion';
+
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
@@ -131,13 +133,17 @@ export function UserNav() {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
-            <DropdownMenuItem>
-              <User className="mr-2" />
-              <span>Perfil</span>
+            <DropdownMenuItem asChild>
+              <Link href={profileLink}>
+                <User className="mr-2" />
+                <span>Perfil</span>
+              </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Settings className="mr-2" />
-              <span>Configuración</span>
+            <DropdownMenuItem asChild>
+               <Link href={settingsLink}>
+                <Settings className="mr-2" />
+                <span>Configuración</span>
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem>
               <LifeBuoy className="mr-2" />
