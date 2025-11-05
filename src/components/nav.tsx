@@ -25,11 +25,12 @@ export function Nav() {
   const { userRole } = useAuth();
 
   const filteredNavItems = navItems.filter(item => {
-    if (!userRole || !userRole.permissions) return false;
+    // Super Admin always sees everything
     if (userRole.name === 'Super Admin') {
       return true;
     }
-    if (userRole.permissions[item.href]) {
+    // For other roles, check permissions
+    if (userRole?.permissions?.[item.href]?.includes('ver')) {
       return true;
     }
     return false;
