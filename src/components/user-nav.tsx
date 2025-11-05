@@ -37,6 +37,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { ThemeToggle } from './theme-toggle';
 
 const notificationIcons: Record<string, React.ReactNode> = {
   new_supplier: <UserPlus className="h-5 w-5 text-blue-500" />,
@@ -55,6 +56,7 @@ export function UserNav() {
 
   return (
     <div className="flex items-center gap-4">
+       <ThemeToggle />
       <Popover>
         <PopoverTrigger asChild>
           <Button variant="ghost" size="icon" className="relative">
