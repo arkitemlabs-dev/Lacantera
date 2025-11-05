@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -89,10 +90,10 @@ const complementaryDocsConfig = [
     { id: 'fotoDomicilio', label: 'Fotografía a color del exterior del domicilio fiscal/comercial', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
     { id: 'referencias', label: 'Referencias comerciales', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
     { id: 'codigoEtica', label: 'Carta firmada de aceptación al código de ética', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
-    { id: 'repse', label: 'Registro en el REPSE', required: true, types: ['services'] },
-    { id: 'tituloPropiedad', label: 'Título de propiedad del inmueble arrendado', required: true, types: ['leasing'] },
-    { id: 'pagoPredial', label: 'Comprobante de pago de predial vigente', required: true, types: ['leasing'] },
-    { id: 'polizaSeguro', label: 'Póliza de seguro de responsabilidad civil vigente', required: true, types: ['transport'] },
+    { id: 'repse', label: 'Registro en el REPSE (Solo si aplica)', required: true, types: ['services'] },
+    { id: 'tituloPropiedad', label: 'Título de propiedad del inmueble arrendado o documento que acredite propiedad (Solo si aplica)', required: true, types: ['leasing'] },
+    { id: 'pagoPredial', label: 'Comprobante de pago de predial vigente (Solo si aplica)', required: true, types: ['leasing'] },
+    { id: 'polizaSeguro', label: 'Póliza de seguro de responsabilidad civil vigente (Solo si aplica)', required: true, types: ['transport'] },
 ];
 
 export function AddSupplierForm() {
@@ -378,3 +379,5 @@ export function AddSupplierForm() {
     </Form>
   );
 }
+
+    

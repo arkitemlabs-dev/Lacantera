@@ -22,21 +22,23 @@ export default function AppLayout({
                              pathname.startsWith('/proveedores/notificaciones') ||
                              pathname.startsWith('/proveedores/seguridad');
 
-  const NavComponent = isSupplierPortal ? SupplierNav : AdminNav;
+  if (isSupplierPortal) {
+    return (
+      <SidebarProvider>
+        <SupplierNav />
+        <SidebarInset>
+          <div className="flex flex-col min-h-screen">
+             <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6 justify-end">
+              <UserNav />
+            </header>
+            <main className="flex-1 bg-muted/40">
+              {children}
+            </main>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    );
+  }
 
-  return (
-    <SidebarProvider>
-      <NavComponent />
-      <SidebarInset>
-        <div className="flex flex-col min-h-screen">
-           <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6 justify-end">
-            <UserNav />
-          </header>
-          <main className="flex-1 bg-muted/40">
-            {children}
-          </main>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
-  );
+  return <>{children}</>;
 }

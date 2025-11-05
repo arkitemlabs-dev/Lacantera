@@ -3,7 +3,6 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import Image from 'next/image';
 
 import {
   Sidebar,
@@ -15,8 +14,6 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Home, User, ShoppingCart, FileText, MessageSquare, Bell, Shield, Building, CreditCard } from 'lucide-react';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { Avatar, AvatarFallback } from '../ui/avatar';
 
 
 const navItems = [
@@ -36,7 +33,6 @@ const LaCanteraLogo = () => {
 
 export function Nav() {
   const pathname = usePathname();
-  const userAvatar = PlaceHolderImages.find((img) => img.id === 'user-avatar-1');
 
   return (
     <Sidebar>
@@ -64,26 +60,6 @@ export function Nav() {
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter className="group-data-[collapsible=icon]:hidden">
-        <div className="flex items-center gap-3 p-2 rounded-md">
-            <Avatar className="h-10 w-10">
-              {userAvatar && (
-                <Image
-                  src={userAvatar.imageUrl}
-                  alt={userAvatar.description}
-                  width={40}
-                  height={40}
-                  data-ai-hint={userAvatar.imageHint}
-                />
-              )}
-              <AvatarFallback>SH</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 overflow-hidden">
-                <p className="text-sm font-medium leading-none truncate">Shirley.H</p>
-                <p className="text-xs leading-none text-muted-foreground truncate">shirley.h@proveedor.com</p>
-            </div>
-        </div>
-      </SidebarFooter>
     </Sidebar>
   );
 }

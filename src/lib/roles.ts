@@ -42,4 +42,8 @@ export const initialRoles: Role[] = [
       name: 'Solo lectura',
       permissions: Object.fromEntries(navItems.map(item => [item.href, ['ver']])),
     },
+    {
+      name: 'Proveedor',
+      permissions: {}, // Permissions for supplier are handled by its own nav
+    }
   ];

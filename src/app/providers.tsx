@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
@@ -9,7 +10,7 @@ type AuthContextType = {
   setUserRole: React.Dispatch<React.SetStateAction<Role>>;
 };
 
-export const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextType | null>(null);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -28,7 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const storedRoleName = sessionStorage.getItem('userRole');
       if (storedRoleName) {
-        const role = initialRoles.find((r) => r.name === storedRoleName);
+        const role = initialRoles.find((r) => r.name === storedRoleName) || initialRoles.find(r => r.name === 'Proveedor');
         if (role) {
           setUserRole(role);
         }

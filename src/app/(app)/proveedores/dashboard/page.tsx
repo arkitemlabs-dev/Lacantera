@@ -1,4 +1,3 @@
-
 import { KpiCards } from '@/components/proveedores/dashboard/kpi-cards';
 import { RecentActivity } from '@/components/proveedores/dashboard/recent-activity';
 import { Alerts } from '@/components/proveedores/dashboard/alerts';

@@ -1,4 +1,3 @@
-
 'use client';
 import {
   ChevronLeft,
@@ -132,6 +131,10 @@ export default function SupplierProfilePage({
   const documentsForSupplier = allDocs.map(doc => {
       if (doc.types.includes(supplier.type)) {
           return doc;
+      }
+      // If the document is not for this supplier type, check if it's a general document
+      if (doc.types.length === 4) { // general doc for all types
+        return doc;
       }
       return { ...doc, status: 'no aplica' as DocStatus };
   });
@@ -386,7 +389,3 @@ export default function SupplierProfilePage({
     </Dialog>
   );
 }
-
-    
-
-    
