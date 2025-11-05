@@ -18,9 +18,9 @@ const activities = [
   {
     icon: <UserPlus className="h-5 w-5" />,
     text: (
-      <p>
+      <span>
         Nuevo proveedor <span className="font-semibold">"Plásticos del Sur"</span> ha sido registrado.
-      </p>
+      </span>
     ),
     time: 'Hace 15 min',
     link: '#',
@@ -28,10 +28,10 @@ const activities = [
   {
     icon: <FileText className="h-5 w-5" />,
     text: (
-      <p>
+      <span>
         Factura <span className="font-semibold">#INV-005</span> ha sido{' '}
         <Badge variant="default" className="bg-green-600 hover:bg-green-700 h-5">Aprobada</Badge>.
-      </p>
+      </span>
     ),
     time: 'Hace 1 hora',
     link: '#',
@@ -39,9 +39,9 @@ const activities = [
   {
     icon: <MessageSquare className="h-5 w-5" />,
     text: (
-      <p>
+      <span>
         Nuevo mensaje en ticket <span className="font-semibold">#T-129</span> sobre orden de compra.
-      </p>
+      </span>
     ),
     time: 'Hace 3 horas',
     link: '#',
