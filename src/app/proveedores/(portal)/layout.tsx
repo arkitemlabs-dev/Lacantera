@@ -1,39 +1,25 @@
 
 'use client';
 
-import { useState } from 'react';
 import { Nav } from '@/components/proveedores/nav';
 import {
   SidebarProvider,
   SidebarInset,
 } from '@/components/ui/sidebar';
 import { UserNav } from '@/components/user-nav';
-import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
 
 export default function SupplierLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [searchTerm, setSearchTerm] = useState('');
 
   return (
     <SidebarProvider>
-      <Nav searchTerm={searchTerm} />
+      <Nav />
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
-           <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Buscar en el portal..."
-                className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+           <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6 justify-end">
             <UserNav />
           </header>
           <main className="flex-1 bg-muted/40">

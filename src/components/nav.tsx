@@ -3,10 +3,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useMemo } from 'react';
 
-import { navItems as allNavItems } from '@/lib/data';
-import { cn } from '@/lib/utils';
+import { navItems } from '@/lib/data';
 import {
   Sidebar,
   SidebarHeader,
@@ -15,23 +13,14 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
-import { Building, CreditCard } from 'lucide-react';
+import { Building } from 'lucide-react';
 
 const LaCanteraLogo = () => (
     <Building className="h-6 w-6 text-primary" />
   );
 
-export function Nav({ searchTerm }: { searchTerm: string }) {
+export function Nav() {
   const pathname = usePathname();
-
-  const navItems = useMemo(() => {
-    if (!searchTerm) {
-      return allNavItems;
-    }
-    return allNavItems.filter(item => 
-      item.title.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [searchTerm]);
 
   return (
     <Sidebar>
