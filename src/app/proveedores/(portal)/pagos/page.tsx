@@ -276,7 +276,7 @@ export default function PagosProveedorPage() {
                                   <Download className="h-4 w-4" />
                                   <span className="sr-only">Descargar Complemento</span>
                                 </Button>
-                               </GLTooltip>
+                               </TooltipTrigger>
                                <TooltipContent>
                                  <p>Descargar Complemento</p>
                                </TooltipContent>
