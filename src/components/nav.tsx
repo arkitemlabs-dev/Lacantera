@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { navItems } from '@/lib/data';
+import { navItems } from '@/app/(app)/nav';
 import {
   Sidebar,
   SidebarHeader,
@@ -14,6 +14,7 @@ import {
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
 import { Building } from 'lucide-react';
+import { useAuth } from '@/app/(app)/layout';
 
 const LaCanteraLogo = () => (
     <Building className="h-6 w-6 text-primary" />
@@ -21,6 +22,15 @@ const LaCanteraLogo = () => (
 
 export function Nav() {
   const pathname = usePathname();
+  const { userRole } = useAuth();
+
+  const filteredNavItems = navItems.filter(item => {
+    if (item.href === '/configuracion') {
+      return userRole === 'Super Admin';
+    }
+    return true;
+  });
+
 
   return (
     <Sidebar>
@@ -32,7 +42,7 @@ export function Nav() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-          {navItems.map((item) => (
+          {filteredNavItems.map((item) => (
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
                 asChild

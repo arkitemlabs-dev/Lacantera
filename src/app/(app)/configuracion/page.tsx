@@ -1,7 +1,8 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -66,6 +67,7 @@ import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { navItems } from '../nav';
 import { Separator } from '@/components/ui/separator';
+import { useAuth } from '../layout';
 
 type User = {
     id: string;
@@ -146,9 +148,11 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } 
   Inactivo: 'secondary',
 };
 
-const availableModules = navItems.filter(item => item.href !== '/dashboard' && item.href !== '/perfil');
+const availableModules = navItems.filter(item => item.href !== '/dashboard' && item.href !== '/perfil' && item.href !== '/configuracion');
 
 export default function ConfiguracionPage() {
+    const { userRole } = useAuth();
+    const router = useRouter();
     const [users, setUsers] = useState<User[]>(initialUsers);
     const [roles, setRoles] = useState<Role[]>(initialRoles);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -162,6 +166,23 @@ export default function ConfiguracionPage() {
     const [isEditRoleDialogOpen, setIsEditRoleDialogOpen] = useState(false);
     const [currentRolePermissions, setCurrentRolePermissions] = useState<Role['permissions']>({});
     const [currentRoleName, setCurrentRoleName] = useState('');
+
+    useEffect(() => {
+        if (userRole !== 'Super Admin') {
+            router.push('/dashboard');
+        }
+    }, [userRole, router]);
+
+    if (userRole !== 'Super Admin') {
+        return (
+            <main className="flex min-h-[calc(100vh_-_theme(spacing.16))] flex-1 flex-col gap-4 bg-muted/40 p-4 md:gap-8 md:p-10">
+                <div className="mx-auto grid w-full max-w-6xl gap-2">
+                    <h1 className="text-3xl font-semibold">Acceso Denegado</h1>
+                    <p>No tienes permiso para acceder a esta página.</p>
+                </div>
+            </main>
+        );
+    }
 
     const handleActionClick = (user: User) => {
         setSelectedUser(user);
@@ -714,5 +735,3 @@ export default function ConfiguracionPage() {
     </main>
   );
 }
-
-    
