@@ -1,3 +1,6 @@
+
+'use client';
+import { useState } from 'react';
 import { Nav } from '@/components/nav';
 import {
   SidebarProvider,
@@ -12,9 +15,11 @@ export default function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const [searchTerm, setSearchTerm] = useState('');
+
   return (
     <SidebarProvider>
-      <Nav />
+      <Nav searchTerm={searchTerm} />
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
            <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6">
@@ -24,6 +29,8 @@ export default function AppLayout({
                 type="search"
                 placeholder="Buscar en el portal..."
                 className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
             <UserNav />

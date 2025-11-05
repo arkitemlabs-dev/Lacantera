@@ -4,6 +4,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
+import { useMemo } from 'react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -20,7 +21,7 @@ import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Avatar, AvatarFallback } from '../ui/avatar';
 
 
-const navItems = [
+const allNavItems = [
     { href: '/proveedores/dashboard', icon: Home, title: 'Inicio' },
     { href: '/proveedores/perfil', icon: User, title: 'Perfil' },
     { href: '/proveedores/ordenes-de-compra', icon: ShoppingCart, title: 'Órdenes de compra' },
@@ -35,9 +36,19 @@ const LaCanteraLogo = () => {
     return <Building className="h-8 w-8 text-primary" />;
 };
 
-export function Nav() {
+export function Nav({ searchTerm }: { searchTerm: string }) {
   const pathname = usePathname();
   const userAvatar = PlaceHolderImages.find((img) => img.id === 'user-avatar-1');
+
+  const navItems = useMemo(() => {
+    if (!searchTerm) {
+      return allNavItems;
+    }
+    return allNavItems.filter(item =>
+      item.title.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [searchTerm]);
+
 
   return (
     <Sidebar>

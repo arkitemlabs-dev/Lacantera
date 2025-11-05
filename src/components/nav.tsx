@@ -1,9 +1,11 @@
+
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useMemo } from 'react';
 
-import { navItems } from '@/lib/data';
+import { navItems as allNavItems } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import {
   Sidebar,
@@ -19,8 +21,17 @@ const LaCanteraLogo = () => (
     <Building className="h-6 w-6 text-primary" />
   );
 
-export function Nav() {
+export function Nav({ searchTerm }: { searchTerm: string }) {
   const pathname = usePathname();
+
+  const navItems = useMemo(() => {
+    if (!searchTerm) {
+      return allNavItems;
+    }
+    return allNavItems.filter(item => 
+      item.title.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [searchTerm]);
 
   return (
     <Sidebar>
