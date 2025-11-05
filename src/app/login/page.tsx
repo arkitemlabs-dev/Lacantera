@@ -29,6 +29,7 @@ import { PlaceHolderImages } from '@/lib/placeholder-images';
 export default function LoginPage() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [userType, setUserType] = useState('admin');
+  const [role, setRole] = useState('');
   const logo = PlaceHolderImages.find((img) => img.id === 'login-logo');
   const bgImage = PlaceHolderImages.find((img) => img.id === 'login-background');
   const router = useRouter();
@@ -84,6 +85,22 @@ export default function LoginPage() {
                     </SelectContent>
                 </Select>
             </div>
+            {userType === 'admin' && (
+              <div className="space-y-2">
+                <Label htmlFor="role">Rol</Label>
+                <Select value={role} onValueChange={setRole}>
+                  <SelectTrigger id="role">
+                    <SelectValue placeholder="Seleccione un rol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="super-admin">Super Admin</SelectItem>
+                    <SelectItem value="compras">Compras</SelectItem>
+                    <SelectItem value="contabilidad">Contabilidad</SelectItem>
+                    <SelectItem value="solo-lectura">Solo lectura</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email">Email / Usuario</Label>
               <Input
@@ -109,7 +126,7 @@ export default function LoginPage() {
                   className="absolute top-1/2 right-2 -translate-y-1/2 h-7 w-7"
                   onClick={() => setPasswordVisible(!passwordVisible)}
                 >
-                  {passwordVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                  {passwordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
