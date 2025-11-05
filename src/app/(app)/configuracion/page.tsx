@@ -317,12 +317,6 @@ export default function ConfiguracionPage() {
                             Gestione los usuarios internos y sus permisos en el sistema.
                             </CardDescription>
                         </div>
-                        <DialogTrigger asChild>
-                            <Button size="sm" className="gap-1">
-                                <PlusCircle className="h-4 w-4" />
-                                Nuevo Usuario
-                            </Button>
-                        </DialogTrigger>
                         </div>
                     </CardHeader>
                     <CardContent>
