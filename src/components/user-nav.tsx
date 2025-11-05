@@ -5,7 +5,6 @@ import {
   Bell,
   FileCheck2,
   FileUp,
-  LifeBuoy,
   LogOut,
   Settings,
   User,
@@ -144,10 +143,6 @@ export function UserNav() {
                 <Settings className="mr-2" />
                 <span>Configuración</span>
               </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <LifeBuoy className="mr-2" />
-              <span>Soporte</span>
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
