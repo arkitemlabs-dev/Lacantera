@@ -25,17 +25,24 @@ import { Eye, EyeOff, User } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { initialRoles } from '@/lib/roles';
 
 export default function LoginPage() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [userType, setUserType] = useState('admin');
-  const [role, setRole] = useState('');
+  const [role, setRole] = useState('Super Admin');
   const logo = PlaceHolderImages.find((img) => img.id === 'login-logo');
   const bgImage = PlaceHolderImages.find((img) => img.id === 'login-background');
   const router = useRouter();
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    if (userType === 'admin') {
+        sessionStorage.setItem('userRole', role);
+    } else {
+        // For supplier, you might want to set a default or specific role
+        sessionStorage.setItem('userRole', 'Proveedor'); 
+    }
     const dashboardUrl = userType === 'admin' ? '/dashboard' : '/proveedores/dashboard';
     router.push(dashboardUrl);
   };
@@ -93,10 +100,9 @@ export default function LoginPage() {
                     <SelectValue placeholder="Seleccione un rol" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="super-admin">Super Admin</SelectItem>
-                    <SelectItem value="compras">Compras</SelectItem>
-                    <SelectItem value="contabilidad">Contabilidad</SelectItem>
-                    <SelectItem value="solo-lectura">Solo lectura</SelectItem>
+                    {initialRoles.map(r => (
+                        <SelectItem key={r.name} value={r.name}>{r.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

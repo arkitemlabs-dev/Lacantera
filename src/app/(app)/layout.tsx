@@ -6,10 +6,8 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar';
 import { UserNav } from '@/components/user-nav';
-import React, { createContext, useContext, useState } from 'react';
-import { initialRoles } from '@/lib/roles';
-
-export type Role = typeof initialRoles[number];
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { initialRoles, type Role } from '@/lib/roles';
 
 type AuthContextType = {
   userRole: Role;
@@ -33,6 +31,14 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   const [userRole, setUserRole] = useState<Role>(initialRoles.find(r => r.name === 'Super Admin')!);
+
+  useEffect(() => {
+    const storedRoleName = sessionStorage.getItem('userRole');
+    const role = initialRoles.find(r => r.name === storedRoleName);
+    if (role) {
+      setUserRole(role);
+    }
+  }, []);
 
   return (
     <AuthContext.Provider value={{ userRole, setUserRole }}>
