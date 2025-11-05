@@ -109,7 +109,7 @@ export default function LoginPage() {
                   className="absolute top-1/2 right-2 -translate-y-1/2 h-7 w-7"
                   onClick={() => setPasswordVisible(!passwordVisible)}
                 >
-                  {passwordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {passwordVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
