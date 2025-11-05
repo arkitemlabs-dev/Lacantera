@@ -66,7 +66,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import { Tooltip, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 
 const getStatusVariant = (status: PaymentStatus) => {
@@ -529,3 +529,5 @@ export default function PagosPage() {
     </main>
   );
 }
+
+    
