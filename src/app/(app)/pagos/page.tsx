@@ -576,17 +576,17 @@ export default function PagosPage() {
                                 </div>
                             )}
                         </div>
-                        <DialogFooter className="gap-2">
+                        <DialogFooter className="justify-between">
                             {selectedPayment.status === 'Completo' ? (
                                 <Button variant="outline" onClick={() => setIsComplementReviewOpen(false)}>Cerrar</Button>
                             ) : (
                                 <>
                                  <Button variant="ghost" onClick={() => setIsComplementReviewOpen(false)}>Cancelar</Button>
                                 {selectedPayment.status === 'En Revisión' && (
-                                    <>
+                                    <div className="flex gap-2">
                                         <Button variant="destructive" onClick={() => setIsComplementReviewOpen(false)}>Rechazar</Button>
                                         <Button onClick={() => setIsComplementReviewOpen(false)}>Aprobar Complemento</Button>
-                                    </>
+                                    </div>
                                 )}
                                 </>
                             )}
@@ -629,4 +629,5 @@ export default function PagosPage() {
         </div>
     </main>
   );
-}
+
+    
