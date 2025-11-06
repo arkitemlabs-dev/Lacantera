@@ -53,21 +53,6 @@ import type { DateRange } from 'react-day-picker';
 
 type PaymentStatus = 'Completado' | 'Pagado';
 
-const kpis = [
-  {
-    title: 'Pagos Registrados',
-    value: 5,
-    description: 'Número total de transacciones',
-    icon: <FileCheck2 className="h-6 w-6 text-muted-foreground" />,
-  },
-  {
-    title: 'Complementos Pendientes',
-    value: 2,
-    description: 'Pagos esperando complemento',
-    icon: <FileArchive className="h-6 w-6 text-muted-foreground" />,
-  },
-];
-
 const payments = [
   {
     id: 'PAY-001',
@@ -158,23 +143,6 @@ export default function PagosProveedorPage() {
         </Link>
         <span>&gt;</span>
         <span className="text-foreground">Pagos</span>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        {kpis.map((kpi) => (
-          <Card key={kpi.title} className="bg-card/70">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {kpi.title}
-              </CardTitle>
-              {kpi.icon}
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{kpi.value}</div>
-              <p className="text-xs text-muted-foreground">{kpi.description}</p>
-            </CardContent>
-          </Card>
-        ))}
       </div>
 
        <Card>
