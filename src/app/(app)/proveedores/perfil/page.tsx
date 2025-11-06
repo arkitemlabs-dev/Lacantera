@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useRef } from 'react';
@@ -141,10 +142,9 @@ export default function PerfilProveedorPage() {
     <main className="flex-1 space-y-8 p-4 md:p-8">
       <h1 className="text-3xl font-bold tracking-tight">Perfil del Proveedor</h1>
        <Tabs defaultValue="general">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="general">Información General</TabsTrigger>
             <TabsTrigger value="documents">Documentos</TabsTrigger>
-            <TabsTrigger value="bank">Información bancaria</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
             <Card>
@@ -152,7 +152,7 @@ export default function PerfilProveedorPage() {
                   <div>
                     <CardTitle>Información General</CardTitle>
                     <CardDescription>
-                      Mantenga su información personal y fiscal actualizada.
+                      Mantenga su información fiscal, de contacto y bancaria actualizada.
                     </CardDescription>
                   </div>
                   <div className="flex justify-end gap-2">
@@ -225,6 +225,17 @@ export default function PerfilProveedorPage() {
                      <InfoField label="Email" value="shirley.h@proveedor.com" isEditing={isEditing} />
                   </div>
                 </div>
+
+                <Separator />
+
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Información Bancaria</h3>
+                   <div className="space-y-4">
+                     <InfoField label="Banco" value="BBVA Bancomer" isEditing={isEditing} />
+                     <InfoField label="CLABE" value="012180012345678901" isEditing={isEditing} />
+                     <InfoField label="Número de cuenta" value="0123456789" isEditing={isEditing} />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -276,21 +287,6 @@ export default function PerfilProveedorPage() {
                     })}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-           <TabsContent value="bank">
-            <Card>
-              <CardHeader>
-                <CardTitle>Información Bancaria</CardTitle>
-                 <CardDescription>
-                      Aquí puede ver y editar su información bancaria.
-                    </CardDescription>
-              </CardHeader>
-               <CardContent className="space-y-4">
-                 <InfoField label="Banco" value="BBVA Bancomer" isEditing={isEditing} />
-                 <InfoField label="CLABE" value="012180012345678901" isEditing={isEditing} />
-                 <InfoField label="Número de cuenta" value="0123456789" isEditing={isEditing} />
               </CardContent>
             </Card>
           </TabsContent>
