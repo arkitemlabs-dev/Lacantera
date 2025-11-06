@@ -29,10 +29,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const storedRoleName = sessionStorage.getItem('userRole');
       if (storedRoleName) {
-        const role = initialRoles.find((r) => r.name === storedRoleName) || initialRoles.find(r => r.name === 'Proveedor');
-        if (role) {
-          setUserRole(role);
-        }
+        const role = initialRoles.find((r) => r.name === storedRoleName);
+        // Fallback to a default role if the stored one is not found, to prevent crashes.
+        setUserRole(role || initialRoles.find(r => r.name === 'Super Admin')!);
       }
     } catch (error) {
         console.error("Could not access sessionStorage. Running on the server?")
