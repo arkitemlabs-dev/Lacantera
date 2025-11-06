@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import type { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
@@ -108,6 +108,7 @@ export default function PagosPage() {
   const [isComplementReviewOpen, setIsComplementReviewOpen] = useState(false);
   const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [status, setStatus] = useState('todas');
@@ -146,6 +147,18 @@ export default function PagosPage() {
   const handleOpenReceiptDialog = (payment: Payment) => {
     setSelectedPayment(payment);
     setIsReceiptDialogOpen(true);
+  };
+  
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      console.log('Archivo seleccionado:', file.name);
+      // Aquí iría la lógica para subir el archivo
+    }
   };
 
 
@@ -348,7 +361,7 @@ export default function PagosPage() {
                            <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                  <Button variant="outline" size="sm" className="h-8">
+                                  <Button variant="outline" size="sm" className="h-8" onClick={handleUploadClick}>
                                     <Upload className="h-3 w-3 mr-2" />
                                     Subir
                                   </Button>
@@ -426,6 +439,12 @@ export default function PagosPage() {
                   ))}
                 </TableBody>
               </Table>
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleFileSelect}
+              />
             </CardContent>
             <CardFooter className="flex justify-center border-t pt-4">
               <Button variant="outline">Cargar más</Button>
@@ -599,5 +618,3 @@ export default function PagosPage() {
     </main>
   );
 }
-
-    
