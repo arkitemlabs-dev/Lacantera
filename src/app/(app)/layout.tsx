@@ -6,21 +6,14 @@ import { Nav as AdminNav } from '@/components/nav';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { UserNav } from '@/components/user-nav';
 import { Nav as SupplierNav } from '@/components/proveedores/nav';
+import { AuthProvider, useAuth } from '../providers';
 
-export default function AppLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isSupplierPortal = pathname.startsWith('/proveedores/dashboard') || 
-                             pathname.startsWith('/proveedores/perfil') ||
-                             pathname.startsWith('/proveedores/ordenes-de-compra') ||
-                             pathname.startsWith('/proveedores/facturacion') ||
-                             pathname.startsWith('/proveedores/pagos') ||
-                             pathname.startsWith('/proveedores/mensajeria') ||
-                             pathname.startsWith('/proveedores/notificaciones') ||
-                             pathname.startsWith('/proveedores/seguridad');
+  const { userRole } = useAuth();
+  
+  // Simplified logic: if it's a supplier route, show supplier nav. Otherwise, show admin nav.
+  const isSupplierPortal = pathname.startsWith('/proveedores/') && userRole.name === 'Proveedor';
 
   const NavComponent = isSupplierPortal ? SupplierNav : AdminNav;
 
@@ -38,5 +31,15 @@ export default function AppLayout({
         </div>
       </SidebarInset>
     </SidebarProvider>
+  );
+}
+
+export default function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+      <AppLayoutContent>{children}</AppLayoutContent>
   );
 }
