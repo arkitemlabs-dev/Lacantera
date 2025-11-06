@@ -422,13 +422,13 @@ export default function PagosPage() {
                             </TooltipProvider>
                           )}
                           {(payment.status === 'Pendiente complemento' || payment.status === 'Pendiente comprobantes') && (
-                              <div className='flex items-center gap-1 text-yellow-400'>
+                              <div className='flex items-center justify-center gap-1 text-yellow-400'>
                                 <Clock className="h-4 w-4"/>
                                 <span className='text-xs'>Pendiente</span>
                               </div>
                           )}
                           {payment.status === 'Rechazada' && (
-                            <div className='flex items-center gap-1 text-red-400'>
+                            <div className='flex items-center justify-center gap-1 text-red-400'>
                               <XCircle className="h-4 w-4"/>
                               <span className='text-xs'>Rechazado</span>
                             </div>
@@ -527,14 +527,14 @@ export default function PagosPage() {
 
             <Dialog open={isComplementReviewOpen} onOpenChange={setIsComplementReviewOpen}>
                 {selectedPayment && (
-                     <DialogContent className="max-w-4xl grid-rows-[auto_1fr_auto]">
+                     <DialogContent className={cn("max-w-4xl grid-rows-[auto_1fr_auto]", selectedPayment.status === 'Completo' && 'max-w-2xl')}>
                         <DialogHeader>
                             <DialogTitle>Revisión de Complemento de Pago</DialogTitle>
                             <DialogDescription>
                             Revise y valide el complemento de pago para: {selectedPayment.id}
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="grid md:grid-cols-2 gap-6 overflow-y-auto max-h-[60vh] p-1">
+                        <div className={cn("grid md:grid-cols-2 gap-6 overflow-y-auto max-h-[60vh] p-1", selectedPayment.status === 'Completo' && 'md:grid-cols-1')}>
                             <div className="space-y-6">
                                 <Card>
                                     <CardHeader>
@@ -549,37 +549,45 @@ export default function PagosPage() {
                                     </CardContent>
                                 </Card>
                             </div>
-                            <div className="space-y-6">
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Validaciones Automáticas</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-md">
-                                            <p className="text-sm dark:text-green-200 text-green-800">UUID coincide con factura</p>
-                                            <Check className="h-5 w-5 text-green-400" />
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Acciones de Revisión</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="rejectionReason">Motivo de Rechazo (si aplica)</Label>
-                                            <Textarea id="rejectionReason" placeholder="Describe el motivo del rechazo..."/>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </div>
+                            {selectedPayment.status !== 'Completo' && (
+                                <div className="space-y-6">
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle>Validaciones Automáticas</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-md">
+                                                <p className="text-sm dark:text-green-200 text-green-800">UUID coincide con factura</p>
+                                                <Check className="h-5 w-5 text-green-400" />
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle>Acciones de Revisión</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="rejectionReason">Motivo de Rechazo (si aplica)</Label>
+                                                <Textarea id="rejectionReason" placeholder="Describe el motivo del rechazo..."/>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                            )}
                         </div>
                         <DialogFooter className="gap-2">
-                            <Button variant="ghost" onClick={() => setIsComplementReviewOpen(false)}>Cancelar</Button>
-                            {selectedPayment.status === 'En Revisión' && (
+                            {selectedPayment.status === 'Completo' ? (
+                                <Button variant="outline" onClick={() => setIsComplementReviewOpen(false)}>Cerrar</Button>
+                            ) : (
                                 <>
-                                    <Button variant="destructive" onClick={() => setIsComplementReviewOpen(false)}>Rechazar</Button>
-                                    <Button onClick={() => setIsComplementReviewOpen(false)}>Aprobar Complemento</Button>
+                                 <Button variant="ghost" onClick={() => setIsComplementReviewOpen(false)}>Cancelar</Button>
+                                {selectedPayment.status === 'En Revisión' && (
+                                    <>
+                                        <Button variant="destructive" onClick={() => setIsComplementReviewOpen(false)}>Rechazar</Button>
+                                        <Button onClick={() => setIsComplementReviewOpen(false)}>Aprobar Complemento</Button>
+                                    </>
+                                )}
                                 </>
                             )}
                         </DialogFooter>
