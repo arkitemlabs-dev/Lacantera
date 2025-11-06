@@ -399,52 +399,12 @@ export default function FacturasPage() {
                       </div>
                     </CardContent>
                   </Card>
-                   {selectedInvoice.status === 'En Revisión' && (
-                    <Card>
-                        <CardHeader>
-                        <CardTitle>Acciones de Revisión</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="rejectionReason">
-                            Motivo de Rechazo (si aplica)
-                            </Label>
-                            <Textarea
-                            id="rejectionReason"
-                            placeholder="Describe el motivo del rechazo..."
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="observations">
-                            Observaciones Adicionales
-                            </Label>
-                            <Textarea
-                            id="observations"
-                            placeholder="Añade tus observaciones aquí..."
-                            />
-                        </div>
-                        </CardContent>
-                    </Card>
-                    )}
                 </div>
               </div>
               <DialogFooter className="gap-2">
                  <Button variant="outline" onClick={handleDialogClose}>
                     Cerrar
                 </Button>
-                {selectedInvoice.status === 'En Revisión' && (
-                  <>
-                    <Button variant="destructive" onClick={handleDialogClose}>
-                      Rechazar con Motivo
-                    </Button>
-                    <Button variant="outline" onClick={handleDialogClose}>
-                      Solicitar Corrección
-                    </Button>
-                    <Button type="submit" onClick={handleDialogClose}>
-                      Aprobar Factura
-                    </Button>
-                  </>
-                )}
               </DialogFooter>
             </DialogContent>
           )}
