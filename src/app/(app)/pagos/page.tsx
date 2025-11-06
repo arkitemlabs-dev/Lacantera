@@ -52,7 +52,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -107,6 +106,7 @@ const getComplementStatus = (payment: Payment) => {
 export default function PagosPage() {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isComplementReviewOpen, setIsComplementReviewOpen] = useState(false);
+  const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
@@ -141,6 +141,11 @@ export default function PagosPage() {
    const handleOpenComplementDialog = (payment: Payment) => {
     setSelectedPayment(payment);
     setIsComplementReviewOpen(true);
+  };
+  
+  const handleOpenReceiptDialog = (payment: Payment) => {
+    setSelectedPayment(payment);
+    setIsReceiptDialogOpen(true);
   };
 
 
@@ -319,7 +324,7 @@ export default function PagosPage() {
                             <div className="flex justify-center gap-1">
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenReceiptDialog(payment)}>
                                     <Eye className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
@@ -559,7 +564,40 @@ export default function PagosPage() {
                 )}
             </Dialog>
 
+            <Dialog open={isReceiptDialogOpen} onOpenChange={setIsReceiptDialogOpen}>
+                {selectedPayment && (
+                    <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>Comprobante de Pago</DialogTitle>
+                            <DialogDescription>
+                                Visualizando el comprobante para el pago {selectedPayment.id}.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                            <Card>
+                                <CardContent className="p-4">
+                                    <div className="bg-muted h-96 flex items-center justify-center rounded-md">
+                                        <p className="text-muted-foreground">
+                                            Vista previa del comprobante no disponible.
+                                        </p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setIsReceiptDialogOpen(false)}>Cerrar</Button>
+                            <Button>
+                                <Download className="h-4 w-4 mr-2" />
+                                Descargar
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                )}
+            </Dialog>
+
         </div>
     </main>
   );
 }
+
+    
