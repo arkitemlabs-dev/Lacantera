@@ -343,6 +343,14 @@ export default function PagosPage() {
                             <TooltipProvider>
                               <div className='flex items-center gap-1'>
                                 <span className='text-xs text-green-400'>Recibido</span>
+                                 <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className='h-8 w-8' onClick={() => handleOpenComplementDialog(payment)}>
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p>Visualizar Complemento</p></TooltipContent>
+                                </Tooltip>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Button variant="ghost" size="icon" className='h-8 w-8 bg-transparent hover:bg-primary/10'>
@@ -365,6 +373,14 @@ export default function PagosPage() {
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent><p>Revisar Complemento</p></TooltipContent>
+                                </Tooltip>
+                                 <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className='h-8 w-8 bg-transparent hover:bg-primary/10'>
+                                        <Download className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p>Descargar Complemento</p></TooltipContent>
                                 </Tooltip>
                               </div>
                             </TooltipProvider>
