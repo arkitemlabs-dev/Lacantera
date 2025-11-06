@@ -1,11 +1,14 @@
+
 'use client';
 
+import { useState, useMemo } from 'react';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from '@/components/ui/card';
 import {
   Table,
@@ -18,9 +21,26 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Eye, Copy, Search, Upload } from 'lucide-react';
+import { Eye, Copy, Search, Upload, ListFilter, Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import type { DateRange } from 'react-day-picker';
+
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+  } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  } from '@/components/ui/select';
 
 type InvoiceStatus = 'En revisión' | 'Pagada' | 'Aprobada' | 'Rechazada';
 
@@ -82,6 +102,28 @@ const getStatusBadgeClass = (status: InvoiceStatus) => {
 };
 
 export default function FacturacionProveedorPage() {
+    const [dateRange, setDateRange] = useState<DateRange | undefined>();
+    const [status, setStatus] = useState('todas');
+    const [searchTerm, setSearchTerm] = useState('');
+  
+    const filteredInvoices = useMemo(() => {
+      return invoices.filter((invoice) => {
+        const invoiceDate = new Date(invoice.fechaEmision);
+        
+        const dateFilter = !dateRange?.from || (invoiceDate >= dateRange.from && (!dateRange.to || invoiceDate <= dateRange.to));
+        const statusFilter = status === 'todas' || invoice.estado.toLowerCase().replace(' ', '-') === status;
+        const searchTermFilter = invoice.folio.toLowerCase().includes(searchTerm.toLowerCase()) || invoice.ordenAsociada.toLowerCase().includes(searchTerm.toLowerCase());
+  
+        return dateFilter && statusFilter && searchTermFilter;
+      });
+    }, [dateRange, status, searchTerm]);
+  
+    const clearFilters = () => {
+      setDateRange(undefined);
+      setStatus('todas');
+      setSearchTerm('');
+    };
+
   return (
     <main className="flex-1 space-y-8 p-4 md:p-8">
       <div className="flex items-center space-x-2 text-sm text-muted-foreground">
@@ -105,31 +147,97 @@ export default function FacturacionProveedorPage() {
           </Card>
         ))}
       </div>
+      
+      <div className="flex items-center justify-end">
+        <Button>
+            <Upload className="mr-2 h-4 w-4" />
+            Subir Factura (PDF/XML)
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+            <CardTitle>Filtros de Búsqueda</CardTitle>
+            <CardDescription>
+                Refine los resultados de las facturas.
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="relative">
+                    <Popover>
+                    <PopoverTrigger asChild>
+                        <Button
+                        variant={'outline'}
+                        className={cn(
+                            'w-full justify-start text-left font-normal',
+                            !dateRange && 'text-muted-foreground'
+                        )}
+                        >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dateRange?.from ? (
+                            dateRange.to ? (
+                            <>
+                                {format(dateRange.from, 'LLL dd, y', { locale: es })} -{' '}
+                                {format(dateRange.to, 'LLL dd, y', { locale: es })}
+                            </>
+                            ) : (
+                            format(dateRange.from, 'LLL dd, y', { locale: es })
+                            )
+                        ) : (
+                            <span>Rango de Fechas</span>
+                        )}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={dateRange?.from}
+                        selected={dateRange}
+                        onSelect={setDateRange}
+                        numberOfMonths={2}
+                        locale={es}
+                        />
+                    </PopoverContent>
+                    </Popover>
+                </div>
+                <Select value={status} onValueChange={setStatus}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="todas">Todos los estados</SelectItem>
+                        <SelectItem value="en-revision">En revisión</SelectItem>
+                        <SelectItem value="aprobada">Aprobada</SelectItem>
+                        <SelectItem value="pagada">Pagada</SelectItem>
+                        <SelectItem value="rechazada">Rechazada</SelectItem>
+                    </SelectContent>
+                </Select>
+                <Input
+                    placeholder="Buscar por folio o número de orden..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </div>
+        </CardContent>
+        <CardFooter className="justify-end gap-2">
+            <Button variant="outline" onClick={clearFilters}>
+            <ListFilter className="mr-2 h-4 w-4" />
+            Limpiar Filtros
+            </Button>
+        </CardFooter>
+        </Card>
+
 
       <Card className="bg-card/70">
         <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <CardTitle>Gestión de Facturas</CardTitle>
               <CardDescription>
                 Cargue y de seguimiento a sus facturas.
               </CardDescription>
             </div>
-            <Button>
-              <Upload className="mr-2 h-4 w-4" />
-              Subir Factura (PDF/XML)
-            </Button>
-          </div>
-          <div className="mt-4 flex max-w-lg items-center space-x-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por folio o número de orden..."
-                className="pl-8"
-              />
-            </div>
-            <Button type="submit">Buscar</Button>
-          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -145,7 +253,7 @@ export default function FacturacionProveedorPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {invoices.map((invoice) => (
+              {filteredInvoices.map((invoice) => (
                 <TableRow key={invoice.folio}>
                   <TableCell className="font-medium">{invoice.folio}</TableCell>
                   <TableCell>{invoice.cfdi}</TableCell>
