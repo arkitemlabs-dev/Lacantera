@@ -79,6 +79,8 @@ const getStatusVariant = (status: PaymentStatus) => {
         return 'dark:bg-blue-500/20 dark:text-blue-200 border-blue-500/30 bg-blue-100 text-blue-800';
     case 'Rechazada':
         return 'dark:bg-red-500/20 dark:text-red-200 border-red-500/30 bg-red-100 text-red-800';
+    case 'Pendiente comprobantes':
+        return 'dark:bg-orange-500/20 dark:text-orange-200 border-orange-500/30 bg-orange-100 text-orange-800';
   }
 };
 
@@ -94,6 +96,9 @@ const getComplementStatus = (payment: Payment) => {
     }
     if (payment.status === 'Rechazada') {
         return { text: 'Rechazado', icon: <ThumbsDown className="h-4 w-4 mr-2 text-red-400"/>, color: 'text-red-400' };
+    }
+    if (payment.status === 'Pendiente comprobantes') {
+      return { text: 'Pendiente de Carga', icon: <Clock className="h-4 w-4 mr-2 text-yellow-400"/>, color: 'text-yellow-400' };
     }
     return { text: 'N/A', icon: null, color: 'text-muted-foreground' };
 };
@@ -214,6 +219,7 @@ export default function PagosPage() {
                     <SelectContent>
                     <SelectItem value="todas">Todos los estados</SelectItem>
                     <SelectItem value="completo">Completo</SelectItem>
+                    <SelectItem value="pendiente-comprobantes">Pendiente comprobantes</SelectItem>
                     <SelectItem value="pendiente-complemento">Pendiente complemento</SelectItem>
                     <SelectItem value="en-revision">En Revisión</SelectItem>
                     <SelectItem value="rechazada">Rechazada</SelectItem>
@@ -310,16 +316,28 @@ export default function PagosPage() {
                        <TableCell className="text-center">
                         {payment.paymentReceipt ? (
                           <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                 <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <Download className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Descargar Comprobante</p>
-                              </TooltipContent>
-                            </Tooltip>
+                            <div className="flex justify-center gap-1">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Visualizar Comprobante</p>
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <Download className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Descargar Comprobante</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
                           </TooltipProvider>
                         ) : (
                            <TooltipProvider>
@@ -385,7 +403,7 @@ export default function PagosPage() {
                               </div>
                             </TooltipProvider>
                           )}
-                          {payment.status === 'Pendiente complemento' && (
+                          {(payment.status === 'Pendiente complemento' || payment.status === 'Pendiente comprobantes') && (
                               <div className='flex items-center gap-1 text-yellow-400'>
                                 <Clock className="h-4 w-4"/>
                                 <span className='text-xs'>Pendiente</span>
@@ -545,5 +563,3 @@ export default function PagosPage() {
     </main>
   );
 }
-
-    

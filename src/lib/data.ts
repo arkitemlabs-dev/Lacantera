@@ -76,9 +76,9 @@ export const invoices: Invoice[] = [
 export const payments: Payment[] = [
     { id: 'PAY-001', invoiceIds: ['FACT-001'], supplierName: 'Aceros del Norte S.A. de C.V.', amount: 25500.00, executionDate: '15/07/2024', status: 'Completo', method: 'Transferencia', paymentComplement: true, paymentReceipt: true },
     { id: 'PAY-002', invoiceIds: ['FACT-003'], supplierName: 'Componentes Electrónicos Globales', amount: 8750.00, executionDate: '18/07/2024', status: 'Pendiente complemento', method: 'Transferencia', paymentComplement: false, paymentReceipt: true },
-    { id: 'PAY-003', invoiceIds: ['FACT-002'], supplierName: 'Logística Express Mexicana', amount: 12300.50, executionDate: '20/07/2024', status: 'Pendiente complemento', method: 'Transferencia', paymentComplement: false, paymentReceipt: false },
+    { id: 'PAY-003', invoiceIds: ['FACT-002'], supplierName: 'Logística Express Mexicana', amount: 12300.50, executionDate: '20/07/2024', status: 'Pendiente comprobantes', method: 'Transferencia', paymentComplement: false, paymentReceipt: false },
     { id: 'PAY-004', invoiceIds: ['FACT-005'], supplierName: 'Aceros del Norte S.A. de C.V.', amount: 31000.00, executionDate: '22/07/2024', status: 'En Revisión', method: 'Transferencia', paymentComplement: true, paymentReceipt: true },
-    { id: 'PAY-005', invoiceIds: ['FACT-004'], supplierName: 'Arrendamientos y Maquinaria Pesada', amount: 4200.00, executionDate: '23/07/2024', status: 'Rechazada', method: 'Transferencia', paymentComplement: false, paymentReceipt: false },
+    { id: 'PAY-005', invoiceIds: ['FACT-004'], supplierName: 'Arrendamientos y Maquinaria Pesada', amount: 4200.00, executionDate: '23/07/2024', status: 'Rechazada', method: 'Transferencia', paymentComplement: false, paymentReceipt: true },
     { id: 'PAY-006', invoiceIds: ['FACT-A', 'FACT-B'], supplierName: 'Servicios de Consultoría Integral', amount: 15000.00, executionDate: '25/07/2024', status: 'Completo', method: 'Transferencia', paymentComplement: true, paymentReceipt: true },
 ];
 

@@ -45,7 +45,7 @@ export type PurchaseOrder = {
   company: string;
 };
 
-export type PaymentStatus = 'Completo' | 'Pendiente complemento' | 'En Revisión' | 'Rechazada';
+export type PaymentStatus = 'Completo' | 'Pendiente complemento' | 'En Revisión' | 'Rechazada' | 'Pendiente comprobantes';
 
 export type Payment = {
   id: string;
