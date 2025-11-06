@@ -576,8 +576,12 @@ export default function PagosPage() {
                         </div>
                         <DialogFooter className="gap-2">
                             <Button variant="ghost" onClick={() => setIsComplementReviewOpen(false)}>Cancelar</Button>
-                            <Button variant="destructive" onClick={() => setIsComplementReviewOpen(false)}>Rechazar</Button>
-                            <Button onClick={() => setIsComplementReviewOpen(false)}>Aprobar Complemento</Button>
+                            {selectedPayment.status === 'En Revisión' && (
+                                <>
+                                    <Button variant="destructive" onClick={() => setIsComplementReviewOpen(false)}>Rechazar</Button>
+                                    <Button onClick={() => setIsComplementReviewOpen(false)}>Aprobar Complemento</Button>
+                                </>
+                            )}
                         </DialogFooter>
                     </DialogContent>
                 )}
