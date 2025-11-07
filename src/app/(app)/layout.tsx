@@ -12,7 +12,6 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { userRole } = useAuth();
   
-  // Simplified logic: if it's a supplier route, show supplier nav. Otherwise, show admin nav.
   const isSupplierPortal = pathname.startsWith('/proveedores/') && userRole.name === 'Proveedor';
 
   const NavComponent = isSupplierPortal ? SupplierNav : AdminNav;
