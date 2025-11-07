@@ -26,6 +26,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { initialRoles } from '@/lib/roles';
+import { useAuth } from '../providers';
 
 export default function LoginPage() {
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -34,16 +35,31 @@ export default function LoginPage() {
   const logo = PlaceHolderImages.find((img) => img.id === 'login-logo');
   const bgImage = PlaceHolderImages.find((img) => img.id === 'login-background');
   const router = useRouter();
+  const { setUserRole } = useAuth();
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    let selectedRoleName: string;
+    let dashboardUrl: string;
+
     if (userType === 'admin') {
-        sessionStorage.setItem('userRole', role);
+        selectedRoleName = role;
+        dashboardUrl = '/dashboard';
     } else {
-        // For supplier, you might want to set a default or specific role
-        sessionStorage.setItem('userRole', 'Proveedor'); 
+        selectedRoleName = 'Proveedor';
+        dashboardUrl = '/proveedores/dashboard';
     }
-    const dashboardUrl = userType === 'admin' ? '/dashboard' : '/proveedores/dashboard';
+    
+    // Find the full role object
+    const newRole = initialRoles.find(r => r.name === selectedRoleName);
+
+    if (newRole) {
+        // Update context state immediately
+        setUserRole(newRole);
+        // Persist to session storage for refreshes
+        sessionStorage.setItem('userRole', selectedRoleName);
+    }
+    
     router.push(dashboardUrl);
   };
 
@@ -100,7 +116,7 @@ export default function LoginPage() {
                     <SelectValue placeholder="Seleccione un rol" />
                   </SelectTrigger>
                   <SelectContent>
-                    {initialRoles.map(r => (
+                    {initialRoles.filter(r => r.name !== 'Proveedor').map(r => (
                         <SelectItem key={r.name} value={r.name}>{r.name}</SelectItem>
                     ))}
                   </SelectContent>
