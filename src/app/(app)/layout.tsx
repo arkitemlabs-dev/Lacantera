@@ -1,19 +1,40 @@
 
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { Nav as AdminNav } from '@/components/nav';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { UserNav } from '@/components/user-nav';
 import { Nav as SupplierNav } from '@/components/proveedores/nav';
-import { AuthProvider, useAuth } from '../providers';
+import { useAuth } from '../providers';
 
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { userRole } = useAuth();
   
-  const isSupplierPortal = pathname.startsWith('/proveedores/') && userRole.name === 'Proveedor';
+  // Robust check to ensure correct interface is displayed based on role.
+  useEffect(() => {
+    if (!userRole || !pathname) return;
 
+    const isAdminRoute = !pathname.startsWith('/proveedores');
+    const isSupplierRole = userRole.name === 'Proveedor';
+
+    // If a supplier is trying to access an admin route, redirect to supplier dashboard.
+    if (isSupplierRole && isAdminRoute && pathname !== '/login') {
+      router.replace('/proveedores/dashboard');
+      return;
+    }
+
+    // If an admin is trying to access a supplier route, redirect to admin dashboard.
+    if (!isSupplierRole && !isAdminRoute) {
+      router.replace('/dashboard');
+      return;
+    }
+  }, [userRole, pathname, router]);
+
+  const isSupplierPortal = userRole.name === 'Proveedor';
   const NavComponent = isSupplierPortal ? SupplierNav : AdminNav;
 
   return (
