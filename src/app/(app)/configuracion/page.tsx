@@ -67,7 +67,7 @@ import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { navItems } from '../nav';
 import { Separator } from '@/components/ui/separator';
-import { useAuth } from '../layout';
+import { useAuth } from '@/app/providers';
 import { initialRoles, type Role, type Permission } from '@/lib/roles';
 
 
