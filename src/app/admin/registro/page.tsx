@@ -1,7 +1,8 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -19,12 +20,92 @@ import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { auth, db } from '@/lib/firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { useAuth } from '@/app/providers';
+import { initialRoles } from '@/lib/roles';
+import { useToast } from '@/hooks/use-toast';
 
 export default function RegistroAdminPage() {
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [role, setRole] = useState('');
+  const [razonSocial, setRazonSocial] = useState('La Cantera Desarrollos Mineros S.A. de C.V.');
+  const [additionalContact, setAdditionalContact] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const router = useRouter();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const logo = PlaceHolderImages.find((img) => img.id === 'login-logo');
   const bgImage = PlaceHolderImages.find((img) => img.id === 'login-background');
+
+  useEffect(() => {
+    // Redirect if user is already logged in
+    if (user) {
+      router.push('/dashboard');
+    }
+  }, [user, router]);
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (password !== confirmPassword) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
+
+    if (!role) {
+      setError("Por favor, seleccione un rol.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      await setDoc(doc(db, 'users', user.uid), {
+        fullName,
+        email,
+        telefono,
+        role,
+        razonSocial,
+        additionalContact,
+        createdAt: serverTimestamp(),
+      });
+
+      toast({
+        title: "¡Registro exitoso!",
+        description: "La cuenta de administrador ha sido creada. Ahora serás redirigido para iniciar sesión.",
+      });
+
+      // Redirect to login after a short delay
+      setTimeout(() => {
+        router.push('/login');
+      }, 3000);
+
+    } catch (error: any) {
+      const errorCode = error.code;
+      let errorMessage = "Ocurrió un error al registrar la cuenta.";
+      if (errorCode === 'auth/email-already-in-use') {
+        errorMessage = "Este correo electrónico ya está en uso. Por favor, intente con otro.";
+      } else if (errorCode === 'auth/weak-password') {
+        errorMessage = "La contraseña es demasiado débil. Debe tener al menos 6 caracteres.";
+      }
+      setError(errorMessage);
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="relative flex items-center justify-center min-h-screen bg-background py-12">
@@ -58,44 +139,44 @@ export default function RegistroAdminPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4">
+          <form className="space-y-4" onSubmit={handleRegister}>
+            {error && <p className="text-red-500 text-center font-medium">{error}</p>}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="fullName">Nombre Completo</Label>
-                <Input id="fullName" type="text" placeholder="Juan Pérez" required />
+                <Input id="fullName" type="text" placeholder="Juan Pérez" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Correo Electrónico</Label>
-                <Input id="email" type="email" placeholder="juan.perez@lacanteta.com" required />
+                <Input id="email" type="email" placeholder="juan.perez@lacanteta.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label htmlFor="telefono">Teléfono</Label>
-                    <Input id="telefono" type="tel" placeholder="55 1234 5678" required />
+                    <Input id="telefono" type="tel" placeholder="55 1234 5678" required value={telefono} onChange={(e) => setTelefono(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="role">Roll</Label>
-                    <Select>
+                    <Label htmlFor="role">Rol</Label>
+                    <Select onValueChange={setRole} value={role}>
                         <SelectTrigger id="role">
                             <SelectValue placeholder="Seleccione un rol" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="super-admin">Super Admin</SelectItem>
-                            <SelectItem value="compras">Compras</SelectItem>
-                            <SelectItem value="contabilidad">Contabilidad</SelectItem>
-                            <SelectItem value="solo-lectura">Solo lectura</SelectItem>
+                          {initialRoles.filter(r => r.name !== 'Proveedor').map(r => (
+                              <SelectItem key={r.name} value={r.name}>{r.name}</SelectItem>
+                          ))}
                         </SelectContent>
                     </Select>
                 </div>
             </div>
             <div className="space-y-2">
                 <Label htmlFor="razonSocial">Razón Social</Label>
-                <Input id="razonSocial" type="text" defaultValue="La Cantera Desarrollos Mineros S.A. de C.V." required />
+                <Input id="razonSocial" type="text" value={razonSocial} onChange={(e) => setRazonSocial(e.target.value)} required />
             </div>
             <div className="space-y-2">
                 <Label htmlFor="additionalContact">Datos de Contacto Adicional</Label>
-                <Textarea id="additionalContact" placeholder="Notas, otro email, etc." />
+                <Textarea id="additionalContact" placeholder="Notas, otro email, etc." value={additionalContact} onChange={(e) => setAdditionalContact(e.target.value)} />
             </div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -105,6 +186,8 @@ export default function RegistroAdminPage() {
                         id="password"
                         type={passwordVisible ? 'text' : 'password'}
                         required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                         />
                         <Button
                         type="button"
@@ -124,6 +207,8 @@ export default function RegistroAdminPage() {
                         id="confirmPassword"
                         type={confirmPasswordVisible ? 'text' : 'password'}
                         required
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
                         />
                         <Button
                         type="button"
@@ -133,18 +218,18 @@ export default function RegistroAdminPage() {
                         onClick={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
                         >
                         {confirmPasswordVisible ? <EyeOff /> : <Eye />}
-                        </Button>
-                    </div>
+                        </Button
+                    </, 
                 </div>
             </div>
             <div className="flex items-start space-x-2 pt-2">
-                <Checkbox id="terms" className="mt-1" />
+                <Checkbox id="terms" className="mt-1" required />
                 <Label htmlFor="terms" className="text-sm font-normal text-muted-foreground">
                     He leído y acepto los <Link href="#" className="underline text-primary">Términos y Condiciones</Link> y la <Link href="#" className="underline text-primary">Política de Privacidad</Link>.
                 </Label>
             </div>
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-                Crear Cuenta
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+                {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
             </Button>
              <div className="mt-4 text-center text-sm text-muted-foreground">
                 ¿Ya tiene una cuenta?{' '}

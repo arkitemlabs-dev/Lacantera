@@ -13,7 +13,8 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { signOut } from 'firebase/auth';
 
 import { notifications } from '@/lib/data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
@@ -38,6 +39,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ThemeToggle } from './theme-toggle';
 import { useAuth } from '@/app/providers';
+import { auth } from '@/lib/firebase';
 
 const notificationIcons: Record<string, React.ReactNode> = {
   new_supplier: <UserPlus className="h-5 w-5 text-blue-500" />,
@@ -49,13 +51,27 @@ const notificationIcons: Record<string, React.ReactNode> = {
 export function UserNav() {
   const userAvatar = PlaceHolderImages.find((img) => img.id === 'user-avatar-1');
   const pathname = usePathname();
-  const { userRole } = useAuth();
+  const router = useRouter();
+  const { user, userRole } = useAuth();
   const isProviderPortal = pathname.startsWith('/proveedores');
   const notificationsLink = isProviderPortal ? '/proveedores/notificaciones' : '/notificaciones';
   const profileLink = isProviderPortal ? '/proveedores/perfil' : '/perfil';
   const settingsLink = isProviderPortal ? '/proveedores/seguridad' : '/configuracion';
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      router.push('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="flex items-center gap-4">
@@ -119,16 +135,16 @@ export function UserNav() {
                   data-ai-hint={userAvatar.imageHint}
                 />
               )}
-              <AvatarFallback>JD</AvatarFallback>
+              <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-56" align="end" forceMount>
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium leading-none">Juan Pérez</p>
+              <p className="text-sm font-medium leading-none">{user.displayName || user.email}</p>
               <p className="text-xs leading-none text-muted-foreground">
-                admin@lacantora.com
+                {user.email}
               </p>
               <p className="text-xs leading-none text-muted-foreground pt-1 font-semibold">
                 {userRole?.name}
@@ -151,12 +167,10 @@ export function UserNav() {
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <Link href="/login">
-             <DropdownMenuItem>
-                <LogOut className="mr-2" />
-                <span>Cerrar Sesión</span>
-             </DropdownMenuItem>
-          </Link>
+          <DropdownMenuItem onClick={handleSignOut}>
+            <LogOut className="mr-2" />
+            <span>Cerrar Sesión</span>
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

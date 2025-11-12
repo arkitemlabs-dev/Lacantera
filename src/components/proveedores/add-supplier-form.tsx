@@ -54,6 +54,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { addSupplier } from '@/lib/firebase/firestore';
 
 const formSchema = z.object({
   // Datos fiscales
@@ -117,12 +118,22 @@ export function AddSupplierForm() {
 
   const supplierType = form.watch('supplierType');
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values);
-    toast({
-      title: 'Proveedor Guardado',
-      description: `El proveedor ${values.name} ha sido guardado exitosamente.`,
-    });
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      await addSupplier(values);
+      toast({
+        title: 'Proveedor Guardado',
+        description: `El proveedor ${values.name} ha sido guardado exitosamente.`,
+      });
+      form.reset();
+    } catch (error) {
+      console.error('Error al guardar el proveedor:', error);
+      toast({
+        title: 'Error',
+        description: 'Hubo un problema al guardar el proveedor. Por favor, intenta de nuevo.',
+        variant: 'destructive',
+      });
+    }
   }
 
   const renderFileUpload = (label: string) => (
