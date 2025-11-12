@@ -1,13 +1,16 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { initialRoles, type Role } from '@/lib/roles';
 import { ThemeProvider } from '@/components/theme-provider';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged, type User } from 'firebase/auth';
 
 type AuthContextType = {
+  user: User | null;
   userRole: Role;
   setUserRole: React.Dispatch<React.SetStateAction<Role>>;
+  loading: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -21,16 +24,26 @@ export const useAuth = () => {
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<Role>(
     initialRoles.find((r) => r.name === 'Super Admin')!
   );
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     try {
       const storedRoleName = sessionStorage.getItem('userRole');
       if (storedRoleName) {
         const role = initialRoles.find((r) => r.name === storedRoleName);
-        // Fallback to a default role if the stored one is not found, to prevent crashes.
         setUserRole(role || initialRoles.find(r => r.name === 'Super Admin')!);
       }
     } catch (error) {
@@ -39,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ userRole, setUserRole }}>
+    <AuthContext.Provider value={{ user, userRole, setUserRole, loading }}>
       {children}
     </AuthContext.Provider>
   );

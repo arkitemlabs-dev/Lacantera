@@ -218,8 +218,8 @@ export default function RegistroAdminPage() {
                         onClick={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
                         >
                         {confirmPasswordVisible ? <EyeOff /> : <Eye />}
-                        </Button
-                    </, 
+                        </Button>
+                    </div>
                 </div>
             </div>
             <div className="flex items-start space-x-2 pt-2">

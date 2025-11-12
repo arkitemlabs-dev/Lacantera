@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,47 +21,117 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Eye, EyeOff, User } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { initialRoles } from '@/lib/roles';
 import { useAuth } from '../providers';
+import { auth, db } from '@/lib/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { initialRoles } from '@/lib/roles'; // Import roles
 
 export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState(''); // State for selected role
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [userType, setUserType] = useState('admin');
-  const [role, setRole] = useState('Super Admin');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+
   const logo = PlaceHolderImages.find((img) => img.id === 'login-logo');
   const bgImage = PlaceHolderImages.find((img) => img.id === 'login-background');
-  const router = useRouter();
-  const { setUserRole } = useAuth();
 
-  const handleLogin = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!authLoading && user) {
+      // User is already logged in, redirect them
+      const fetchUserRoleAndRedirect = async () => {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (userData.role === 'Proveedor') {
+            router.push('/proveedores/dashboard');
+          } else {
+            router.push('/dashboard');
+          }
+        } else {
+          // Fallback if user doc doesn't exist for some reason
+          router.push('/dashboard');
+        }
+      };
+      fetchUserRoleAndRedirect();
+    }
+  }, [user, authLoading, router]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    let selectedRoleName: string;
-    let dashboardUrl: string;
+    setError(null);
 
-    if (userType === 'admin') {
-        selectedRoleName = role;
-        dashboardUrl = '/dashboard';
-    } else {
-        selectedRoleName = 'Proveedor';
-        dashboardUrl = '/proveedores/dashboard';
+    if (!role) {
+      setError('Por favor, seleccione un tipo de usuario.');
+      return;
     }
-    
-    // Find the full role object
-    const newRole = initialRoles.find(r => r.name === selectedRoleName);
 
-    if (newRole) {
-        // Update context state immediately
-        setUserRole(newRole);
-        // Persist to session storage for refreshes
-        sessionStorage.setItem('userRole', selectedRoleName);
+    setLoading(true);
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const loggedInUser = userCredential.user;
+
+      const userDoc = await getDoc(doc(db, 'users', loggedInUser.uid));
+
+      if (!userDoc.exists()) {
+        setError('No se encontró la información del usuario.');
+        await auth.signOut(); // Sign out the user
+        setLoading(false);
+        return;
+      }
+      
+      const userData = userDoc.data();
+
+      // **Role Validation**
+      if (userData.role !== role) {
+        setError(`Credenciales inválidas para el rol de ${role}.`);
+        await auth.signOut(); // Sign out the user
+        setLoading(false);
+        return;
+      }
+
+      let dashboardUrl = '/dashboard'; // Default dashboard
+      if (userData.role === 'Proveedor') {
+          dashboardUrl = '/proveedores/dashboard';
+      }
+
+      toast({
+        title: 'Inicio de sesión exitoso',
+        description: 'Bienvenido de nuevo.',
+      });
+
+      router.push(dashboardUrl);
+
+    } catch (error: any) {
+      let errorMessage = 'Ocurrió un error al iniciar sesión.';
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        errorMessage = 'El correo electrónico o la contraseña son incorrectos.';
+      }
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-    
-    router.push(dashboardUrl);
   };
+
+  if (authLoading || user) {
+    return (
+        <div className="flex items-center justify-center min-h-screen">
+            <p>Cargando...</p>
+        </div>
+    );
+  }
 
   return (
     <div className="relative flex items-center justify-center min-h-screen bg-background">
@@ -96,40 +166,32 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleLogin}>
+            {error && <p className="text-red-500 text-center font-medium">{error}</p>}
+            
+            {/* Role Selector Dropdown */}
             <div className="space-y-2">
-                <Label htmlFor="userType">Tipo de Usuario</Label>
-                <Select value={userType} onValueChange={setUserType}>
-                    <SelectTrigger id="userType">
-                        <SelectValue placeholder="Seleccione un tipo de usuario" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="admin">Administrador</SelectItem>
-                        <SelectItem value="supplier">Proveedor</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-            {userType === 'admin' && (
-              <div className="space-y-2">
-                <Label htmlFor="role">Rol</Label>
-                <Select value={role} onValueChange={setRole}>
+              <Label htmlFor="role">Tipo de Usuario</Label>
+              <Select onValueChange={setRole} value={role}>
                   <SelectTrigger id="role">
-                    <SelectValue placeholder="Seleccione un rol" />
+                      <SelectValue placeholder="Seleccione un rol" />
                   </SelectTrigger>
                   <SelectContent>
-                    {initialRoles.filter(r => r.name !== 'Proveedor').map(r => (
-                        <SelectItem key={r.name} value={r.name}>{r.name}</SelectItem>
-                    ))}
+                      {initialRoles.map(r => (
+                          <SelectItem key={r.name} value={r.name}>{r.name}</SelectItem>
+                      ))}
                   </SelectContent>
-                </Select>
-              </div>
-            )}
+              </Select>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="email">Email / Usuario</Label>
+              <Label htmlFor="email">Correo Electrónico</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder={userType === 'admin' ? "admin@lacantora.com" : "contacto@proveedor.com"}
+                placeholder="contacto@suempresa.com"
                 required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -139,7 +201,8 @@ export default function LoginPage() {
                   id="password"
                   type={passwordVisible ? 'text' : 'password'}
                   required
-                  defaultValue="••••••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                 />
                 <Button
                   type="button"
@@ -175,8 +238,8 @@ export default function LoginPage() {
                 ¿Olvidó su contraseña?
               </Link>
             </div>
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-                Iniciar sesión
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+                {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
             </Button>
             <div className="mt-4 text-center text-sm">
                 ¿Nuevo usuario? Registrar como:
