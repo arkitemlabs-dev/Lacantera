@@ -62,11 +62,16 @@ export function UserNav() {
 
   const handleSignOut = async () => {
     try {
-      // Primero redirigir al login
-      router.push('/login');
+      // PRIMERO: Limpiar sessionStorage
+      sessionStorage.removeItem('userRole');
+      sessionStorage.removeItem('firebaseRole');
+      sessionStorage.removeItem('userType');
       
-      // Luego hacer el signOut
+      // SEGUNDO: Hacer signOut de Firebase
       await signOut(auth);
+      
+      // TERCERO: Redirigir a login
+      router.push('/login');
     } catch (error) {
       console.error('Error signing out:', error);
     }
