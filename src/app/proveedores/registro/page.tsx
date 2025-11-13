@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -18,9 +17,9 @@ import { Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { auth, db } from '@/lib/firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth } from '@/lib/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { registerUserWithRole } from '@/app/actions/auth'; // ← NUEVO
 import { useAuth } from '@/app/providers';
 import { useToast } from '@/hooks/use-toast';
 
@@ -57,41 +56,52 @@ export default function RegistroProveedorPage() {
       return;
     }
 
+    if (password.length < 6) {
+      setError("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      await setDoc(doc(db, 'users', user.uid), {
-        razonSocial,
-        rfc,
-        fullName: contactName, // Standardize to fullName
+      // ← CAMBIO PRINCIPAL: Usar Server Action en lugar de createUserWithEmailAndPassword
+      const result = await registerUserWithRole({
         email,
-        role: 'Proveedor',
-        createdAt: serverTimestamp(),
+        password,
+        displayName: contactName,
+        role: 'proveedor',
+        userType: 'Proveedor',
+        empresa: razonSocial,
+        rfc,
+        razonSocial,
       });
+
+      if (!result.success) {
+        setError(result.message);
+        setLoading(false);
+        return;
+      }
+
+      // Login automático después de registrar
+      await signInWithEmailAndPassword(auth, email, password);
+      
+      // Esperar 2 segundos para sincronización de custom claims
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Forzar refresh del token para obtener custom claims
+      await auth.currentUser?.getIdToken(true);
 
       toast({
         title: "¡Registro exitoso!",
-        description: "Tu cuenta de proveedor ha sido creada. Ahora serás redirigido para iniciar sesión.",
+        description: "Tu cuenta de proveedor ha sido creada con éxito.",
       });
 
-      // Redirect to login after a short delay to allow toast to be seen
-      setTimeout(() => {
-        router.push('/login');
-      }, 3000);
-      setLoading(false);
-
+      // Redirigir al dashboard de proveedor
+      router.push('/proveedores/dashboard');
+      
     } catch (error: any) {
-      const errorCode = error.code;
-      let errorMessage = "Ocurrió un error al registrar la cuenta.";
-      if (errorCode === 'auth/email-already-in-use') {
-        errorMessage = "Este correo electrónico ya está en uso. Por favor, intente con otro.";
-      } else if (errorCode === 'auth/weak-password') {
-        errorMessage = "La contraseña es demasiado débil. Debe tener al menos 6 caracteres.";
-      }
-      setError(errorMessage);
+      console.error('Error en registro:', error);
+      setError(error.message || "Ocurrió un error al registrar la cuenta.");
       setLoading(false);
     }
   };
@@ -139,16 +149,34 @@ export default function RegistroProveedorPage() {
                 required
                 value={razonSocial}
                 onChange={(e) => setRazonSocial(e.target.value)}
+                disabled={loading}
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label htmlFor="rfc">RFC</Label>
-                    <Input id="rfc" type="text" placeholder="SUE010101ABC" required value={rfc} onChange={(e) => setRfc(e.target.value)} />
+                    <Input 
+                      id="rfc" 
+                      type="text" 
+                      placeholder="SUE010101ABC" 
+                      required 
+                      value={rfc} 
+                      onChange={(e) => setRfc(e.target.value)}
+                      disabled={loading}
+                      maxLength={13}
+                    />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="contactName">Nombre del Contacto</Label>
-                    <Input id="contactName" type="text" placeholder="Juan Pérez" required value={contactName} onChange={(e) => setContactName(e.target.value)} />
+                    <Input 
+                      id="contactName" 
+                      type="text" 
+                      placeholder="Juan Pérez" 
+                      required 
+                      value={contactName} 
+                      onChange={(e) => setContactName(e.target.value)}
+                      disabled={loading}
+                    />
                 </div>
             </div>
             <div className="space-y-2">
@@ -160,6 +188,7 @@ export default function RegistroProveedorPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
               />
             </div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -172,6 +201,7 @@ export default function RegistroProveedorPage() {
                         required
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        disabled={loading}
                         />
                         <Button
                         type="button"
@@ -179,6 +209,7 @@ export default function RegistroProveedorPage() {
                         size="icon"
                         className="absolute top-1/2 right-2 -translate-y-1/2 h-7 w-7"
                         onClick={() => setPasswordVisible(!passwordVisible)}
+                        disabled={loading}
                         >
                         {passwordVisible ? <EyeOff /> : <Eye />}
                         </Button>
@@ -193,6 +224,7 @@ export default function RegistroProveedorPage() {
                         required
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
+                        disabled={loading}
                         />
                         <Button
                         type="button"
@@ -200,6 +232,7 @@ export default function RegistroProveedorPage() {
                         size="icon"
                         className="absolute top-1/2 right-2 -translate-y-1/2 h-7 w-7"
                         onClick={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
+                        disabled={loading}
                         >
                         {confirmPasswordVisible ? <EyeOff /> : <Eye />}
                         </Button>
@@ -207,7 +240,7 @@ export default function RegistroProveedorPage() {
                 </div>
             </div>
             <div className="flex items-start space-x-2 pt-2">
-                <Checkbox id="terms" className="mt-1" required />
+                <Checkbox id="terms" className="mt-1" required disabled={loading} />
                 <Label htmlFor="terms" className="text-sm font-normal text-muted-foreground">
                     He leído y acepto los <Link href="#" className="underline text-primary">Términos y Condiciones</Link> y la <Link href="#" className="underline text-primary">Política de Privacidad</Link>.
                 </Label>

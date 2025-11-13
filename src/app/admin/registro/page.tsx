@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -20,12 +19,20 @@ import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { auth, db } from '@/lib/firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth } from '@/lib/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { registerUserWithRole } from '@/app/actions/auth';
 import { useAuth } from '@/app/providers';
 import { initialRoles } from '@/lib/roles';
 import { useToast } from '@/hooks/use-toast';
+
+// Mapeo de roles de UI a roles de Firebase
+const roleMapping: Record<string, 'admin_super' | 'admin_compras'> = {
+  'Super Admin': 'admin_super',
+  'Compras': 'admin_compras',
+  'Contabilidad': 'admin_super', // Ajusta según necesites
+  'Solo lectura': 'admin_super', // Ajusta según necesites
+};
 
 export default function RegistroAdminPage() {
   const [fullName, setFullName] = useState('');
@@ -48,7 +55,6 @@ export default function RegistroAdminPage() {
   const bgImage = PlaceHolderImages.find((img) => img.id === 'login-background');
 
   useEffect(() => {
-    // Redirect if user is already logged in
     if (user) {
       router.push('/dashboard');
     }
@@ -68,41 +74,64 @@ export default function RegistroAdminPage() {
       return;
     }
 
+    if (password.length < 6) {
+      setError("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      // Mapear el rol seleccionado al código de Firebase
+      const mappedRole = roleMapping[role] || 'admin_super';
 
-      await setDoc(doc(db, 'users', user.uid), {
-        fullName,
+      console.log('Registrando admin con rol:', role, '→', mappedRole);
+
+      // Usar Server Action para registrar
+      const result = await registerUserWithRole({
         email,
-        telefono,
-        role,
-        razonSocial,
-        additionalContact,
-        createdAt: serverTimestamp(),
+        password,
+        displayName: fullName,
+        role: mappedRole,
+        userType: 'Administrador',
+        empresa: razonSocial,
       });
+
+      if (!result.success) {
+        setError(result.message);
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ Usuario registrado exitosamente:', result.uid);
+
+      // Login automático
+      await signInWithEmailAndPassword(auth, email, password);
+      
+      // Esperar sincronización de custom claims
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await auth.currentUser?.getIdToken(true);
 
       toast({
         title: "¡Registro exitoso!",
-        description: "La cuenta de administrador ha sido creada. Ahora serás redirigido para iniciar sesión.",
+        description: "La cuenta de administrador ha sido creada con éxito.",
       });
 
-      // Redirect to login after a short delay
-      setTimeout(() => {
-        router.push('/login');
-      }, 3000);
+      // // Redirigir según el rol
+      // if (mappedRole === 'admin_super') {
+      //   router.push('/admin/dashboard');
+      // } else if (mappedRole === 'admin_compras') {
+      //   router.push('/admin/compras');
+      // } else {
+      //   router.push('/dashboard');
+      // }
+
+    // Redirigir al dashboard
+    router.push('/dashboard');
 
     } catch (error: any) {
-      const errorCode = error.code;
-      let errorMessage = "Ocurrió un error al registrar la cuenta.";
-      if (errorCode === 'auth/email-already-in-use') {
-        errorMessage = "Este correo electrónico ya está en uso. Por favor, intente con otro.";
-      } else if (errorCode === 'auth/weak-password') {
-        errorMessage = "La contraseña es demasiado débil. Debe tener al menos 6 caracteres.";
-      }
-      setError(errorMessage);
+      console.error('❌ Error en registro:', error);
+      setError(error.message || "Ocurrió un error al registrar la cuenta.");
       setLoading(false);
     }
   };
@@ -144,21 +173,45 @@ export default function RegistroAdminPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="fullName">Nombre Completo</Label>
-                <Input id="fullName" type="text" placeholder="Juan Pérez" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                <Input 
+                  id="fullName" 
+                  type="text" 
+                  placeholder="Juan Pérez" 
+                  required 
+                  value={fullName} 
+                  onChange={(e) => setFullName(e.target.value)}
+                  disabled={loading}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Correo Electrónico</Label>
-                <Input id="email" type="email" placeholder="juan.perez@lacanteta.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Input 
+                  id="email" 
+                  type="email" 
+                  placeholder="juan.perez@lacanteta.com" 
+                  required 
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label htmlFor="telefono">Teléfono</Label>
-                    <Input id="telefono" type="tel" placeholder="55 1234 5678" required value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+                    <Input 
+                      id="telefono" 
+                      type="tel" 
+                      placeholder="55 1234 5678" 
+                      required 
+                      value={telefono} 
+                      onChange={(e) => setTelefono(e.target.value)}
+                      disabled={loading}
+                    />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="role">Rol</Label>
-                    <Select onValueChange={setRole} value={role}>
+                    <Select onValueChange={setRole} value={role} disabled={loading}>
                         <SelectTrigger id="role">
                             <SelectValue placeholder="Seleccione un rol" />
                         </SelectTrigger>
@@ -172,11 +225,24 @@ export default function RegistroAdminPage() {
             </div>
             <div className="space-y-2">
                 <Label htmlFor="razonSocial">Razón Social</Label>
-                <Input id="razonSocial" type="text" value={razonSocial} onChange={(e) => setRazonSocial(e.target.value)} required />
+                <Input 
+                  id="razonSocial" 
+                  type="text" 
+                  value={razonSocial} 
+                  onChange={(e) => setRazonSocial(e.target.value)} 
+                  required
+                  disabled={loading}
+                />
             </div>
             <div className="space-y-2">
                 <Label htmlFor="additionalContact">Datos de Contacto Adicional</Label>
-                <Textarea id="additionalContact" placeholder="Notas, otro email, etc." value={additionalContact} onChange={(e) => setAdditionalContact(e.target.value)} />
+                <Textarea 
+                  id="additionalContact" 
+                  placeholder="Notas, otro email, etc." 
+                  value={additionalContact} 
+                  onChange={(e) => setAdditionalContact(e.target.value)}
+                  disabled={loading}
+                />
             </div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -188,6 +254,7 @@ export default function RegistroAdminPage() {
                         required
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        disabled={loading}
                         />
                         <Button
                         type="button"
@@ -195,6 +262,7 @@ export default function RegistroAdminPage() {
                         size="icon"
                         className="absolute top-1/2 right-2 -translate-y-1/2 h-7 w-7"
                         onClick={() => setPasswordVisible(!passwordVisible)}
+                        disabled={loading}
                         >
                         {passwordVisible ? <EyeOff /> : <Eye />}
                         </Button>
@@ -209,6 +277,7 @@ export default function RegistroAdminPage() {
                         required
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
+                        disabled={loading}
                         />
                         <Button
                         type="button"
@@ -216,6 +285,7 @@ export default function RegistroAdminPage() {
                         size="icon"
                         className="absolute top-1/2 right-2 -translate-y-1/2 h-7 w-7"
                         onClick={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
+                        disabled={loading}
                         >
                         {confirmPasswordVisible ? <EyeOff /> : <Eye />}
                         </Button>
@@ -223,7 +293,7 @@ export default function RegistroAdminPage() {
                 </div>
             </div>
             <div className="flex items-start space-x-2 pt-2">
-                <Checkbox id="terms" className="mt-1" required />
+                <Checkbox id="terms" className="mt-1" required disabled={loading} />
                 <Label htmlFor="terms" className="text-sm font-normal text-muted-foreground">
                     He leído y acepto los <Link href="#" className="underline text-primary">Términos y Condiciones</Link> y la <Link href="#" className="underline text-primary">Política de Privacidad</Link>.
                 </Label>

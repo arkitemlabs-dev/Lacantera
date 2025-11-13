@@ -62,8 +62,11 @@ export function UserNav() {
 
   const handleSignOut = async () => {
     try {
-      await signOut(auth);
+      // Primero redirigir al login
       router.push('/login');
+      
+      // Luego hacer el signOut
+      await signOut(auth);
     } catch (error) {
       console.error('Error signing out:', error);
     }
