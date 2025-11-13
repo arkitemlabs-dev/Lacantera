@@ -1,6 +1,4 @@
-
 'use client';
-
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Nav as AdminNav } from '@/components/nav';
@@ -12,34 +10,32 @@ import { useAuth } from '../providers';
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { userRole } = useAuth();
+  const { userRole, isLoggingOut } = useAuth();
   
-  // Robust check to ensure correct interface is displayed based on role.
-useEffect(() => {
-  if (!userRole || !pathname) return;
+  useEffect(() => {
+    // No redirigir si está en proceso de logout
+    if (isLoggingOut || !userRole || !pathname) return;
+    
+    // No redirigir si estamos en login
+    if (pathname === '/login' || pathname === '/') return;
+    
+    const isAdminRoute = !pathname.startsWith('/proveedores');
+    const isSupplierRole = userRole.name === 'Proveedor';
+    
+    if (isSupplierRole && isAdminRoute) {
+      router.replace('/proveedores/dashboard');
+      return;
+    }
+    
+    if (!isSupplierRole && !isAdminRoute) {
+      router.replace('/dashboard');
+      return;
+    }
+  }, [userRole, pathname, router, isLoggingOut]);
   
-  // No redirigir si estamos en login o en proceso de logout
-  if (pathname === '/login' || pathname === '/') return;
-  
-  const isAdminRoute = !pathname.startsWith('/proveedores');
-  const isSupplierRole = userRole.name === 'Proveedor';
-  
-  // If a supplier is trying to access an admin route, redirect to supplier dashboard.
-  if (isSupplierRole && isAdminRoute) {
-    router.replace('/proveedores/dashboard');
-    return;
-  }
-  
-  // If an admin is trying to access a supplier route, redirect to admin dashboard.
-  if (!isSupplierRole && !isAdminRoute) {
-    router.replace('/dashboard');
-    return;
-  }
-}, [userRole, pathname, router]);
-
   const isSupplierPortal = userRole.name === 'Proveedor';
   const NavComponent = isSupplierPortal ? SupplierNav : AdminNav;
-
+  
   return (
     <SidebarProvider>
       <NavComponent />

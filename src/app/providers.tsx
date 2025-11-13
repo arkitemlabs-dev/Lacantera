@@ -10,10 +10,11 @@ import { doc, getDoc } from 'firebase/firestore';
 type AuthContextType = {
   user: User | null;
   userRole: Role;
-  firebaseRole: string | null; // Rol de Firebase (proveedor, admin_super, admin_compras)
-  userType: string | null; // Tipo de usuario (Proveedor, Administrador)
+  firebaseRole: string | null;
+  userType: string | null;
   setUserRole: React.Dispatch<React.SetStateAction<Role>>;
   loading: boolean;
+  isLoggingOut: boolean; // Nueva bandera
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -34,21 +35,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initialRoles.find((r) => r.name === 'Super Admin')!
   );
   const [loading, setLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Obtener rol desde Firestore cuando el usuario cambia
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      
       if (firebaseUser) {
+        // Usuario autenticado
+        setIsLoggingOut(false);
+        setUser(firebaseUser);
+        
         try {
-          // Obtener datos del usuario desde Firestore
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           
           if (userDoc.exists()) {
             const userData = userDoc.data();
-            const firestoreRole = userData.role; // proveedor, admin_super, admin_compras
-            const firestoreUserType = userData.userType; // Proveedor, Administrador
+            const firestoreRole = userData.role;
+            const firestoreUserType = userData.userType;
             
             console.log('📋 Usuario autenticado:', {
               uid: firebaseUser.uid,
@@ -60,7 +62,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setFirebaseRole(firestoreRole);
             setUserType(firestoreUserType);
 
-            // Mapear rol de Firebase a rol de UI
             let mappedRole: Role | undefined;
             
             if (firestoreRole === 'proveedor') {
@@ -73,7 +74,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (mappedRole) {
               setUserRole(mappedRole);
-              // Guardar en sessionStorage para persistencia
               try {
                 sessionStorage.setItem('userRole', mappedRole.name);
                 sessionStorage.setItem('firebaseRole', firestoreRole);
@@ -93,10 +93,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUserType(null);
         }
       } else {
-        // Usuario no autenticado - limpiar todo
+        // Usuario no autenticado - marcar como logging out
+        setIsLoggingOut(true);
+        setUser(null);
         setFirebaseRole(null);
         setUserType(null);
-        setUserRole(initialRoles.find((r) => r.name === 'Super Admin')!);
+        
         try {
           sessionStorage.removeItem('userRole');
           sessionStorage.removeItem('firebaseRole');
@@ -112,32 +114,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  // Restaurar desde sessionStorage al cargar la página
-  useEffect(() => {
-    try {
-      const storedRoleName = sessionStorage.getItem('userRole');
-      const storedFirebaseRole = sessionStorage.getItem('firebaseRole');
-      const storedUserType = sessionStorage.getItem('userType');
-      
-      if (storedRoleName) {
-        const role = initialRoles.find((r) => r.name === storedRoleName);
-        if (role) {
-          setUserRole(role);
-        }
-      }
-      
-      if (storedFirebaseRole) {
-        setFirebaseRole(storedFirebaseRole);
-      }
-      
-      if (storedUserType) {
-        setUserType(storedUserType);
-      }
-    } catch (error) {
-      console.error("No se pudo acceder a sessionStorage:", error);
-    }
-  }, []);
-
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -145,7 +121,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       firebaseRole, 
       userType, 
       setUserRole, 
-      loading 
+      loading,
+      isLoggingOut
     }}>
       {children}
     </AuthContext.Provider>
