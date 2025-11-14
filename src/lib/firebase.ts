@@ -1,7 +1,7 @@
-
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage, connectStorageEmulator } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDjOPRuY4FoZxnYTSlrZWxDRctLWQfzlQY",
@@ -15,9 +15,20 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-//const analytics = getAnalytics(app);
 
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
-export { app, auth, db };
+// Solo conectar Storage al emulador en desarrollo
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  try {
+    // Solo Storage usa emulador, Auth y Firestore usan producción
+    connectStorageEmulator(storage, "127.0.0.1", 9199);
+    console.log("🔧 Storage Emulator conectado");
+  } catch (error) {
+    console.log("⚠️ Storage Emulator ya conectado");
+  }
+}
+
+export { app, auth, db, storage };
