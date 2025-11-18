@@ -126,9 +126,11 @@ export default function FacturacionProveedorPage() {
       </div>
 
       <div className="flex items-center justify-end">
-        <Button>
+        <Button asChild>
+          <Link href="/proveedores/facturacion/subir">
             <Upload className="mr-2 h-4 w-4" />
             Subir Factura (PDF/XML)
+          </Link>
         </Button>
       </div>
 

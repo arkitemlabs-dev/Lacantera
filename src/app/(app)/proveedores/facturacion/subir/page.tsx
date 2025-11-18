@@ -1,0 +1,198 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { FileUpload } from '@/components/upload/file-upload';
+import { uploadFactura } from '@/app/actions/archivos';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Loader2, CheckCircle2, ArrowLeft } from 'lucide-react';
+
+export default function SubirFacturaPage() {
+  const router = useRouter();
+  const [xmlFile, setXmlFile] = useState<File | null>(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [ordenCompraId, setOrdenCompraId] = useState('');
+  const [observaciones, setObservaciones] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handleSubmit = async () => {
+    if (!xmlFile || !pdfFile) {
+      setResult({
+        success: false,
+        error: 'Por favor selecciona ambos archivos (XML y PDF)',
+      });
+      return;
+    }
+
+    setLoading(true);
+    setResult(null);
+
+    try {
+      const xmlBase64 = await fileToBase64(xmlFile);
+      const pdfBase64 = await fileToBase64(pdfFile);
+
+      const response = await uploadFactura({
+        proveedorId: 'proveedor-1',
+        xmlFile: xmlBase64,
+        xmlFileName: xmlFile.name,
+        pdfFile: pdfBase64,
+        pdfFileName: pdfFile.name,
+        ordenCompraId: ordenCompraId || undefined,
+        observaciones: observaciones || undefined,
+      });
+
+      setResult(response);
+
+      if (response.success) {
+        setTimeout(() => {
+          router.push('/proveedores/facturacion');
+        }, 2000);
+      }
+    } catch (error: any) {
+      setResult({
+        success: false,
+        error: error.message || 'Error al subir factura',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const canSubmit = xmlFile && pdfFile && !loading;
+
+  return (
+    <div className="container mx-auto p-4 md:p-8 max-w-4xl">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
+        <Link href="/proveedores/dashboard" className="hover:text-foreground">
+          Inicio
+        </Link>
+        <span>&gt;</span>
+        <Link href="/proveedores/facturacion" className="hover:text-foreground">
+          Facturación
+        </Link>
+        <span>&gt;</span>
+        <span className="text-foreground">Subir Factura</span>
+      </div>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        className="mb-4"
+        onClick={() => router.back()}
+      >
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Regresar
+      </Button>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Subir Nueva Factura</CardTitle>
+          <CardDescription>
+            Carga los archivos XML y PDF de tu factura para revisión
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label>Archivo XML (CFDI) *</Label>
+            <FileUpload
+              accept={{ 'text/xml': ['.xml'] }}
+              maxSize={5 * 1024 * 1024}
+              onFileSelect={setXmlFile}
+              label="Arrastra el archivo XML aquí"
+              description="Archivo XML del CFDI"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Archivo PDF *</Label>
+            <FileUpload
+              accept={{ 'application/pdf': ['.pdf'] }}
+              maxSize={10 * 1024 * 1024}
+              onFileSelect={setPdfFile}
+              label="Arrastra el archivo PDF aquí"
+              description="Representación impresa de la factura"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="ordenCompra">Orden de Compra (opcional)</Label>
+            <Input
+              id="ordenCompra"
+              placeholder="OC-123"
+              value={ordenCompraId}
+              onChange={(e) => setOrdenCompraId(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="observaciones">Observaciones (opcional)</Label>
+            <Textarea
+              id="observaciones"
+              placeholder="Notas adicionales..."
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+              rows={3}
+            />
+          </div>
+
+          {result && (
+            <Alert
+              variant={result.success ? 'default' : 'destructive'}
+              className={
+                result.success ? 'border-green-500 bg-green-500/10' : ''
+              }
+            >
+              {result.success && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+              <AlertTitle>
+                {result.success ? '¡Factura subida exitosamente!' : 'Error'}
+              </AlertTitle>
+              <AlertDescription>
+                {result.success
+                  ? 'Redirigiendo...'
+                  : result.error}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <Button
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+            size="lg"
+            className="w-full"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Subiendo...
+              </>
+            ) : (
+              'Subir Factura'
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
