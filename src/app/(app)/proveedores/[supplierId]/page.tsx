@@ -1,4 +1,7 @@
 'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import {
   ChevronLeft,
   FileCheck,
@@ -8,6 +11,8 @@ import {
   Eye,
   CheckCircle,
   XCircle,
+  Loader2,
+  Download,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -29,12 +34,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { suppliers } from '@/lib/data';
 import { cn } from '@/lib/utils';
-import type { Supplier, SupplierType } from '@/lib/types';
-import { notFound } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -46,64 +47,28 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { getProveedor, getDocumentosByProveedor } from '@/app/actions/proveedores';
 
-type DocStatus = 'aprobado' | 'pendiente' | 'rechazado' | 'vencido' | 'no aplica';
-
-type Document = {
-  name: string;
-  status: DocStatus;
-  date: string | null;
-  types: SupplierType[];
-  extraLabel?: string;
-};
-
-const allDocs: Document[] = [
-    { name: 'Poder notarial del representante legal', status: 'aprobado', date: '2024-07-15', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Constancia de Situación Fiscal (vigencia semestral)', status: 'vencido', date: '2024-01-15', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Opinión de cumplimiento positiva del SAT (vigencia mensual)', status: 'pendiente', date: null, types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Identificación Oficial del Representante', status: 'aprobado', date: '2024-07-20', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Acta constitutiva y sus modificaciones', status: 'aprobado', date: '2023-01-20', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Comprobante de domicilio fiscal (no mayor a 3 meses)', status: 'aprobado', date: '2024-06-01', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Carátula del estado de cuenta bancaria (preferentemente del nombre del titular coincidente)', status: 'rechazado', date: '2024-07-10', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Fotografía a color del exterior del domicilio fiscal/comercial', status: 'vencido', date: '2024-06-30', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Referencias comerciales', status: 'aprobado', date: '2024-07-18', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Carta firmada de aceptación al código de ética', status: 'pendiente', date: null, types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Registro en el REPSE', status: 'aprobado', date: '2024-05-20', types: ['services'], extraLabel: '(Solo si aplica)' },
-    { name: 'Título de propiedad del inmueble arrendado o documento que acredite propiedad', status: 'aprobado', date: '2023-11-10', types: ['leasing'], extraLabel: '(Solo si aplica)' },
-    { name: 'Comprobante de pago de predial vigente', status: 'vencido', date: '2024-03-31', types: ['leasing'], extraLabel: '(Solo si aplica)' },
-    { name: 'Póliza de seguro de responsabilidad civil vigente', status: 'pendiente', date: null, types: ['transport'], extraLabel: '(Solo si aplica)' },
-];
+type DocStatus = 'aprobado' | 'pendiente' | 'rechazado';
 
 const docStatusConfig = {
   aprobado: {
     icon: <FileCheck className="h-5 w-5 text-green-500" />,
     label: 'Aprobado',
-    variant: 'default',
+    variant: 'default' as const,
     className: 'dark:bg-green-500/20 dark:text-green-200 border-green-500/30 bg-green-100 text-green-800',
   },
   pendiente: {
     icon: <FileClock className="h-5 w-5 text-yellow-500" />,
     label: 'Pendiente',
-    variant: 'secondary',
+    variant: 'secondary' as const,
     className: 'dark:bg-yellow-500/20 dark:text-yellow-200 border-yellow-500/30 bg-yellow-100 text-yellow-800',
   },
   rechazado: {
     icon: <FileX className="h-5 w-5 text-red-500" />,
     label: 'Rechazado',
-    variant: 'destructive',
+    variant: 'destructive' as const,
     className: 'dark:bg-red-500/20 dark:text-red-200 border-red-500/30 bg-red-100 text-red-800',
-  },
-  vencido: {
-    icon: <FileQuestion className="h-5 w-5 text-orange-500" />,
-    label: 'Vencido',
-    variant: 'destructive',
-    className: 'dark:bg-orange-500/20 dark:text-orange-200 border-orange-500/30 bg-orange-100 text-orange-800',
-  },
-   'no aplica': {
-    icon: <FileX className="h-5 w-5 text-muted-foreground" />,
-    label: 'No Aplica',
-    variant: 'outline',
-    className: 'text-muted-foreground',
   },
 };
 
@@ -114,35 +79,75 @@ const InfoRow = ({ label, value }: { label: string; value: string | undefined | 
   </div>
 );
 
-export default function SupplierProfilePage({
-  params,
-}: {
-  params: { supplierId: string };
-}) {
+export default function SupplierProfilePage() {
+  const params = useParams();
+  const router = useRouter();
+  const [proveedor, setProveedor] = useState<any>(null);
+  const [documentos, setDocumentos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<any | null>(null);
 
-  const supplier = suppliers.find((s) => s.id === params.supplierId);
+  useEffect(() => {
+    if (params.supplierId) {
+      cargarDatos();
+    }
+  }, [params.supplierId]);
 
-  if (!supplier) {
-    notFound();
-  }
-  
-  const documentsForSupplier = allDocs.map(doc => {
-      if (doc.types.includes(supplier.type)) {
-          return doc;
+  const cargarDatos = async () => {
+    setLoading(true);
+    console.log('🔍 Cargando proveedor:', params.supplierId);
+    
+    // Cargar proveedor
+    const resultProveedor = await getProveedor(params.supplierId as string);
+    console.log('📦 Proveedor:', resultProveedor);
+    
+    if (resultProveedor.success) {
+      setProveedor(resultProveedor.data);
+      
+      // Cargar documentos
+      const resultDocs = await getDocumentosByProveedor(params.supplierId as string);
+      console.log('📄 Documentos:', resultDocs);
+      
+      if (resultDocs.success) {
+        setDocumentos(resultDocs.data || []);
       }
-      // If the document is not for this supplier type, check if it's a general document
-      if (doc.types.length === 4) { // general doc for all types
-        return doc;
-      }
-      return { ...doc, status: 'no aplica' as DocStatus };
-  });
+    }
 
-  const handleOpenDocumentDialog = (doc: Document) => {
+    setLoading(false);
+  };
+
+  const handleOpenDocumentDialog = (doc: any) => {
     setSelectedDocument(doc);
     setIsDocumentDialogOpen(true);
   };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!proveedor) {
+    return (
+      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold">Proveedor no encontrado</h2>
+          <Button className="mt-4" onClick={() => router.push('/proveedores')}>
+            Volver a la lista
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const totalDocumentos = documentos.length;
+  const documentosAprobados = documentos.filter((d) => d.status === 'aprobado').length;
+  const porcentajeCompletado = totalDocumentos > 0 
+    ? Math.round((documentosAprobados / totalDocumentos) * 100)
+    : 0;
 
   return (
     <Dialog open={isDocumentDialogOpen} onOpenChange={setIsDocumentDialogOpen}>
@@ -154,12 +159,15 @@ export default function SupplierProfilePage({
               <ChevronLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <h1 className="text-3xl font-semibold">{supplier.name}</h1>
+          <div className="flex-1">
+            <h1 className="text-3xl font-semibold">{proveedor.razonSocial}</h1>
+            <p className="text-muted-foreground">RFC: {proveedor.rfc}</p>
+          </div>
         </div>
         <Tabs defaultValue="general" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="general">Información General</TabsTrigger>
-                <TabsTrigger value="documents">Documentación</TabsTrigger>
+                <TabsTrigger value="documents">Documentación ({porcentajeCompletado}%)</TabsTrigger>
             </TabsList>
             <TabsContent value="general">
                  <Card className="mt-6">
@@ -175,10 +183,10 @@ export default function SupplierProfilePage({
                                 <Button variant="outline">Editar</Button>
                                 <Button
                                     variant={
-                                    supplier.status === 'active' ? 'destructive' : 'default'
+                                    proveedor.status === 'active' ? 'destructive' : 'default'
                                     }
                                 >
-                                    {supplier.status === 'active'
+                                    {proveedor.status === 'active'
                                     ? 'Desactivar'
                                     : 'Activar'}
                                 </Button>
@@ -190,12 +198,13 @@ export default function SupplierProfilePage({
                         <div>
                             <h3 className="text-lg font-semibold mb-4">Datos Fiscales</h3>
                             <div className="space-y-4">
-                            <InfoRow label="Razón Social" value={supplier.name} />
-                            <InfoRow label="RFC / Tax ID" value={supplier.taxId} />
+                            <InfoRow label="Razón Social" value={proveedor.razonSocial} />
+                            <InfoRow label="RFC" value={proveedor.rfc} />
                             <InfoRow
                                 label="Dirección Fiscal"
-                                value="Av. Siempre Viva 123, Springfield, USA"
+                                value={proveedor.direccionFiscal}
                             />
+                            <InfoRow label="Tipo de Proveedor" value={proveedor.tipoProveedor} />
                             </div>
                         </div>
                         <Separator />
@@ -205,13 +214,13 @@ export default function SupplierProfilePage({
                             <div className="space-y-4">
                             <InfoRow
                                 label="Contacto Principal"
-                                value={supplier.contactName}
+                                value={proveedor.nombreContacto}
                             />
                             <InfoRow
                                 label="Email"
-                                value={supplier.contactEmail}
+                                value={proveedor.email}
                             />
-                            <InfoRow label="Teléfono" value="+52 55 1234 5678" />
+                            <InfoRow label="Teléfono" value={proveedor.telefono} />
                             </div>
                         </div>
                         <Separator />
@@ -221,16 +230,22 @@ export default function SupplierProfilePage({
                             <div className="space-y-4">
                             <InfoRow
                                 label="Nombre"
-                                value="Lic. Ernesto de la Cruz"
+                                value={proveedor.representanteLegal?.nombre}
                             />
                             <InfoRow
                                 label="Email"
-                                value="e.delacruz@example.com"
+                                value={proveedor.representanteLegal?.email}
                             />
-                            <InfoRow
-                                label="Teléfono"
-                                value="+52 55 8765 4321"
-                            />
+                            </div>
+                        </div>
+                        <Separator />
+                        {/* Información Bancaria */}
+                        <div>
+                            <h3 className="text-lg font-semibold mb-4">Información Bancaria</h3>
+                            <div className="space-y-4">
+                            <InfoRow label="Banco" value={proveedor.informacionBancaria?.banco} />
+                            <InfoRow label="CLABE" value={proveedor.informacionBancaria?.clabe} />
+                            <InfoRow label="Número de Cuenta" value={proveedor.informacionBancaria?.numeroCuenta} />
                             </div>
                         </div>
                         <Separator />
@@ -238,11 +253,16 @@ export default function SupplierProfilePage({
                         <div>
                             <h3 className="text-lg font-semibold mb-4">Estado de la Cuenta</h3>
                             <div className="space-y-4">
-                                <InfoRow label="Código de Proveedor" value={`PROV-${supplier.id.padStart(3, '0')}`} />
-                                <InfoRow label="Fecha de Registro" value={supplier.registrationDate} />
+                                <InfoRow 
+                                  label="Fecha de Registro" 
+                                  value={proveedor.createdAt 
+                                    ? new Date(proveedor.createdAt).toLocaleDateString('es-MX')
+                                    : 'N/A'
+                                  } 
+                                />
                                 <InfoRow label="Estado Actual" value={
-                                <Badge variant={supplier.status === 'active' ? 'default' : 'destructive'} className={cn(supplier.status === 'active' ? 'dark:bg-green-500/20 dark:text-green-200 bg-green-100 text-green-800' : 'dark:bg-red-500/20 dark:text-red-200 bg-red-100 text-red-800', 'hover:bg-transparent')}>
-                                    {supplier.status === 'active' ? 'Activo' : 'Inactivo'}
+                                <Badge variant={proveedor.status === 'active' ? 'default' : 'destructive'} className={cn(proveedor.status === 'active' ? 'dark:bg-green-500/20 dark:text-green-200 bg-green-100 text-green-800' : 'dark:bg-red-500/20 dark:text-red-200 bg-red-100 text-red-800', 'hover:bg-transparent')}>
+                                    {proveedor.status === 'active' ? 'Activo' : proveedor.status === 'review' ? 'En revisión' : 'Inactivo'}
                                 </Badge>
                                 } />
                             </div>
@@ -253,12 +273,27 @@ export default function SupplierProfilePage({
             <TabsContent value="documents">
                 <Card className="mt-6">
                     <CardHeader>
-                        <CardTitle>Documentación</CardTitle>
-                        <CardDescription>
-                        Gestione y valide los documentos del proveedor.
-                        </CardDescription>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle>Documentación</CardTitle>
+                          <CardDescription>
+                            Gestione y valide los documentos del proveedor.
+                          </CardDescription>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold">{porcentajeCompletado}%</div>
+                          <div className="text-xs text-muted-foreground">
+                            {documentosAprobados}/{totalDocumentos} aprobados
+                          </div>
+                        </div>
+                      </div>
                     </CardHeader>
                     <CardContent>
+                      {documentos.length === 0 ? (
+                        <div className="text-center p-8 text-muted-foreground">
+                          No hay documentos cargados.
+                        </div>
+                      ) : (
                         <Table>
                         <TableHeader>
                             <TableRow>
@@ -269,14 +304,12 @@ export default function SupplierProfilePage({
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {documentsForSupplier.map((doc, index) => {
-                            const config = docStatusConfig[doc.status];
-                            const isActionable = doc.status !== 'no aplica';
+                            {documentos.map((doc) => {
+                            const config = docStatusConfig[doc.status as DocStatus] || docStatusConfig.pendiente;
                             return (
-                                <TableRow key={index}>
+                                <TableRow key={doc.id}>
                                 <TableCell className="font-medium">
-                                    {doc.name}
-                                    {doc.extraLabel && <span className="text-muted-foreground text-xs ml-2">{doc.extraLabel}</span>}
+                                    {doc.tipoDocumento}
                                 </TableCell>
                                 <TableCell>
                                     <Badge
@@ -287,25 +320,45 @@ export default function SupplierProfilePage({
                                     {config.label}
                                     </Badge>
                                 </TableCell>
-                                <TableCell>{doc.date || 'N/A'}</TableCell>
+                                <TableCell>
+                                  {doc.uploadedAt 
+                                    ? new Date(doc.uploadedAt).toLocaleDateString('es-MX', {
+                                        year: 'numeric',
+                                        month: '2-digit',
+                                        day: '2-digit',
+                                      })
+                                    : 'N/A'}
+                                </TableCell>
                                 <TableCell className="text-right">
-                                    <DialogTrigger asChild>
-                                        <Button 
+                                  <div className="flex items-center justify-end gap-2">
+                                    {doc.archivoUrl && (
+                                      <>
+                                        <DialogTrigger asChild>
+                                          <Button 
                                             variant="outline" 
-                                            size="icon" 
-                                            disabled={!isActionable}
+                                            size="icon"
                                             onClick={() => handleOpenDocumentDialog(doc)}
-                                        >
+                                          >
                                             <Eye className="h-4 w-4" />
                                             <span className="sr-only">Ver</span>
+                                          </Button>
+                                        </DialogTrigger>
+                                        <Button variant="ghost" size="icon" asChild>
+                                          <a href={doc.archivoUrl} download>
+                                            <Download className="h-4 w-4" />
+                                            <span className="sr-only">Descargar</span>
+                                          </a>
                                         </Button>
-                                    </DialogTrigger>
+                                      </>
+                                    )}
+                                  </div>
                                 </TableCell>
                                 </TableRow>
                             );
                             })}
                         </TableBody>
                         </Table>
+                      )}
                     </CardContent>
                 </Card>
             </TabsContent>
@@ -317,7 +370,7 @@ export default function SupplierProfilePage({
           <DialogHeader>
             <DialogTitle>Revisión de Documento</DialogTitle>
             <DialogDescription>
-              {selectedDocument.name} - {supplier.name}
+              {selectedDocument.tipoDocumento} - {proveedor.razonSocial}
             </DialogDescription>
           </DialogHeader>
           <div className="grid md:grid-cols-2 gap-6 overflow-y-auto max-h-[60vh] p-1">
@@ -329,9 +382,17 @@ export default function SupplierProfilePage({
                 </CardHeader>
                 <CardContent>
                   <div className="bg-muted h-[500px] flex items-center justify-center rounded-md border-2 border-dashed">
-                    <p className="text-muted-foreground">
-                      Vista previa del documento no disponible.
-                    </p>
+                    {selectedDocument.archivoUrl ? (
+                      <iframe 
+                        src={selectedDocument.archivoUrl} 
+                        className="w-full h-full rounded-md"
+                        title="Documento"
+                      />
+                    ) : (
+                      <p className="text-muted-foreground">
+                        Vista previa del documento no disponible.
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -343,17 +404,11 @@ export default function SupplierProfilePage({
                   <CardTitle>Validaciones</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className={cn("flex items-center justify-between p-3 rounded-md", selectedDocument.status !== 'vencido' ? "bg-green-500/10" : "bg-red-500/10")}>
-                    <p className={cn("text-sm", selectedDocument.status !== 'vencido' ? "dark:text-green-200 text-green-800" : "dark:text-red-200 text-red-800")}>
-                      Verificación de vigencia
+                  <div className={cn("flex items-center justify-between p-3 rounded-md", selectedDocument.status === 'aprobado' ? "bg-green-500/10" : "bg-yellow-500/10")}>
+                    <p className={cn("text-sm", selectedDocument.status === 'aprobado' ? "dark:text-green-200 text-green-800" : "dark:text-yellow-200 text-yellow-800")}>
+                      Estado del documento
                     </p>
-                    {selectedDocument.status !== 'vencido' ? <CheckCircle className="h-5 w-5 text-green-400" /> : <XCircle className="h-5 w-5 text-red-400" />}
-                  </div>
-                   <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-md">
-                    <p className="text-sm dark:text-green-200 text-green-800">
-                      Coincide con RFC y Razón Social
-                    </p>
-                    <CheckCircle className="h-5 w-5 text-green-400" />
+                    {selectedDocument.status === 'aprobado' ? <CheckCircle className="h-5 w-5 text-green-400" /> : <FileClock className="h-5 w-5 text-yellow-400" />}
                   </div>
                 </CardContent>
               </Card>

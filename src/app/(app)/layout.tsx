@@ -19,15 +19,23 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     // No redirigir si estamos en login
     if (pathname === '/login' || pathname === '/') return;
     
-    const isAdminRoute = !pathname.startsWith('/proveedores');
+    // Rutas exclusivas para PROVEEDORES (portal de proveedores)
+    const isSupplierRoute = pathname.startsWith('/proveedores/perfil') || 
+                           pathname.startsWith('/proveedores/dashboard') ||
+                           pathname.startsWith('/proveedores/ordenes') ||
+                           pathname.startsWith('/proveedores/facturas') ||
+                           pathname.startsWith('/proveedores/mensajes');
+    
     const isSupplierRole = userRole.name === 'Proveedor';
     
-    if (isSupplierRole && isAdminRoute) {
+    // Si es proveedor y está en ruta de admin, redirigir a su dashboard
+    if (isSupplierRole && !isSupplierRoute) {
       router.replace('/proveedores/dashboard');
       return;
     }
     
-    if (!isSupplierRole && !isAdminRoute) {
+    // Si es admin y está en ruta de proveedor, redirigir a dashboard admin
+    if (!isSupplierRole && isSupplierRoute) {
       router.replace('/dashboard');
       return;
     }

@@ -196,12 +196,18 @@ export default function PerfilProveedorPage() {
 
   const cargarDocumentos = async () => {
     setLoading(true);
+    console.log("🔍 Cargando documentos para proveedorId:", proveedorId);
     const result = await getDocumentosByProveedor(proveedorId);
+    console.log("📦 Resultado:", result);
     if (result.success) {
+      console.log("✅ Documentos cargados:", result.data);
       setDocumentos(result.data || []);
+    } else {
+      console.error("❌ Error cargando documentos:", result.error);
     }
     setLoading(false);
   };
+
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

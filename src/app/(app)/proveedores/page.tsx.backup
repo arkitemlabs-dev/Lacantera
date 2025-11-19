@@ -207,12 +207,12 @@ export default function ProveedoresPage() {
                       <TableCell>{typeText[supplier.tipoProveedor as SupplierType] || supplier.tipoProveedor}</TableCell>
                       <TableCell>
                         {supplier.createdAt 
-                          ? new Date(supplier.createdAt).toLocaleDateString("es-MX")
-                          : "N/A"}
+                          ? new Date(supplier.createdAt).toLocaleDateString('es-MX')
+                          : 'N/A'}
                       </TableCell>
                       <TableCell>
                         <Badge 
-                          variant={statusStyles[supplier.status as SupplierStatus]?.variant || "secondary"} 
+                          variant={statusStyles[supplier.status as SupplierStatus]?.variant || 'secondary'} 
                           className={cn(statusStyles[supplier.status as SupplierStatus]?.className)}
                         >
                           {statusText[supplier.status as SupplierStatus] || supplier.status}
@@ -220,8 +220,6 @@ export default function ProveedoresPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Button asChild variant="ghost" size="icon">
-                             <Link href={`/proveedores/${supplier.uid}`}>
                                <Eye className="h-4 w-4" />
                                <span className="sr-only">Ver Detalles</span>
                              </Link>
@@ -241,7 +239,7 @@ export default function ProveedoresPage() {
                               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                               <DropdownMenuItem>Editar</DropdownMenuItem>
                               <DropdownMenuItem>
-                                {supplier.status === "active" ? "Desactivar" : "Activar"}
+                                {supplier.status === 'active' ? 'Desactivar' : 'Activar'}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
