@@ -152,8 +152,17 @@ export async function uploadDocumentoProveedor(data: {
     | 'comprobante_domicilio'
     | 'identificacion_representante'
     | 'constancia_fiscal'
-    | 'caratula_bancaria';
-  file: string; // Base64
+    | 'caratula_bancaria'
+    | 'poder_notarial'
+    | 'opinion_cumplimiento'
+    | 'foto_domicilio'
+    | 'referencias_comerciales'
+    | 'codigo_etica'
+    | 'repse'
+    | 'titulo_propiedad'
+    | 'pago_predial'
+    | 'poliza_seguro';
+  file: string;
   fileName: string;
   fileType: string;
 }) {

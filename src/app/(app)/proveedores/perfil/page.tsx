@@ -1,7 +1,6 @@
-
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,12 +21,22 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
-import { Eye, Upload, Camera, FileCheck, FileClock, FileX, AlertCircle } from 'lucide-react';
+import { Eye, Upload, Camera, FileCheck, FileClock, FileX, AlertCircle, Loader2, Download } from 'lucide-react';
 import Image from 'next/image';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { FileUpload } from '@/components/upload/file-upload';
+import { uploadDocumentoProveedor } from '@/app/actions/archivos';
+import { getDocumentosByProveedor } from '@/app/actions/proveedores';
 
 const InfoField = ({
   label,
@@ -51,28 +60,96 @@ const InfoField = ({
   </div>
 );
 
-type DocStatus = 'aprobado' | 'pendiente' | 'rechazado' | 'vencido';
+type DocStatus = 'aprobado' | 'pendiente' | 'rechazado';
 
-const documents: {
-  name: string;
-  status: DocStatus;
-  updateDate: string;
-  types: string[];
-}[] = [
-    { name: 'Poder notarial del representante legal', status: 'aprobado', updateDate: '2024-07-15', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Constancia de Situación Fiscal (vigencia semestral)', status: 'vencido', updateDate: '2024-01-15', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Opinión de cumplimiento positiva del SAT (vigencia mensual)', status: 'pendiente', updateDate: 'N/A', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Identificación Oficial del Representante', status: 'aprobado', updateDate: '2024-07-20', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Acta constitutiva y sus modificaciones', status: 'aprobado', updateDate: '2023-01-20', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Comprobante de domicilio fiscal (no mayor a 3 meses)', status: 'aprobado', updateDate: '2024-06-01', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Carátula del estado de cuenta bancaria (preferentemente del nombre del titular coincidente)', status: 'rechazado', updateDate: '2024-07-10', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Fotografía a color del exterior del domicilio fiscal/comercial', status: 'vencido', updateDate: '2024-06-30', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Referencias comerciales', status: 'aprobado', updateDate: '2024-07-18', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Carta firmada de aceptación al código de ética', status: 'pendiente', updateDate: 'N/A', types: ['supplies', 'services', 'leasing', 'transport'] },
-    { name: 'Registro en el REPSE (Solo si aplica)', status: 'aprobado', updateDate: '2024-05-20', types: ['services'] },
-    { name: 'Título de propiedad del inmueble arrendado o documento que acredite propiedad (Solo si aplica)', status: 'aprobado', updateDate: '2023-11-10', types: ['leasing'] },
-    { name: 'Comprobante de pago de predial vigente (Solo si aplica)', status: 'vencido', updateDate: '2024-03-31', types: ['leasing'] },
-    { name: 'Póliza de seguro de responsabilidad civil vigente (Solo si aplica)', status: 'pendiente', updateDate: 'N/A', types: ['transport'] },
+type TipoDocumento = 
+  | 'acta_constitutiva'
+  | 'comprobante_domicilio'
+  | 'identificacion_representante'
+  | 'constancia_fiscal'
+  | 'caratula_bancaria'
+  | 'poder_notarial'
+  | 'opinion_cumplimiento'
+  | 'foto_domicilio'
+  | 'referencias_comerciales'
+  | 'codigo_etica'
+  | 'repse'
+  | 'titulo_propiedad'
+  | 'pago_predial'
+  | 'poliza_seguro';
+
+interface DocumentoRequerido {
+  tipo: TipoDocumento;
+  nombre: string;
+  descripcion: string;
+  required: boolean;
+  vigencia?: string;
+}
+
+const documentosRequeridos: DocumentoRequerido[] = [
+  {
+    tipo: 'poder_notarial',
+    nombre: 'Poder notarial del representante legal',
+    descripcion: 'Documento notariado',
+    required: true,
+  },
+  {
+    tipo: 'constancia_fiscal',
+    nombre: 'Constancia de Situación Fiscal',
+    descripcion: 'Vigencia semestral',
+    required: true,
+    vigencia: '6 meses',
+  },
+  {
+    tipo: 'opinion_cumplimiento',
+    nombre: 'Opinión de cumplimiento positiva del SAT',
+    descripcion: 'Vigencia mensual',
+    required: true,
+    vigencia: '1 mes',
+  },
+  {
+    tipo: 'identificacion_representante',
+    nombre: 'Identificación Oficial del Representante',
+    descripcion: 'INE, pasaporte o cédula',
+    required: true,
+  },
+  {
+    tipo: 'acta_constitutiva',
+    nombre: 'Acta constitutiva y sus modificaciones',
+    descripcion: 'Documento legal de la empresa',
+    required: true,
+  },
+  {
+    tipo: 'comprobante_domicilio',
+    nombre: 'Comprobante de domicilio fiscal',
+    descripcion: 'No mayor a 3 meses',
+    required: true,
+    vigencia: '3 meses',
+  },
+  {
+    tipo: 'caratula_bancaria',
+    nombre: 'Carátula del estado de cuenta bancaria',
+    descripcion: 'Estado de cuenta o formato del banco',
+    required: true,
+  },
+  {
+    tipo: 'foto_domicilio',
+    nombre: 'Fotografía del exterior del domicilio',
+    descripcion: 'Foto a color del domicilio fiscal/comercial',
+    required: true,
+  },
+  {
+    tipo: 'referencias_comerciales',
+    nombre: 'Referencias comerciales',
+    descripcion: 'Mínimo 2 referencias',
+    required: true,
+  },
+  {
+    tipo: 'codigo_etica',
+    nombre: 'Carta de aceptación al código de ética',
+    descripcion: 'Documento firmado',
+    required: true,
+  },
 ];
 
 const docStatusConfig = {
@@ -91,17 +168,7 @@ const docStatusConfig = {
     label: 'Rechazado',
     className: 'bg-red-500/20 text-red-200 border-red-500/30',
   },
-  vencido: {
-    icon: <AlertCircle className="h-5 w-5 text-orange-500" />,
-    label: 'Vencido',
-    className: 'bg-orange-500/20 text-orange-200 border-orange-500/30',
-  },
 };
-
-// Assuming the supplier type is 'services' for this example
-const supplierType = 'services';
-const documentsForSupplier = documents.filter(doc => doc.types.includes(supplierType));
-
 
 export default function PerfilProveedorPage() {
   const userAvatar = PlaceHolderImages.find(
@@ -112,6 +179,29 @@ export default function PerfilProveedorPage() {
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isEditing, setIsEditing] = useState(false);
+  
+  // Estados para documentos
+  const [documentos, setDocumentos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [selectedDocTipo, setSelectedDocTipo] = useState<TipoDocumento | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const proveedorId = 'proveedor-1'; // TODO: obtener del usuario autenticado
+
+  useEffect(() => {
+    cargarDocumentos();
+  }, []);
+
+  const cargarDocumentos = async () => {
+    setLoading(true);
+    const result = await getDocumentosByProveedor(proveedorId);
+    if (result.success) {
+      setDocumentos(result.data || []);
+    }
+    setLoading(false);
+  };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -125,7 +215,6 @@ export default function PerfilProveedorPage() {
   };
 
   const handleSave = () => {
-    // Here you would typically save the form data
     setIsEditing(false);
   };
 
@@ -134,9 +223,62 @@ export default function PerfilProveedorPage() {
   };
 
   const handleCancel = () => {
-    // Optionally reset form data to initial state here
     setIsEditing(false);
   };
+
+  const openUploadDialog = (tipo: TipoDocumento) => {
+    setSelectedDocTipo(tipo);
+    setSelectedFile(null);
+    setUploadDialogOpen(true);
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handleUploadDocument = async () => {
+    if (!selectedFile || !selectedDocTipo) return;
+
+    setUploading(true);
+
+    try {
+      const base64 = await fileToBase64(selectedFile);
+
+      const result = await uploadDocumentoProveedor({
+        proveedorId,
+        tipoDocumento: selectedDocTipo,
+        file: base64,
+        fileName: selectedFile.name,
+        fileType: selectedFile.type,
+      });
+
+      if (result.success) {
+        await cargarDocumentos(); // This re-fetches the documents, including the new date
+        setUploadDialogOpen(false);
+        setSelectedFile(null);
+        setSelectedDocTipo(null);
+      } else {
+        alert(result.error);
+      }
+    } catch (error: any) {
+      alert(error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const getDocumentoStatus = (tipo: TipoDocumento) => {
+    return documentos.find((d) => d.tipoDocumento === tipo);
+  };
+
+  const totalDocumentos = documentosRequeridos.length;
+  const documentosAprobados = documentos.filter((d) => d.status === 'aprobado').length;
+  const porcentajeCompletado = Math.round((documentosAprobados / totalDocumentos) * 100);
 
   return (
     <main className="flex-1 space-y-8 p-4 md:p-8">
@@ -242,55 +384,150 @@ export default function PerfilProveedorPage() {
           <TabsContent value="documents">
             <Card>
               <CardHeader>
-                <CardTitle>Documentos</CardTitle>
-                <CardDescription>
-                  Gestione y valide los documentos requeridos para mantener su perfil activo.
-                </CardDescription>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle>Documentos</CardTitle>
+                    <CardDescription>
+                      Gestione y valide los documentos requeridos para mantener su perfil activo.
+                    </CardDescription>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold">{porcentajeCompletado}%</div>
+                    <div className="text-xs text-muted-foreground">
+                      {documentosAprobados}/{totalDocumentos} aprobados
+                    </div>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Documento</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Fecha de Actualización</TableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {documentsForSupplier.map((doc, index) => {
-                      const config = docStatusConfig[doc.status];
-                      return (
-                        <TableRow key={index}>
-                          <TableCell className="font-medium">{doc.name}</TableCell>
-                          <TableCell>
-                            <Badge
-                              className={cn('gap-1 font-normal', config.className)}
-                            >
-                              {config.icon}
-                              {config.label}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{doc.updateDate}</TableCell>
-                          <TableCell className="text-right space-x-2">
-                             <Button variant="outline" size="sm">
-                               <Upload className="mr-2 h-4 w-4" />
-                               Subir
-                            </Button>
-                            <Button variant="ghost" size="icon">
-                               <Eye className="h-4 w-4" />
-                               <span className="sr-only">Ver</span>
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                {loading ? (
+                  <div className="flex items-center justify-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Documento</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Fecha de Actualización</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {documentosRequeridos.map((docReq) => {
+                        const doc = getDocumentoStatus(docReq.tipo);
+                        const config = doc ? docStatusConfig[doc.status as DocStatus] : docStatusConfig.pendiente;
+                        
+                        return (
+                          <TableRow key={docReq.tipo}>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{docReq.nombre}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {docReq.descripcion}
+                                  {docReq.vigencia && ` • Vigencia: ${docReq.vigencia}`}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                className={cn('gap-1 font-normal', config.className)}
+                              >
+                                {config.icon}
+                                {config.label}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {doc 
+                                ? new Date(doc.uploadedAt).toLocaleDateString('es-MX', {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                  })
+                                : 'N/A'}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => openUploadDialog(docReq.tipo)}
+                                >
+                                  <Upload className="mr-2 h-4 w-4" />
+                                  {doc ? 'Reemplazar' : 'Subir'}
+                                </Button>
+                                {doc && (
+                                  <>
+                                    <Button variant="ghost" size="sm" asChild>
+                                      <a href={doc.archivoUrl} target="_blank" rel="noopener noreferrer">
+                                        <Eye className="mr-2 h-4 w-4" />
+                                        Ver
+                                      </a>
+                                    </Button>
+                                    <Button variant="ghost" size="sm" asChild>
+                                      <a href={doc.archivoUrl} download>
+                                        <Download className="h-4 w-4" />
+                                        <span className="sr-only">Descargar</span>
+                                      </a>
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Dialog de subida */}
+        <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Subir Documento</DialogTitle>
+              <DialogDescription>
+                {selectedDocTipo && documentosRequeridos.find(d => d.tipo === selectedDocTipo)?.nombre}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <FileUpload
+                accept={{
+                  'application/pdf': ['.pdf'],
+                  'image/jpeg': ['.jpg', '.jpeg'],
+                  'image/png': ['.png'],
+                }}
+                maxSize={10 * 1024 * 1024}
+                onFileSelect={setSelectedFile}
+                label="Arrastra tu documento aquí"
+                description="PDF, JPG o PNG (máx. 10MB)"
+              />
+
+              <Button
+                onClick={handleUploadDocument}
+                disabled={!selectedFile || uploading}
+                className="w-full"
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Subiendo...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Subir Documento
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
     </main>
   );
 }
