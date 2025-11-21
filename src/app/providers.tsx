@@ -93,19 +93,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUserType(null);
         }
       } else {
-        // Usuario no autenticado - marcar como logging out
-        setIsLoggingOut(true);
+        // Usuario no autenticado
+        console.log('🚪 Usuario no autenticado');
         setUser(null);
         setFirebaseRole(null);
         setUserType(null);
         
-        try {
-          sessionStorage.removeItem('userRole');
-          sessionStorage.removeItem('firebaseRole');
-          sessionStorage.removeItem('userType');
-        } catch (e) {
-          console.error('Error limpiando sessionStorage:', e);
+        // Solo limpiar sessionStorage si no estamos en proceso de logout
+        if (!isLoggingOut) {
+          try {
+            sessionStorage.removeItem('userRole');
+            sessionStorage.removeItem('firebaseRole');
+            sessionStorage.removeItem('userType');
+            sessionStorage.removeItem('empresaSeleccionada');
+          } catch (e) {
+            console.error('Error limpiando sessionStorage:', e);
+          }
         }
+        
+        // Resetear el estado de logout después de un breve delay
+        setTimeout(() => setIsLoggingOut(false), 500);
       }
       
       setLoading(false);

@@ -150,7 +150,7 @@ export default function LoginPage() {
         description: 'Selecciona una empresa para continuar.',
       });
       
-      // NUEVO: En lugar de redirigir, preparar datos para selector de empresa
+      // Preparar datos para selector de empresa
       const userDataForSelector = {
         uid: loggedInUser.uid,
         email: loggedInUser.email,
@@ -163,15 +163,6 @@ export default function LoginPage() {
       setShowEmpresaSelector(true);
       setLoading(false);
 
-     const finalRole = customRole || firestoreRole;
-
-      if (finalRole === 'proveedor') {
-      router.push('/proveedores/dashboard');
-      } else {
-       // Todos los admins van a /dashboard
-        router.push('/dashboard');
-      }
-
     } catch (error: any) {
       console.error('Error en login:', error);
       let errorMessage = 'Ocurrió un error al iniciar sesión.';
@@ -183,9 +174,12 @@ export default function LoginPage() {
     }
   };
 
-  // NUEVO: Manejar selección de empresa
+  // Manejar selección de empresa
   const handleEmpresaSelected = (empresa: any) => {
     if (!loggedUser) return;
+
+    console.log('Empresa seleccionada:', empresa);
+    console.log('Usuario logueado:', loggedUser);
 
     // Redirigir según el rol del usuario
     if (loggedUser.role === 'proveedor') {
@@ -220,9 +214,10 @@ export default function LoginPage() {
           src={bgImage.imageUrl}
           alt={bgImage.description}
           fill
-          objectFit="cover"
-          className="absolute inset-0 z-0"
+          className="absolute inset-0 z-0 object-cover"
           data-ai-hint={bgImage.imageHint}
+          priority
+          sizes="100vw"
         />
       )}
       <div className="absolute inset-0 bg-black/50 z-10" />
@@ -230,13 +225,14 @@ export default function LoginPage() {
       <Card className="w-full max-w-md bg-card/80 backdrop-blur-sm border-border/20 z-20">
         <CardHeader className="text-center">
           {logo && (
-             <Image
+            <Image
               src={logo.imageUrl}
               alt={logo.description}
               width={100}
               height={50}
               className="mx-auto"
               data-ai-hint={logo.imageHint}
+              priority
             />
           )}
           <CardTitle className="text-2xl mt-4">La Cantera Desarrollos Mineros</CardTitle>

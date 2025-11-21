@@ -2,6 +2,11 @@
 
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 
+// Verificar si Firebase Admin está disponible
+const isAdminAvailable = () => {
+  return adminAuth && adminDb && process.env.NODE_ENV !== 'development';
+};
+
 interface RegisterData {
   email: string;
   password: string;
@@ -15,6 +20,15 @@ interface RegisterData {
 
 export async function registerUserWithRole(data: RegisterData) {
   try {
+    // Verificar si Firebase Admin está disponible
+    if (!adminAuth || !adminDb) {
+      console.log('⚠️ Firebase Admin no disponible');
+      return {
+        success: false,
+        message: 'Error de configuración del servidor. Contacte al administrador.',
+      };
+    }
+
     // Validaciones
     if (!data.email || !data.password || !data.role || !data.userType) {
       return {
@@ -113,6 +127,15 @@ export async function registerUserWithRole(data: RegisterData) {
 
 export async function updateUserRole(userId: string, newRole: string) {
   try {
+    // Verificar si Firebase Admin está disponible
+    if (!isAdminAvailable()) {
+      console.log('⚠️ Firebase Admin no disponible en desarrollo');
+      return {
+        success: false,
+        message: 'Actualización de roles no disponible en modo desarrollo.',
+      };
+    }
+
     // Actualizar en Firestore
     await adminDb.collection('users').doc(userId).update({
       role: newRole,

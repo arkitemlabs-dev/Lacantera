@@ -62,18 +62,23 @@ export function UserNav() {
 
   const handleSignOut = async () => {
     try {
-      // PRIMERO: Limpiar sessionStorage
+      // PRIMERO: Limpiar sessionStorage completamente
       sessionStorage.removeItem('userRole');
       sessionStorage.removeItem('firebaseRole');
       sessionStorage.removeItem('userType');
+      sessionStorage.removeItem('empresaSeleccionada');
       
       // SEGUNDO: Hacer signOut de Firebase
       await signOut(auth);
       
-      // TERCERO: Redirigir a login
-      router.push('/login');
+      // TERCERO: Redirigir a login después de un breve delay
+      setTimeout(() => {
+        router.push('/login');
+      }, 100);
     } catch (error) {
       console.error('Error signing out:', error);
+      // Forzar redirección incluso si hay error
+      router.push('/login');
     }
   };
 

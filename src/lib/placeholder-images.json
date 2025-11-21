@@ -3,19 +3,19 @@
     {
       "id": "user-avatar-1",
       "description": "User avatar",
-      "imageUrl": "https://images.unsplash.com/photo-1521119989659-a83eee488004?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxwZXJzb24lMjBwb3J0cmFpdHxlbnwwfHx8fDE3NjE4ODIwMzV8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageUrl": "https://placehold.co/300x300/6366f1/ffffff?text=👤",
       "imageHint": "person portrait"
     },
     {
       "id": "login-background",
       "description": "Dark rocks background for login page",
-      "imageUrl": "https://images.unsplash.com/photo-1559621768-63898afd1de8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxkYXJrJTIwcm9ja3N8ZW58MHx8fHwxNzYxOTQ4MTA0fDA&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "dark rocks"
+      "imageUrl": "https://firebasestorage.googleapis.com/v0/b/portal-proveedores-web.firebasestorage.app/o/images%2Ffoto-del-patron-de-textura-de-la-piedra.jpg?alt=media&token=b212da11-517c-44f8-bc3b-dc407ad31797",
+      "imageHint": "dark background"
     },
     {
       "id": "login-logo",
       "description": "La Cantera Desarrollos Mineros Logo",
-      "imageUrl": "https://storage.googleapis.com/aall-demos/la-cantera-logo.png",
+      "imageUrl": "https://firebasestorage.googleapis.com/v0/b/portal-proveedores-web.firebasestorage.app/o/images%2Flogo_use.PNG?alt=media&token=4e2ce4e3-c070-4de3-92cd-5418c79a5e2c",
       "imageHint": "company logo"
     }
   ]
