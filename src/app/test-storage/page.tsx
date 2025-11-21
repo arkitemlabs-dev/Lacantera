@@ -92,7 +92,7 @@ export default function TestStoragePage() {
               <div className="text-xs break-all bg-muted p-2 rounded">
                 {downloadUrl}
               </div>
-              
+              <a
                 href={downloadUrl}
                 target="_blank"
                 rel="noopener noreferrer"

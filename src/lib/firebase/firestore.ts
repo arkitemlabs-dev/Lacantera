@@ -8,7 +8,7 @@ import {
   deleteDoc,
   getDoc,
 } from 'firebase/firestore';
-import { db } from './firebase'; // Assuming you have a firebase config file
+import { db } from '../firebase'; // Assuming you have a firebase config file
 import { z } from 'zod';
 
 // Zod schema for supplier data validation

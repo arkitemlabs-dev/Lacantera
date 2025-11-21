@@ -21,6 +21,8 @@ import type {
   ProveedorFilters,
   OrdenCompraFilters,
   FacturaFilters,
+  Empresa,
+  UsuarioEmpresa,
 } from './interface';
 
 import type {
@@ -464,6 +466,145 @@ export class FirestoreDatabase implements Database {
         ? timestampToDate(data.ultimaSincronizacion)
         : undefined,
     } as Factura;
+  }
+
+  // ==================== EMPRESAS ====================
+  async createEmpresa(data: Omit<Empresa, 'id'>): Promise<string> {
+    const empresaData = cleanUndefined({
+      ...data,
+      activa: data.activa ?? true,
+      createdAt: dateToTimestamp(data.createdAt as Date),
+      updatedAt: data.updatedAt ? dateToTimestamp(data.updatedAt as Date) : null,
+    });
+
+    const docRef = await addDoc(collection(db, 'empresas'), empresaData);
+    return docRef.id;
+  }
+
+  async getEmpresa(id: string): Promise<Empresa | null> {
+    const docRef = doc(db, 'empresas', id);
+    const docSnap = await getDoc(docRef);
+
+    if (!docSnap.exists()) {
+      return null;
+    }
+
+    const data = docSnap.data();
+    return {
+      ...data,
+      id: docSnap.id,
+      createdAt: timestampToDate(data.createdAt),
+      updatedAt: data.updatedAt ? timestampToDate(data.updatedAt) : undefined,
+    } as Empresa;
+  }
+
+  async getEmpresaByCodigo(codigo: string): Promise<Empresa | null> {
+    const q = query(
+      collection(db, 'empresas'),
+      where('codigo', '==', codigo),
+      firestoreLimit(1)
+    );
+
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) {
+      return null;
+    }
+
+    const doc = snapshot.docs[0];
+    const data = doc.data();
+    return {
+      ...data,
+      id: doc.id,
+      createdAt: timestampToDate(data.createdAt),
+      updatedAt: data.updatedAt ? timestampToDate(data.updatedAt) : undefined,
+    } as Empresa;
+  }
+
+  async getEmpresas(filters?: { activa?: boolean }): Promise<Empresa[]> {
+    let q = query(collection(db, 'empresas'));
+
+    if (filters?.activa !== undefined) {
+      q = query(q, where('activa', '==', filters.activa));
+    }
+
+    q = query(q, orderBy('createdAt', 'desc'));
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        ...data,
+        id: doc.id,
+        createdAt: timestampToDate(data.createdAt),
+        updatedAt: data.updatedAt ? timestampToDate(data.updatedAt) : undefined,
+      } as Empresa;
+    });
+  }
+
+  async updateEmpresa(id: string, data: Partial<Empresa>): Promise<void> {
+    const docRef = doc(db, 'empresas', id);
+    const updateData = cleanUndefined({
+      ...data,
+      updatedAt: serverTimestamp(),
+    });
+
+    if (data.createdAt) {
+      updateData.createdAt = dateToTimestamp(data.createdAt as Date);
+    }
+
+    await updateDoc(docRef, updateData);
+  }
+
+  // ==================== USUARIO-EMPRESA ====================
+  async createUsuarioEmpresa(data: Omit<UsuarioEmpresa, 'id'>): Promise<string> {
+    const relacionData = cleanUndefined({
+      ...data,
+      activo: data.activo ?? true,
+      createdAt: dateToTimestamp(data.createdAt as Date),
+    });
+
+    const docRef = await addDoc(collection(db, 'usuarios_empresas'), relacionData);
+    return docRef.id;
+  }
+
+  async getEmpresasByUsuario(usuarioId: string): Promise<UsuarioEmpresa[]> {
+    const q = query(
+      collection(db, 'usuarios_empresas'),
+      where('usuarioId', '==', usuarioId),
+      where('activo', '==', true),
+      orderBy('createdAt', 'desc')
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        ...data,
+        id: doc.id,
+        createdAt: timestampToDate(data.createdAt),
+      } as UsuarioEmpresa;
+    });
+  }
+
+  async updateUsuarioEmpresa(
+    usuarioId: string, 
+    empresaId: string, 
+    data: Partial<UsuarioEmpresa>
+  ): Promise<void> {
+    // Buscar la relación existente
+    const q = query(
+      collection(db, 'usuarios_empresas'),
+      where('usuarioId', '==', usuarioId),
+      where('empresaId', '==', empresaId),
+      firestoreLimit(1)
+    );
+
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      const docRef = doc(db, 'usuarios_empresas', snapshot.docs[0].id);
+      const updateData = cleanUndefined(data);
+      await updateDoc(docRef, updateData);
+    }
   }
 
   // Métodos restantes (stubs para evitar errores)

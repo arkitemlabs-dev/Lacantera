@@ -30,6 +30,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { initialRoles } from '@/lib/roles';
+import EmpresaSelector from '@/components/auth/EmpresaSelector';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -38,6 +39,9 @@ export default function LoginPage() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // NUEVO: Estados para manejo multiempresa
+  const [showEmpresaSelector, setShowEmpresaSelector] = useState(false);
+  const [loggedUser, setLoggedUser] = useState<any>(null);
 
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -143,22 +147,22 @@ export default function LoginPage() {
 
       toast({
         title: 'Inicio de sesión exitoso',
-        description: 'Bienvenido de nuevo.',
+        description: 'Selecciona una empresa para continuar.',
       });
+      
+      // NUEVO: En lugar de redirigir, preparar datos para selector de empresa
+      const userDataForSelector = {
+        uid: loggedInUser.uid,
+        email: loggedInUser.email,
+        displayName: userData.displayName || loggedInUser.displayName,
+        role: firestoreRole,
+        userType: firestoreUserType
+      };
+      
+      setLoggedUser(userDataForSelector);
+      setShowEmpresaSelector(true);
+      setLoading(false);
 
-      // // Redirigir según el rol de Firebase (custom claims o Firestore)
-      // const finalRole = customRole || firestoreRole;
-
-      // if (finalRole === 'proveedor') {
-      //   router.push('/proveedores/dashboard');
-      // } else if (finalRole === 'admin_super') {
-      //   router.push('/admin/dashboard');
-      // } else if (finalRole === 'admin_compras') {
-      //   router.push('/admin/compras');
-      // } else {
-      //   router.push('/dashboard');
-      // }
-      // Redirigir según el rol
      const finalRole = customRole || firestoreRole;
 
       if (finalRole === 'proveedor') {
@@ -179,11 +183,33 @@ export default function LoginPage() {
     }
   };
 
+  // NUEVO: Manejar selección de empresa
+  const handleEmpresaSelected = (empresa: any) => {
+    if (!loggedUser) return;
+
+    // Redirigir según el rol del usuario
+    if (loggedUser.role === 'proveedor') {
+      router.push('/proveedores/dashboard');
+    } else {
+      router.push('/dashboard');
+    }
+  };
+
   if (authLoading || user) {
     return (
         <div className="flex items-center justify-center min-h-screen">
             <p>Cargando...</p>
         </div>
+    );
+  }
+
+  // NUEVO: Mostrar selector de empresa si es necesario
+  if (showEmpresaSelector && loggedUser) {
+    return (
+      <EmpresaSelector
+        user={loggedUser}
+        onEmpresaSelected={handleEmpresaSelected}
+      />
     );
   }
 
