@@ -30,21 +30,24 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { initialRoles } from '@/lib/roles';
-import EmpresaSelector from '@/components/auth/EmpresaSelector';
+import { getEmpresasByUsuario } from '@/app/actions/empresas';
+import { getAllEmpresas } from '@/app/actions/get-empresas';
+import { useEmpresa } from '@/contexts/EmpresaContext';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [userType, setUserType] = useState(''); // Tipo de usuario seleccionado
+  const [userType, setUserType] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  // NUEVO: Estados para manejo multiempresa
-  const [showEmpresaSelector, setShowEmpresaSelector] = useState(false);
-  const [loggedUser, setLoggedUser] = useState<any>(null);
+  const [empresaSeleccionada, setEmpresaSeleccionada] = useState('');
+  const [empresasDisponibles, setEmpresasDisponibles] = useState<any[]>([]);
+  const [loadingEmpresas, setLoadingEmpresas] = useState(true);
 
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { setEmpresaSeleccionada: setEmpresaContext } = useEmpresa();
   const { toast } = useToast();
 
   const logo = PlaceHolderImages.find((img) => img.id === 'login-logo');
@@ -55,6 +58,27 @@ export default function LoginPage() {
       redirectUserByRole();
     }
   }, [user, authLoading, router]);
+
+  useEffect(() => {
+    cargarEmpresas();
+  }, []);
+
+  const cargarEmpresas = async () => {
+    try {
+      // Cargar todas las empresas disponibles para mostrar en el selector
+      const result = await getAllEmpresas();
+      if (result.success) {
+        setEmpresasDisponibles(result.data);
+        if (result.data.length === 1) {
+          setEmpresaSeleccionada(result.data[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('Error cargando empresas:', error);
+    } finally {
+      setLoadingEmpresas(false);
+    }
+  };
 
   const redirectUserByRole = async () => {
     if (!user) return;
@@ -88,6 +112,11 @@ export default function LoginPage() {
 
     if (!userType) {
       setError('Por favor, seleccione un tipo de usuario.');
+      return;
+    }
+
+    if (!empresaSeleccionada) {
+      setError('Por favor, seleccione una empresa.');
       return;
     }
 
@@ -145,22 +174,40 @@ export default function LoginPage() {
         return;
       }
 
+      // Verificar acceso a la empresa seleccionada
+      const { verificarAccesoEmpresa } = await import('@/app/actions/empresas');
+      const accesoResult = await verificarAccesoEmpresa(loggedInUser.uid, empresaSeleccionada);
+      
+      console.log('🔍 Verificación de acceso:', accesoResult);
+      
+      if (!accesoResult.success || !accesoResult.hasAccess) {
+        console.error('❌ Sin acceso a empresa:', empresaSeleccionada);
+        setError('No tienes acceso a la empresa seleccionada.');
+        await auth.signOut();
+        setLoading(false);
+        return;
+      }
+      
+      console.log('✅ Acceso verificado para empresa:', empresaSeleccionada);
+
+      // Guardar empresa seleccionada en contexto
+      const empresaObj = empresasDisponibles.find(e => e.id === empresaSeleccionada);
+      if (empresaObj) {
+        setEmpresaContext(empresaObj);
+      }
+
       toast({
         title: 'Inicio de sesión exitoso',
-        description: 'Selecciona una empresa para continuar.',
+        description: `Bienvenido a ${empresaObj?.nombreComercial || 'la aplicación'}`,
       });
+
+      // Redirigir según el rol
+      if (firestoreRole === 'proveedor') {
+        router.push('/proveedores/dashboard');
+      } else {
+        router.push('/dashboard');
+      }
       
-      // Preparar datos para selector de empresa
-      const userDataForSelector = {
-        uid: loggedInUser.uid,
-        email: loggedInUser.email,
-        displayName: userData.displayName || loggedInUser.displayName,
-        role: firestoreRole,
-        userType: firestoreUserType
-      };
-      
-      setLoggedUser(userDataForSelector);
-      setShowEmpresaSelector(true);
       setLoading(false);
 
     } catch (error: any) {
@@ -174,20 +221,7 @@ export default function LoginPage() {
     }
   };
 
-  // Manejar selección de empresa
-  const handleEmpresaSelected = (empresa: any) => {
-    if (!loggedUser) return;
 
-    console.log('Empresa seleccionada:', empresa);
-    console.log('Usuario logueado:', loggedUser);
-
-    // Redirigir según el rol del usuario
-    if (loggedUser.role === 'proveedor') {
-      router.push('/proveedores/dashboard');
-    } else {
-      router.push('/dashboard');
-    }
-  };
 
   if (authLoading || user) {
     return (
@@ -197,15 +231,7 @@ export default function LoginPage() {
     );
   }
 
-  // NUEVO: Mostrar selector de empresa si es necesario
-  if (showEmpresaSelector && loggedUser) {
-    return (
-      <EmpresaSelector
-        user={loggedUser}
-        onEmpresaSelected={handleEmpresaSelected}
-      />
-    );
-  }
+
 
   return (
     <div className="relative flex items-center justify-center min-h-screen bg-background">
@@ -295,12 +321,16 @@ export default function LoginPage() {
             </div>
              <div className="space-y-2">
                 <Label htmlFor="empresa">Empresa</Label>
-                <Select defaultValue="lqdm" disabled={loading}>
+                <Select value={empresaSeleccionada} onValueChange={setEmpresaSeleccionada} disabled={loading || loadingEmpresas}>
                     <SelectTrigger id="empresa">
-                        <SelectValue placeholder="Seleccione una empresa" />
+                        <SelectValue placeholder={loadingEmpresas ? "Cargando empresas..." : "Seleccione una empresa"} />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="lqdm">La Cantera Desarrollos Mineros</SelectItem>
+                        {empresasDisponibles.map((empresa) => (
+                            <SelectItem key={empresa.id} value={empresa.id}>
+                                {empresa.nombreComercial}
+                            </SelectItem>
+                        ))}
                     </SelectContent>
                 </Select>
             </div>

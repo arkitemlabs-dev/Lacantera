@@ -9,7 +9,8 @@
     "build": "NODE_ENV=production next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "init:multiempresa": "node scripts/init-multiempresa.js"
   },
   "dependencies": {
     "@floating-ui/react-dom": "^2.1.6",

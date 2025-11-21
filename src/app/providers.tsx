@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { initialRoles, type Role } from '@/lib/roles';
 import { ThemeProvider } from '@/components/theme-provider';
+import { EmpresaProvider } from '@/contexts/EmpresaContext';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -14,7 +15,8 @@ type AuthContextType = {
   userType: string | null;
   setUserRole: React.Dispatch<React.SetStateAction<Role>>;
   loading: boolean;
-  isLoggingOut: boolean; // Nueva bandera
+  isLoggingOut: boolean;
+  setIsLoggingOut: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -99,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setFirebaseRole(null);
         setUserType(null);
         
-        // Solo limpiar sessionStorage si no estamos en proceso de logout
+        // Limpiar sessionStorage solo si no estamos en proceso de logout
         if (!isLoggingOut) {
           try {
             sessionStorage.removeItem('userRole');
@@ -110,15 +112,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error('Error limpiando sessionStorage:', e);
           }
         }
-        
-        // Resetear el estado de logout después de un breve delay
-        setTimeout(() => setIsLoggingOut(false), 500);
       }
       
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      // Limpiar timeout si existe
+      setIsLoggingOut(false);
+    };
   }, []);
 
   return (
@@ -129,7 +132,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userType, 
       setUserRole, 
       loading,
-      isLoggingOut
+      isLoggingOut,
+      setIsLoggingOut
     }}>
       {children}
     </AuthContext.Provider>
@@ -139,14 +143,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function AppProviders({ children }: { children: React.ReactNode }) {
     return (
         <AuthProvider>
-            <ThemeProvider
-                attribute="class"
-                defaultTheme="dark"
-                enableSystem
-                disableTransitionOnChange
-            >
-                {children}
-            </ThemeProvider>
+            <EmpresaProvider>
+                <ThemeProvider
+                    attribute="class"
+                    defaultTheme="dark"
+                    enableSystem
+                    disableTransitionOnChange
+                >
+                    {children}
+                </ThemeProvider>
+            </EmpresaProvider>
         </AuthProvider>
     );
 }

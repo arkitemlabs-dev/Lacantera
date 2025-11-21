@@ -4,13 +4,16 @@ import { useEffect } from 'react';
 import { Nav as AdminNav } from '@/components/nav';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { UserNav } from '@/components/user-nav';
+import { EmpresaSelector } from '@/components/ui/empresa-selector';
 import { Nav as SupplierNav } from '@/components/proveedores/nav';
 import { useAuth } from '../providers';
+import { useEmpresa } from '@/contexts/EmpresaContext';
 
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { userRole, isLoggingOut } = useAuth();
+  const { userRole, isLoggingOut, user } = useAuth();
+  const { loading: empresaLoading } = useEmpresa();
   
   useEffect(() => {
     // No redirigir si está en proceso de logout
@@ -41,6 +44,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }
   }, [userRole, pathname, router, isLoggingOut]);
   
+
+
   const isSupplierPortal = userRole.name === 'Proveedor';
   const NavComponent = isSupplierPortal ? SupplierNav : AdminNav;
   
@@ -49,7 +54,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
       <NavComponent />
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
-           <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6 justify-end">
+           <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6 justify-between">
+            <EmpresaSelector />
             <UserNav />
           </header>
           <main className="flex-1 bg-muted/40">

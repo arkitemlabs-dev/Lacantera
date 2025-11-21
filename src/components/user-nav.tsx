@@ -39,6 +39,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ThemeToggle } from './theme-toggle';
 import { useAuth } from '@/app/providers';
+import { useEmpresa } from '@/contexts/EmpresaContext';
 import { auth } from '@/lib/firebase';
 
 const notificationIcons: Record<string, React.ReactNode> = {
@@ -52,7 +53,8 @@ export function UserNav() {
   const userAvatar = PlaceHolderImages.find((img) => img.id === 'user-avatar-1');
   const pathname = usePathname();
   const router = useRouter();
-  const { user, userRole } = useAuth();
+  const { user, userRole, setIsLoggingOut } = useAuth();
+  const { empresaSeleccionada } = useEmpresa();
   const isProviderPortal = pathname.startsWith('/proveedores');
   const notificationsLink = isProviderPortal ? '/proveedores/notificaciones' : '/notificaciones';
   const profileLink = isProviderPortal ? '/proveedores/perfil' : '/perfil';
@@ -62,22 +64,22 @@ export function UserNav() {
 
   const handleSignOut = async () => {
     try {
-      // PRIMERO: Limpiar sessionStorage completamente
+      // Marcar que estamos haciendo logout
+      setIsLoggingOut(true);
+      
+      // Limpiar sessionStorage
       sessionStorage.removeItem('userRole');
       sessionStorage.removeItem('firebaseRole');
       sessionStorage.removeItem('userType');
       sessionStorage.removeItem('empresaSeleccionada');
       
-      // SEGUNDO: Hacer signOut de Firebase
+      // Hacer signOut de Firebase
       await signOut(auth);
       
-      // TERCERO: Redirigir a login después de un breve delay
-      setTimeout(() => {
-        router.push('/login');
-      }, 100);
+      // Redirigir a login
+      router.push('/login');
     } catch (error) {
       console.error('Error signing out:', error);
-      // Forzar redirección incluso si hay error
       router.push('/login');
     }
   };
@@ -162,6 +164,11 @@ export function UserNav() {
               <p className="text-xs leading-none text-muted-foreground pt-1 font-semibold">
                 {userRole?.name}
               </p>
+              {empresaSeleccionada && (
+                <p className="text-xs leading-none text-blue-600 pt-1 font-medium">
+                  📍 {empresaSeleccionada.nombreComercial}
+                </p>
+              )}
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />

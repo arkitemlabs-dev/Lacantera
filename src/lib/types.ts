@@ -15,6 +15,7 @@ export type Supplier = {
   registrationDate: string;
   spent: number;
   trend: number;
+  empresaId: string; // ID de la empresa
 };
 
 export type Invoice = {
@@ -26,6 +27,7 @@ export type Invoice = {
   status: 'Pendiente pago' | 'En Revisión' | 'Rechazada' | 'Pagada';
   actionable: boolean;
   purchaseOrderIds: string[];
+  empresaId: string; // ID de la empresa
 };
 
 export type PurchaseOrderStatus = 'Pendiente' | 'Completa' | 'Cancelada';
@@ -43,6 +45,7 @@ export type PurchaseOrder = {
   createdBy: string;
   budget: number;
   company: string;
+  empresaId: string; // ID de la empresa
 };
 
 export type PaymentStatus = 'Completo' | 'Pendiente complemento' | 'En Revisión' | 'Rechazada' | 'Pendiente comprobantes';
@@ -57,6 +60,7 @@ export type Payment = {
   method: 'Transferencia' | 'Tarjeta de Crédito';
   paymentComplement: boolean;
   paymentReceipt?: boolean;
+  empresaId: string; // ID de la empresa
 };
 
 export type NotificationType = 'new_supplier' | 'doc_update' | 'invoice_status' | 'new_message' | 'payment_done';
@@ -78,4 +82,23 @@ export type NavItem = {
   title: string;
   icon: LucideIcon;
   label?: string;
+};
+
+// Tipos para multiempresa
+export type Empresa = {
+  id: string;
+  codigo: string;
+  razonSocial: string;
+  nombreComercial: string;
+  logo?: string;
+  activa: boolean;
+  fechaCreacion: string;
+};
+
+export type UsuarioEmpresa = {
+  usuarioId: string;
+  empresaId: string;
+  rol: string;
+  activo: boolean;
+  fechaAsignacion: string;
 };
