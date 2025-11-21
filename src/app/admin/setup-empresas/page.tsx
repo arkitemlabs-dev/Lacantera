@@ -20,7 +20,7 @@ export default function SetupEmpresasPage() {
     try {
       const result = await inicializarEmpresasDefault();
       
-      if (result.success) {
+      if (result.success && result.data) {
         setEmpresasCreadas(result.data.empresasCreadas || 0);
         toast({
           title: 'Éxito',
@@ -29,7 +29,7 @@ export default function SetupEmpresasPage() {
       } else {
         toast({
           title: 'Error',
-          description: result.error,
+          description: result.error || 'Ocurrió un error desconocido.',
           variant: 'destructive',
         });
       }
