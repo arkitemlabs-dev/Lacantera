@@ -10,15 +10,14 @@ import {
   User,
   UserPlus,
   MessageSquare,
+  UserCircle,
 } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 
 import { notifications } from '@/lib/data';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -50,7 +49,6 @@ const notificationIcons: Record<string, React.ReactNode> = {
 };
 
 export function UserNav() {
-  const userAvatar = PlaceHolderImages.find((img) => img.id === 'user-avatar-1');
   const pathname = usePathname();
   const router = useRouter();
   const { user, userRole, setIsLoggingOut } = useAuth();
@@ -141,16 +139,13 @@ export function UserNav() {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-10 w-10 rounded-full">
             <Avatar className="h-10 w-10">
-              {userAvatar && (
-                <Image
-                  src={userAvatar.imageUrl}
-                  alt={userAvatar.description}
-                  width={40}
-                  height={40}
-                  data-ai-hint={userAvatar.imageHint}
-                />
+              {user.photoURL ? (
+                <AvatarImage src={user.photoURL} alt="Avatar del usuario" />
+              ) : (
+                <AvatarFallback className="bg-primary/10">
+                  <UserCircle className="h-6 w-6 text-primary" />
+                </AvatarFallback>
               )}
-              <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
           </Button>
         </DropdownMenuTrigger>
