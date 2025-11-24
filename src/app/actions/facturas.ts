@@ -5,6 +5,7 @@ import { database } from '@/lib/database';
 import type { Factura, StatusFactura } from '@/types/backend';
 import type { FacturaFilters } from '@/lib/database';
 import { revalidatePath } from 'next/cache';
+import { validacionCompletaSAT } from '@/lib/sat-validator';
 
 // ==================== OBTENER FACTURAS ====================
 
@@ -232,16 +233,60 @@ export async function validarFacturaConSAT(id: string) {
       return { success: false, error: 'Factura no encontrada' };
     }
 
-    // TODO: Implementar llamada real al SAT
-    // Por ahora, simulamos validación exitosa
-    const validadaSAT = true;
-    const estatusSAT = 'vigente' as const;
+    console.log(`🔍 Iniciando validación SAT para factura ${factura.uuid}`);
 
+    // Realizar validación completa con el SAT
+    const validacionSAT = await validacionCompletaSAT({
+      uuid: factura.uuid,
+      rfcEmisor: factura.proveedorRFC,
+      rfcReceptor: factura.receptorRFC,
+      total: factura.total
+    });
+
+    console.log('📊 Resultado validación SAT:', validacionSAT);
+
+    // Verificar si la validación fue aprobada
+    if (!validacionSAT.aprobada) {
+      // Actualizar factura como rechazada
+      await database.updateFactura(id, {
+        validadaSAT: false,
+        estatusSAT: validacionSAT.validacionCFDI.estado === 'Cancelado' ? 'cancelada' : undefined,
+        fechaValidacionSAT: new Date(),
+        status: 'rechazada',
+        motivoRechazo: validacionSAT.motivo || 'No pasó validación SAT'
+      });
+
+      revalidatePath('/proveedores/facturacion');
+      revalidatePath('/facturas');
+
+      return {
+        success: false,
+        error: validacionSAT.motivo,
+        data: {
+          validadaSAT: false,
+          estatusSAT: validacionSAT.validacionCFDI.estado,
+          motivo: validacionSAT.motivo
+        }
+      };
+    }
+
+    // Validación exitosa - actualizar factura
     await database.updateFactura(id, {
-      validadaSAT,
-      estatusSAT,
+      validadaSAT: true,
+      estatusSAT: validacionSAT.validacionCFDI.estado === 'Vigente' ? 'vigente' : 'cancelada',
       fechaValidacionSAT: new Date(),
     });
+
+    console.log('✅ Factura validada exitosamente con SAT');
+
+    // TODO: Crear notificación para proveedor
+    // await crearNotificacionFactura({
+    //   proveedorId: factura.proveedorId,
+    //   facturaId: id,
+    //   folio: factura.folio,
+    //   empresaId: factura.empresaId,
+    //   tipo: 'aprobada'
+    // });
 
     revalidatePath('/proveedores/facturacion');
     revalidatePath('/facturas');
@@ -249,13 +294,16 @@ export async function validarFacturaConSAT(id: string) {
     return {
       success: true,
       data: {
-        validadaSAT,
-        estatusSAT,
+        validadaSAT: true,
+        estatusSAT: validacionSAT.validacionCFDI.estado,
+        codigoEstatus: validacionSAT.validacionCFDI.codigoEstatus,
+        esCancelable: validacionSAT.validacionCFDI.esCancelable,
+        validacionEFOS: validacionSAT.validacionCFDI.validacionEFOS,
         message: 'Factura validada con SAT exitosamente',
       },
     };
   } catch (error: any) {
-    console.error('Error validando factura con SAT:', error);
+    console.error('❌ Error validando factura con SAT:', error);
     return { success: false, error: error.message };
   }
 }
