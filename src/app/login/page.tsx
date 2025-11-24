@@ -65,18 +65,26 @@ export default function LoginPage() {
 
   const cargarEmpresas = async () => {
     try {
+      console.log('🔄 Iniciando carga de empresas...');
       // Cargar todas las empresas disponibles para mostrar en el selector
       const result = await getAllEmpresas();
+      console.log('📊 Resultado de getAllEmpresas:', result);
+
       if (result.success) {
+        console.log('✅ Empresas cargadas:', result.data.length, result.data);
         setEmpresasDisponibles(result.data);
         if (result.data.length === 1) {
           setEmpresaSeleccionada(result.data[0].id);
+          console.log('🏢 Auto-seleccionada empresa única:', result.data[0].id);
         }
+      } else {
+        console.error('❌ Error al cargar empresas:', result.error);
       }
     } catch (error) {
-      console.error('Error cargando empresas:', error);
+      console.error('❌ Excepción cargando empresas:', error);
     } finally {
       setLoadingEmpresas(false);
+      console.log('✓ Carga de empresas finalizada');
     }
   };
 

@@ -3,6 +3,7 @@
 import { storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { database } from '@/lib/database';
+import { parseCFDI, validateCFDI, extractEssentialData } from '@/lib/cfdi-parser';
 
 // Subir archivo a Firebase Storage
 export async function uploadFile(data: {
@@ -94,23 +95,66 @@ export async function uploadFactura(data: {
       };
     }
 
-    // 3. Extraer datos del XML (simulado por ahora)
-    // TODO: Implementar parser real de XML de CFDI
+    // 3. Parsear el XML para extraer datos del CFDI
+    const xmlBase64Data = xmlFile.split(',')[1] || xmlFile;
+    const xmlBuffer = Buffer.from(xmlBase64Data, 'base64');
+    const parseResult = parseCFDI(xmlBuffer);
+
+    if (!parseResult.success || !parseResult.data) {
+      return {
+        success: false,
+        error: `Error parseando CFDI: ${parseResult.error}`,
+      };
+    }
+
+    const cfdiData = parseResult.data;
+
+    // Validar el CFDI
+    const validationResult = validateCFDI(cfdiData);
+    if (!validationResult.valid) {
+      return {
+        success: false,
+        error: `CFDI inválido: ${validationResult.errors.join(', ')}`,
+      };
+    }
+
+    // Verificar que el tipo de comprobante sea Ingreso (I)
+    if (cfdiData.tipoDeComprobante !== 'I') {
+      return {
+        success: false,
+        error: `Tipo de comprobante no válido: ${cfdiData.tipoDeComprobante}. Solo se aceptan facturas de tipo Ingreso (I)`,
+      };
+    }
+
+    // Extraer datos esenciales
+    const essentialData = extractEssentialData(cfdiData);
+
+    // Verificar que el UUID no esté vacío
+    if (!essentialData.uuid) {
+      return {
+        success: false,
+        error: 'El CFDI no contiene UUID válido',
+      };
+    }
+
+    // Preparar datos para almacenamiento
     const facturaData = {
+      facturaId: `FACT-${Date.now()}`,
       proveedorId,
-      proveedorRFC: 'RFC123456789', // Extraer del XML
-      proveedorRazonSocial: 'Proveedor Test', // Extraer del XML
-      receptorRFC: 'LCD010101A00',
-      receptorRazonSocial: 'La Cantera Desarrollos Mineros',
-      empresaId: 'empresa-1',
-      uuid: `UUID-${Date.now()}`, // Extraer del XML
-      serie: 'A', // Extraer del XML
-      folio: `${Date.now()}`, // Extraer del XML
-      fecha: new Date(),
-      subtotal: 1000, // Extraer del XML
-      iva: 160, // Extraer del XML
-      total: 1160, // Extraer del XML
-      moneda: 'MXN' as const,
+      proveedorRFC: essentialData.emisorRFC,
+      proveedorRazonSocial: essentialData.emisorNombre,
+      receptorRFC: essentialData.receptorRFC,
+      receptorRazonSocial: essentialData.receptorNombre,
+      empresaId: 'empresa-1', // TODO: Obtener empresaId real del usuario
+      uuid: essentialData.uuid,
+      serie: essentialData.serie,
+      folio: essentialData.folio,
+      fecha: essentialData.fecha,
+      subtotal: essentialData.subTotal,
+      iva: essentialData.iva,
+      total: essentialData.total,
+      moneda: essentialData.moneda as 'MXN' | 'USD',
+      tipoCambio: essentialData.tipoCambio,
       xmlUrl: xmlResult.data!.url,
       pdfUrl: pdfResult.data!.url,
       validadaSAT: false,
