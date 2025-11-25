@@ -2,6 +2,7 @@
 // Validación de CFDI con servicios del SAT
 
 import axios from 'axios';
+import { validarCFDIConSOAPReal, validarCFDIConHTTPDirecto } from './sat-soap-client';
 
 // ==================== TIPOS ====================
 
@@ -73,11 +74,13 @@ export async function validarCFDIconSAT(params: {
 
     console.log('🔍 Validando CFDI con SAT:', { uuid, rfcEmisor, rfcReceptor, total: totalFormateado });
 
-    // OPCIÓN 1: Usar la API pública del SAT (si está disponible)
-    // Esta es una simulación ya que el SAT no tiene una API REST pública oficial
-    // En producción, tendrías que usar web scraping o el servicio SOAP
-
-    const response = await consultarEstadoCFDI(expresionImpresa);
+    // Consultar estado del CFDI (usará SOAP real o simulación según configuración)
+    const response = await consultarEstadoCFDI(expresionImpresa, {
+      uuid,
+      rfcEmisor,
+      rfcReceptor,
+      total: typeof total === 'string' ? parseFloat(total) : total
+    });
 
     return response;
 
@@ -95,37 +98,50 @@ export async function validarCFDIconSAT(params: {
 }
 
 /**
- * Consulta el estado de un CFDI mediante web scraping del sitio del SAT
- * NOTA: Esta es una implementación de ejemplo. En producción deberías usar
- * el servicio SOAP oficial o un servicio de terceros certificado.
+ * Consulta el estado de un CFDI usando el servicio SOAP real del SAT
  */
-async function consultarEstadoCFDI(expresionImpresa: string): Promise<ValidacionSATResult> {
+async function consultarEstadoCFDI(expresionImpresa: string, params: {
+  uuid: string;
+  rfcEmisor: string;
+  rfcReceptor: string;
+  total: number;
+}): Promise<ValidacionSATResult> {
   try {
-    // OPCIÓN A: Usar servicio SOAP del SAT (requiere más configuración)
-    // const soapResponse = await consultarViaSoap(expresionImpresa);
+    // Verificar modo de operación desde variables de entorno
+    const modoProduccion = process.env.SAT_MODO === 'produccion';
+    const usarHTTPDirecto = process.env.SAT_USE_HTTP_DIRECTO === 'true';
 
-    // OPCIÓN B: Usar servicio de terceros (PAC)
-    // const pacResponse = await consultarViaPAC(expresionImpresa);
+    if (!modoProduccion) {
+      // MODO DESARROLLO: Simular respuesta
+      console.log('⚠️  MODO DESARROLLO: Simulando validación SAT');
+      console.log('   Para usar SAT real: SAT_MODO=produccion en .env');
 
-    // OPCIÓN C: Por ahora, simular la respuesta (para desarrollo)
-    // En producción, debes implementar una de las opciones anteriores
+      return {
+        success: true,
+        codigoEstatus: 'S - Comprobante obtenido satisfactoriamente.',
+        estado: 'Vigente',
+        esCancelable: 'Cancelable sin aceptación',
+        estatusReceptor: 'Aceptado',
+        validacionEFOS: 'No incluida en EL SAT',
+        fechaConsulta: new Date()
+      };
+    }
 
-    console.log('⚠️  MODO DESARROLLO: Simulando validación SAT');
-    console.log('   En producción, usar servicio SOAP o PAC certificado');
+    // MODO PRODUCCIÓN: Usar servicio SOAP real del SAT
+    console.log('🔴 MODO PRODUCCIÓN: Consultando SAT real...');
 
-    // Simular respuesta del SAT
-    // En un escenario real, aquí procesarías la respuesta XML del servicio SOAP
-    return {
-      success: true,
-      codigoEstatus: 'S - Comprobante obtenido satisfactoriamente.',
-      estado: 'Vigente',
-      esCancelable: 'Cancelable sin aceptación',
-      estatusReceptor: 'Aceptado',
-      validacionEFOS: 'No incluida en EL SAT',
-      fechaConsulta: new Date()
-    };
+    if (usarHTTPDirecto) {
+      // Método alternativo usando HTTP directo
+      console.log('   Método: HTTP Directo');
+      return await validarCFDIConHTTPDirecto(params);
+    } else {
+      // Método predeterminado usando librería SOAP
+      console.log('   Método: Cliente SOAP');
+      return await validarCFDIConSOAPReal(params);
+    }
 
   } catch (error: any) {
+    console.error('❌ Error consultando estado CFDI:', error);
     throw new Error(`Error consultando estado CFDI: ${error.message}`);
   }
 }
