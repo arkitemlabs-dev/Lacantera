@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -25,12 +26,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useAuth } from '../providers';
-import { auth, db } from '@/lib/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { initialRoles } from '@/lib/roles';
-import { getEmpresasByUsuario } from '@/app/actions/empresas';
 import { getAllEmpresas } from '@/app/actions/get-empresas';
 import { useEmpresa } from '@/contexts/EmpresaContext';
 
@@ -66,7 +62,6 @@ export default function LoginPage() {
   const cargarEmpresas = async () => {
     try {
       console.log('🔄 Iniciando carga de empresas...');
-      // Cargar todas las empresas disponibles para mostrar en el selector
       const result = await getAllEmpresas();
       console.log('📊 Resultado de getAllEmpresas:', result);
 
@@ -88,28 +83,14 @@ export default function LoginPage() {
     }
   };
 
-  const redirectUserByRole = async () => {
+  const redirectUserByRole = () => {
     if (!user) return;
-  
-    try {
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        const role = userData.role;
-  
-        // Redirigir según el rol
-        if (role === 'proveedor') {
-          router.push('/proveedores/dashboard');
-        } else {
-          // Todos los admins van a /dashboard
-          router.push('/dashboard');
-        }
-      } else {
-        router.push('/dashboard');
-      }
-    } catch (error) {
-      console.error('Error al obtener rol del usuario:', error);
+
+    const role = user.role;
+
+    if (role === 'proveedor') {
+      router.push('/proveedores/dashboard');
+    } else {
       router.push('/dashboard');
     }
   };
@@ -131,115 +112,48 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // Login con Firebase Auth
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const loggedInUser = userCredential.user;
-
-      // Esperar 2 segundos para sincronización de custom claims
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Forzar refresh del token para obtener custom claims actualizados
-      await loggedInUser.getIdToken(true);
-
-      // Obtener el token con los claims
-      const idTokenResult = await loggedInUser.getIdTokenResult();
-      const customRole = idTokenResult.claims.role;
-
-      console.log('Custom claim role:', customRole);
-
-      // Obtener datos de Firestore
-      const userDoc = await getDoc(doc(db, 'users', loggedInUser.uid));
-
-      if (!userDoc.exists()) {
-        setError('No se encontró la información del usuario.');
-        await auth.signOut();
-        setLoading(false);
-        return;
-      }
-      
-      const userData = userDoc.data();
-      const firestoreRole = userData.role;
-      const firestoreUserType = userData.userType;
-
-      console.log('Firestore role:', firestoreRole);
-      console.log('Firestore userType:', firestoreUserType);
-
-      // Validar que el tipo de usuario seleccionado coincida
-      const isProveedor = userType === 'Proveedor';
-      const isAdmin = userType !== 'Proveedor';
-
-      if (isProveedor && firestoreUserType !== 'Proveedor') {
-        setError('Credenciales inválidas para el tipo de usuario seleccionado.');
-        await auth.signOut();
-        setLoading(false);
-        return;
-      }
-
-      if (isAdmin && firestoreUserType !== 'Administrador') {
-        setError('Credenciales inválidas para el tipo de usuario seleccionado.');
-        await auth.signOut();
-        setLoading(false);
-        return;
-      }
-
-      // Verificar acceso a la empresa seleccionada
-      const { verificarAccesoEmpresa } = await import('@/app/actions/empresas');
-      const accesoResult = await verificarAccesoEmpresa(loggedInUser.uid, empresaSeleccionada);
-      
-      console.log('🔍 Verificación de acceso:', accesoResult);
-      
-      if (!accesoResult.success || !accesoResult.hasAccess) {
-        console.error('❌ Sin acceso a empresa:', empresaSeleccionada);
-        setError('No tienes acceso a la empresa seleccionada.');
-        await auth.signOut();
-        setLoading(false);
-        return;
-      }
-      
-      console.log('✅ Acceso verificado para empresa:', empresaSeleccionada);
-
-      // Guardar empresa seleccionada en contexto
-      const empresaObj = empresasDisponibles.find(e => e.id === empresaSeleccionada);
-      if (empresaObj) {
-        setEmpresaContext(empresaObj);
-      }
-
-      toast({
-        title: 'Inicio de sesión exitoso',
-        description: `Bienvenido a ${empresaObj?.nombreComercial || 'la aplicación'}`,
+      const result = await signIn('credentials', {
+        redirect: false,
+        email,
+        password,
+        userType,
+        empresaId: empresaSeleccionada,
       });
 
-      // Redirigir según el rol
-      if (firestoreRole === 'proveedor') {
-        router.push('/proveedores/dashboard');
-      } else {
-        router.push('/dashboard');
+      if (result?.error) {
+        setError(result.error);
+        setLoading(false);
+        return;
       }
-      
-      setLoading(false);
 
+      if (result?.ok) {
+        const empresaObj = empresasDisponibles.find((e) => e.id === empresaSeleccionada);
+        if (empresaObj) {
+          setEmpresaContext(empresaObj);
+        }
+
+        toast({
+          title: 'Inicio de sesión exitoso',
+          description: `Bienvenido a ${empresaObj?.nombreComercial || 'la aplicación'}`,
+        });
+
+        // La redirección se manejará automáticamente por el useEffect
+        setLoading(false);
+      }
     } catch (error: any) {
       console.error('Error en login:', error);
-      let errorMessage = 'Ocurrió un error al iniciar sesión.';
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        errorMessage = 'El correo electrónico o la contraseña son incorrectos.';
-      }
-      setError(errorMessage);
+      setError('Ocurrió un error al iniciar sesión.');
       setLoading(false);
     }
   };
 
-
-
   if (authLoading || user) {
     return (
-        <div className="flex items-center justify-center min-h-screen">
-            <p>Cargando...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Cargando...</p>
+      </div>
     );
   }
-
-
 
   return (
     <div className="relative flex items-center justify-center min-h-screen bg-background">
@@ -270,25 +184,23 @@ export default function LoginPage() {
             />
           )}
           <CardTitle className="text-2xl mt-4">La Cantera Desarrollos Mineros</CardTitle>
-          <CardDescription>
-            Portal de Proveedores
-          </CardDescription>
+          <CardDescription>Portal de Proveedores</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleLogin}>
             {error && <p className="text-red-500 text-center font-medium">{error}</p>}
-            
+
             {/* Tipo de Usuario Selector */}
             <div className="space-y-2">
               <Label htmlFor="userType">Tipo de Usuario</Label>
               <Select onValueChange={setUserType} value={userType} disabled={loading}>
-                  <SelectTrigger id="userType">
-                      <SelectValue placeholder="Seleccione tipo de usuario" />
-                  </SelectTrigger>
-                  <SelectContent>
-                      <SelectItem value="Proveedor">Proveedor</SelectItem>
-                      <SelectItem value="Administrador">Administrador</SelectItem>
-                  </SelectContent>
+                <SelectTrigger id="userType">
+                  <SelectValue placeholder="Seleccione tipo de usuario" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Proveedor">Proveedor</SelectItem>
+                  <SelectItem value="Administrador">Administrador</SelectItem>
+                </SelectContent>
               </Select>
             </div>
 
@@ -327,46 +239,57 @@ export default function LoginPage() {
                 </Button>
               </div>
             </div>
-             <div className="space-y-2">
-                <Label htmlFor="empresa">Empresa</Label>
-                <Select value={empresaSeleccionada} onValueChange={setEmpresaSeleccionada} disabled={loading || loadingEmpresas}>
-                    <SelectTrigger id="empresa">
-                        <SelectValue placeholder={loadingEmpresas ? "Cargando empresas..." : "Seleccione una empresa"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {empresasDisponibles.map((empresa) => (
-                            <SelectItem key={empresa.id} value={empresa.id}>
-                                {empresa.nombreComercial}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+            <div className="space-y-2">
+              <Label htmlFor="empresa">Empresa</Label>
+              <Select
+                value={empresaSeleccionada}
+                onValueChange={setEmpresaSeleccionada}
+                disabled={loading || loadingEmpresas}
+              >
+                <SelectTrigger id="empresa">
+                  <SelectValue
+                    placeholder={
+                      loadingEmpresas ? 'Cargando empresas...' : 'Seleccione una empresa'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {empresasDisponibles.map((empresa) => (
+                    <SelectItem key={empresa.id} value={empresa.id}>
+                      {empresa.nombreComercial}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Checkbox id="remember-me" disabled={loading} />
-                <Label htmlFor="remember-me" className="text-sm font-normal">Recordarme</Label>
+                <Label htmlFor="remember-me" className="text-sm font-normal">
+                  Recordarme
+                </Label>
               </div>
-              <Link
-                href="#"
-                className="inline-block text-sm text-primary hover:underline"
-              >
+              <Link href="#" className="inline-block text-sm text-primary hover:underline">
                 ¿Olvidó su contraseña?
               </Link>
             </div>
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
-                {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
+            <Button
+              type="submit"
+              className="w-full bg-blue-600 hover:bg-blue-700"
+              disabled={loading}
+            >
+              {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
             </Button>
             <div className="mt-4 text-center text-sm">
-                ¿Nuevo usuario? Registrar como:
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                    <Button variant="outline" className="w-full" asChild disabled={loading}>
-                       <Link href="/proveedores/registro">Proveedor</Link>
-                    </Button>
-                    <Button variant="outline" className="w-full" asChild disabled={loading}>
-                        <Link href="/admin/registro">Administrador</Link>
-                    </Button>
-                </div>
+              ¿Nuevo usuario? Registrar como:
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <Button variant="outline" className="w-full" asChild disabled={loading}>
+                  <Link href="/proveedores/registro">Proveedor</Link>
+                </Button>
+                <Button variant="outline" className="w-full" asChild disabled={loading}>
+                  <Link href="/admin/registro">Administrador</Link>
+                </Button>
+              </div>
             </div>
           </form>
         </CardContent>

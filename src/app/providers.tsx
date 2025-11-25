@@ -4,12 +4,11 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { initialRoles, type Role } from '@/lib/roles';
 import { ThemeProvider } from '@/components/theme-provider';
 import { EmpresaProvider } from '@/contexts/EmpresaContext';
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged, type User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { SessionProvider, useSession } from 'next-auth/react';
+import type { Session } from 'next-auth';
 
 type AuthContextType = {
-  user: User | null;
+  user: Session['user'] | null;
   userRole: Role;
   firebaseRole: string | null;
   userType: string | null;
@@ -29,130 +28,107 @@ export const useAuth = () => {
   return context;
 };
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+function AuthProviderInner({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession();
   const [firebaseRole, setFirebaseRole] = useState<string | null>(null);
   const [userType, setUserType] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<Role>(
     initialRoles.find((r) => r.name === 'Super Admin')!
   );
-  const [loading, setLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // Usuario autenticado
-        setIsLoggingOut(false);
-        setUser(firebaseUser);
-        
+    if (session?.user) {
+      const role = session.user.role;
+      const type = session.user.userType;
+
+      console.log('📋 Usuario autenticado:', {
+        id: session.user.id,
+        email: session.user.email,
+        role: role,
+        userType: type,
+      });
+
+      setFirebaseRole(role);
+      setUserType(type);
+
+      let mappedRole: Role | undefined;
+
+      if (role === 'proveedor') {
+        mappedRole = initialRoles.find((r) => r.name === 'Proveedor');
+      } else if (role === 'admin_super') {
+        mappedRole = initialRoles.find((r) => r.name === 'Super Admin');
+      } else if (role === 'admin_compras') {
+        mappedRole = initialRoles.find((r) => r.name === 'Compras');
+      }
+
+      if (mappedRole) {
+        setUserRole(mappedRole);
         try {
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            const firestoreRole = userData.role;
-            const firestoreUserType = userData.userType;
-            
-            console.log('📋 Usuario autenticado:', {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              role: firestoreRole,
-              userType: firestoreUserType
-            });
-
-            setFirebaseRole(firestoreRole);
-            setUserType(firestoreUserType);
-
-            let mappedRole: Role | undefined;
-            
-            if (firestoreRole === 'proveedor') {
-              mappedRole = initialRoles.find(r => r.name === 'Proveedor');
-            } else if (firestoreRole === 'admin_super') {
-              mappedRole = initialRoles.find(r => r.name === 'Super Admin');
-            } else if (firestoreRole === 'admin_compras') {
-              mappedRole = initialRoles.find(r => r.name === 'Compras');
-            }
-
-            if (mappedRole) {
-              setUserRole(mappedRole);
-              try {
-                sessionStorage.setItem('userRole', mappedRole.name);
-                sessionStorage.setItem('firebaseRole', firestoreRole);
-                sessionStorage.setItem('userType', firestoreUserType);
-              } catch (e) {
-                console.error('Error guardando en sessionStorage:', e);
-              }
-            }
-          } else {
-            console.warn('⚠️ No se encontró documento de usuario en Firestore');
-            setFirebaseRole(null);
-            setUserType(null);
-          }
-        } catch (error) {
-          console.error('❌ Error obteniendo datos de usuario:', error);
-          setFirebaseRole(null);
-          setUserType(null);
-        }
-      } else {
-        // Usuario no autenticado
-        console.log('🚪 Usuario no autenticado');
-        setUser(null);
-        setFirebaseRole(null);
-        setUserType(null);
-        
-        // Limpiar sessionStorage solo si no estamos en proceso de logout
-        if (!isLoggingOut) {
-          try {
-            sessionStorage.removeItem('userRole');
-            sessionStorage.removeItem('firebaseRole');
-            sessionStorage.removeItem('userType');
-            sessionStorage.removeItem('empresaSeleccionada');
-          } catch (e) {
-            console.error('Error limpiando sessionStorage:', e);
-          }
+          sessionStorage.setItem('userRole', mappedRole.name);
+          sessionStorage.setItem('firebaseRole', role);
+          sessionStorage.setItem('userType', type);
+        } catch (e) {
+          console.error('Error guardando en sessionStorage:', e);
         }
       }
-      
-      setLoading(false);
-    });
+    } else if (status === 'unauthenticated') {
+      console.log('🚪 Usuario no autenticado');
+      setFirebaseRole(null);
+      setUserType(null);
 
-    return () => {
-      unsubscribe();
-      // Limpiar timeout si existe
-      setIsLoggingOut(false);
-    };
-  }, []);
+      if (!isLoggingOut) {
+        try {
+          sessionStorage.removeItem('userRole');
+          sessionStorage.removeItem('firebaseRole');
+          sessionStorage.removeItem('userType');
+          sessionStorage.removeItem('empresaSeleccionada');
+        } catch (e) {
+          console.error('Error limpiando sessionStorage:', e);
+        }
+      }
+    }
+  }, [session, status, isLoggingOut]);
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      userRole, 
-      firebaseRole, 
-      userType, 
-      setUserRole, 
-      loading,
-      isLoggingOut,
-      setIsLoggingOut
-    }}>
+    <AuthContext.Provider
+      value={{
+        user: session?.user || null,
+        userRole,
+        firebaseRole,
+        userType,
+        setUserRole,
+        loading: status === 'loading',
+        isLoggingOut,
+        setIsLoggingOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
 
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <SessionProvider>
+      <AuthProviderInner>{children}</AuthProviderInner>
+    </SessionProvider>
+  );
+}
+
 export function AppProviders({ children }: { children: React.ReactNode }) {
-    return (
-        <AuthProvider>
-            <EmpresaProvider>
-                <ThemeProvider
-                    attribute="class"
-                    defaultTheme="dark"
-                    enableSystem
-                    disableTransitionOnChange
-                >
-                    {children}
-                </ThemeProvider>
-            </EmpresaProvider>
-        </AuthProvider>
-    );
+  return (
+    <AuthProvider>
+      <EmpresaProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
+      </EmpresaProvider>
+    </AuthProvider>
+  );
 }
