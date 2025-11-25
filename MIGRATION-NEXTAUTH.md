@@ -56,9 +56,10 @@ NEXTAUTH_SECRET=your-secret-here-min-32-chars
 
 # SQL Server Configuration
 MSSQL_SERVER=localhost
-MSSQL_DATABASE=lacantera_db
+MSSQL_PORT=1433
+MSSQL_DATABASE=pp
 MSSQL_USER=sa
-MSSQL_PASSWORD=your-password
+MSSQL_PASSWORD=
 MSSQL_ENCRYPT=true
 MSSQL_TRUST_CERT=true
 ```
