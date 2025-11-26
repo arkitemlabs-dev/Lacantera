@@ -1,16 +1,10 @@
 // src/lib/database/index.ts
 // Export único para cambiar fácilmente de implementación
 
-import { FirestoreDatabase } from './firestore';
-// import { PostgresDatabase } from './postgres'; // ← Futuro
-// import { SupabaseDatabase } from './supabase'; // ← Futuro
+import { SqlServerDatabase } from './sqlserver';
 
-// HOY: Usar Firestore
-export const database = new FirestoreDatabase();
-
-// MAÑANA: Solo cambias esta línea:
-// export const database = new PostgresDatabase();
-// export const database = new SupabaseDatabase();
+// AHORA: Usar SQL Server
+export const database = new SqlServerDatabase();
 
 // Re-export types para conveniencia
 export type {
@@ -20,4 +14,6 @@ export type {
   FacturaFilters,
   CreateFacturaInput,
   CreateOrdenCompraInput,
+  Empresa,
+  UsuarioEmpresa,
 } from './interface';

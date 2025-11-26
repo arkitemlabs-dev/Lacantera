@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "init:multiempresa": "node scripts/init-multiempresa.js"
+    "db:setup": "node scripts/setup-database.js",
+    "db:test": "node scripts/test-db-connection.js"
   },
   "dependencies": {
     "@floating-ui/react-dom": "^2.1.6",
