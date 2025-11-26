@@ -48,67 +48,77 @@ export const authOptions: NextAuthOptions = {
         try {
           const pool = await getPool();
 
-          // Buscar usuario por email
-          const result = await pool
+          // Buscar usuario en pNetUsuario
+          const userResult = await pool
             .request()
-            .input('email', sql.VarChar, credentials.email)
+            .input('email', sql.VarChar(50), credentials.email)
             .query(`
               SELECT
-                id,
-                email,
-                password_hash,
-                display_name,
-                role,
-                user_type,
-                is_active,
-                created_at
-              FROM users
-              WHERE email = @email AND is_active = 1
+                u.IDUsuario,
+                u.Usuario,
+                u.IDUsuarioTipo,
+                u.eMail,
+                u.Nombre,
+                u.Estatus,
+                u.Empresa,
+                t.Descripcion as TipoUsuario
+              FROM pNetUsuario u
+              INNER JOIN pNetUsuarioTipo t ON u.IDUsuarioTipo = t.IDUsuarioTipo
+              WHERE u.eMail = @email AND (u.Estatus = 'ACTIVO' OR u.Estatus = '1')
             `);
 
-          const user = result.recordset[0];
+          const user = userResult.recordset[0];
 
           if (!user) {
             throw new Error('Credenciales inválidas');
           }
 
           // Verificar contraseña
+          const passwordResult = await pool
+            .request()
+            .input('userId', sql.Int, user.IDUsuario)
+            .query(`
+              SELECT PasswordHash
+              FROM pNetUsuarioPassword
+              WHERE IDUsuario = @userId
+            `);
+
+          if (passwordResult.recordset.length === 0) {
+            throw new Error('Usuario sin contraseña configurada');
+          }
+
           const isValidPassword = await bcrypt.compare(
             credentials.password,
-            user.password_hash
+            passwordResult.recordset[0].PasswordHash
           );
 
           if (!isValidPassword) {
             throw new Error('Credenciales inválidas');
           }
 
-          // Verificar tipo de usuario
-          if (credentials.userType && user.user_type !== credentials.userType) {
+          // Verificar tipo de usuario si se especifica
+          if (credentials.userType && user.TipoUsuario !== credentials.userType) {
             throw new Error('Tipo de usuario inválido');
           }
 
-          // Verificar acceso a empresa si se especifica
-          if (credentials.empresaId) {
-            const empresaAccess = await pool
-              .request()
-              .input('userId', sql.UniqueIdentifier, user.id)
-              .input('empresaId', sql.UniqueIdentifier, credentials.empresaId)
-              .query(`
-                SELECT 1 FROM usuario_empresa
-                WHERE usuario_id = @userId AND empresa_id = @empresaId
-              `);
-
-            if (empresaAccess.recordset.length === 0) {
-              throw new Error('No tienes acceso a esta empresa');
-            }
+          // Determinar rol basado en el tipo de usuario
+          let role = 'user';
+          if (user.IDUsuarioTipo === 1) {
+            // Intelisis = Admin
+            role = 'admin';
+          } else if (user.IDUsuarioTipo === 4) {
+            // Proveedor
+            role = 'proveedor';
           }
 
           return {
-            id: user.id,
-            email: user.email,
-            name: user.display_name,
-            role: user.role,
-            userType: user.user_type,
+            id: String(user.IDUsuario),
+            email: user.eMail,
+            name: user.Nombre,
+            role: role,
+            userType: user.TipoUsuario,
+            empresa: user.Empresa,
+            proveedor: user.Usuario, // La clave del proveedor
           };
         } catch (error: any) {
           console.error('Error en authorize:', error);
@@ -124,6 +134,8 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.role = user.role;
         token.userType = user.userType;
+        token.empresa = user.empresa;
+        token.proveedor = user.proveedor;
       }
       return token;
     },
@@ -133,6 +145,8 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
         session.user.userType = token.userType as string;
+        session.user.empresa = token.empresa as string;
+        session.user.proveedor = token.proveedor as string;
       }
       return session;
     },
