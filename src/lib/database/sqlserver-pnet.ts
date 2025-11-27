@@ -460,7 +460,7 @@ export class SqlServerPNetDatabase implements Database {
           Nombre,
           RFC,
           Direccion,
-          Telefono1
+          Telefonos
         FROM Empresa
         WHERE Empresa = @empresa
       `);
@@ -475,7 +475,7 @@ export class SqlServerPNetDatabase implements Database {
       nombreComercial: row.Nombre,
       rfc: row.RFC,
       direccion: row.Direccion,
-      telefono: row.Telefono1,
+      telefono: row.Telefonos,
       email: '',
       activa: true,
       createdAt: new Date(),
@@ -494,7 +494,7 @@ export class SqlServerPNetDatabase implements Database {
         Nombre,
         RFC,
         Direccion,
-        Telefono1
+        Telefonos
       FROM Empresa
       ORDER BY Empresa
     `);
@@ -506,7 +506,7 @@ export class SqlServerPNetDatabase implements Database {
       nombreComercial: row.Nombre,
       rfc: row.RFC,
       direccion: row.Direccion,
-      telefono: row.Telefono1,
+      telefono: row.Telefonos,
       email: '',
       activa: true,
       createdAt: new Date(),
