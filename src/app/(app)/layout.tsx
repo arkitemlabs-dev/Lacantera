@@ -23,11 +23,17 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     if (pathname === '/login' || pathname === '/') return;
     
     // Rutas exclusivas para PROVEEDORES (portal de proveedores)
-    const isSupplierRoute = pathname.startsWith('/proveedores/perfil') || 
+    const isSupplierRoute = pathname.startsWith('/proveedores/perfil') ||
                            pathname.startsWith('/proveedores/dashboard') ||
                            pathname.startsWith('/proveedores/ordenes') ||
                            pathname.startsWith('/proveedores/facturas') ||
-                           pathname.startsWith('/proveedores/mensajes');
+                           pathname.startsWith('/proveedores/facturacion') ||
+                           pathname.startsWith('/proveedores/pagos') ||
+                           pathname.startsWith('/proveedores/mensajeria') ||
+                           pathname.startsWith('/proveedores/notificaciones') ||
+                           pathname.startsWith('/proveedores/seguridad') ||
+                           pathname.startsWith('/proveedores/mensajes') ||
+                           pathname.startsWith('/facturas'); // Facturas compartida
     
     const isSupplierRole = userRole.name === 'Proveedor';
     
