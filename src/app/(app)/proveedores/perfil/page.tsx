@@ -156,17 +156,17 @@ const docStatusConfig = {
   aprobado: {
     icon: <FileCheck className="h-5 w-5 text-green-500" />,
     label: 'Aprobado',
-    className: 'bg-green-500/20 text-green-200 border-green-500/30',
+    className: 'dark:bg-green-500/20 dark:text-green-200 border-green-500/30 bg-green-100 text-green-800',
   },
   pendiente: {
     icon: <FileClock className="h-5 w-5 text-yellow-500" />,
     label: 'Pendiente',
-    className: 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30',
+    className: 'dark:bg-yellow-500/20 dark:text-yellow-200 border-yellow-500/30 bg-yellow-100 text-yellow-800',
   },
   rechazado: {
     icon: <FileX className="h-5 w-5 text-red-500" />,
     label: 'Rechazado',
-    className: 'bg-red-500/20 text-red-200 border-red-500/30',
+    className: 'dark:bg-red-500/20 dark:text-red-200 border-red-500/30 bg-red-100 text-red-800',
   },
 };
 

@@ -104,9 +104,9 @@ const payments = [
 const getStatusBadgeClass = (status: PaymentStatus) => {
   switch (status) {
     case 'Completado':
-      return 'bg-green-500/20 text-green-200 border-green-500/30';
+      return 'dark:bg-green-500/20 dark:text-green-200 border-green-500/30 hover:bg-green-500/30 bg-green-100 text-green-800';
     case 'Pagado':
-      return 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30';
+      return 'dark:bg-yellow-500/20 dark:text-yellow-200 border-yellow-500/30 hover:bg-yellow-500/30 bg-yellow-100 text-yellow-800';
     default:
       return 'secondary';
   }
