@@ -1,7 +1,6 @@
 'use server';
 
-import { db } from '@/lib/firebase';
-import { doc, setDoc, Timestamp } from 'firebase/firestore';
+// TODO: Este archivo ya no es necesario - los datos vienen directamente del ERP
 import { database } from '@/lib/database';
 
 const mockProveedores = [
@@ -241,68 +240,15 @@ const mockFacturas = [
 ];
 
 export async function migrateMockData() {
-  console.log('🚀 Iniciando migración...');
-  
-  const resultados = {
-    proveedores: { success: 0, errors: [] as string[] },
-    ordenes: { success: 0, errors: [] as string[] },
-    facturas: { success: 0, errors: [] as string[] },
-  };
-
-  // Migrar Proveedores (usando setDoc directo)
-  console.log('�� Migrando proveedores...');
-  for (const proveedor of mockProveedores) {
-    try {
-      console.log(`  Migrando: ${proveedor.razonSocial}`);
-      const docRef = doc(db, 'users', proveedor.uid);
-      await setDoc(docRef, {
-        ...proveedor,
-        createdAt: Timestamp.fromDate(proveedor.createdAt),
-        updatedAt: Timestamp.now(),
-      });
-      resultados.proveedores.success++;
-      console.log(`  ✅ ${proveedor.razonSocial}`);
-    } catch (error: any) {
-      console.error(`  ❌ Error con ${proveedor.razonSocial}:`, error);
-      resultados.proveedores.errors.push(
-        `${proveedor.razonSocial}: ${error.message}`
-      );
-    }
-  }
-
-  // Migrar Órdenes de Compra
-  console.log('📦 Migrando órdenes de compra...');
-  for (const orden of mockOrdenesCompra) {
-    try {
-      console.log(`  Migrando: ${orden.folio}`);
-      await database.createOrdenCompra(orden);
-      resultados.ordenes.success++;
-      console.log(`  ✅ ${orden.folio}`);
-    } catch (error: any) {
-      console.error(`  ❌ Error con ${orden.folio}:`, error);
-      resultados.ordenes.errors.push(`${orden.folio}: ${error.message}`);
-    }
-  }
-
-  // Migrar Facturas
-  console.log('📦 Migrando facturas...');
-  for (const factura of mockFacturas) {
-    try {
-      console.log(`  Migrando: ${factura.folio}`);
-      await database.createFactura(factura);
-      resultados.facturas.success++;
-      console.log(`  ✅ ${factura.folio}`);
-    } catch (error: any) {
-      console.error(`  ❌ Error con ${factura.folio}:`, error);
-      resultados.facturas.errors.push(`${factura.folio}: ${error.message}`);
-    }
-  }
-
-  console.log('✅ Migración completada:', resultados);
+  console.log('🚀 Migración deshabilitada - los datos vienen del ERP');
 
   return {
     success: true,
-    data: resultados,
-    message: `Migración completada: ${resultados.proveedores.success} proveedores, ${resultados.ordenes.success} órdenes, ${resultados.facturas.success} facturas`,
+    data: {
+      proveedores: { success: 0, errors: [] },
+      ordenes: { success: 0, errors: [] },
+      facturas: { success: 0, errors: [] },
+    },
+    message: 'Los datos vienen directamente del ERP - no se requiere migración',
   };
 }

@@ -19,9 +19,8 @@ import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { auth } from '@/lib/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { registerUserWithRole } from '@/app/actions/auth';
+// TODO: Implementar registro de admins usando SQL Server
+// Los administradores deben ser creados directamente en el ERP
 import { useAuth } from '@/app/providers';
 import { initialRoles } from '@/lib/roles';
 import { useToast } from '@/hooks/use-toast';
@@ -82,52 +81,20 @@ export default function RegistroAdminPage() {
     setLoading(true);
 
     try {
-      // Mapear el rol seleccionado al código de Firebase
-      const mappedRole = roleMapping[role] || 'admin_super';
+      // TODO: Implementar registro de administradores usando SQL Server
+      // Por ahora, los administradores deben ser creados directamente en el ERP
 
-      console.log('Registrando admin con rol:', role, '→', mappedRole);
-
-      // Usar Server Action para registrar
-      const result = await registerUserWithRole({
-        email,
-        password,
-        displayName: fullName,
-        role: mappedRole,
-        userType: 'Administrador',
-        empresa: razonSocial,
-      });
-
-      if (!result.success) {
-        setError(result.message);
-        setLoading(false);
-        return;
-      }
-
-      console.log('✅ Usuario registrado exitosamente:', result.uid);
-
-      // Login automático
-      await signInWithEmailAndPassword(auth, email, password);
-      
-      // Esperar sincronización de custom claims
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      await auth.currentUser?.getIdToken(true);
+      setError(
+        'El registro de administradores no está disponible en este portal. ' +
+        'Los usuarios administrativos deben ser creados en el sistema ERP.'
+      );
+      setLoading(false);
 
       toast({
-        title: "¡Registro exitoso!",
-        description: "La cuenta de administrador ha sido creada con éxito.",
+        title: "Función no disponible",
+        description: "Contacta al administrador del sistema para crear cuentas administrativas.",
+        variant: "destructive",
       });
-
-      // // Redirigir según el rol
-      // if (mappedRole === 'admin_super') {
-      //   router.push('/admin/dashboard');
-      // } else if (mappedRole === 'admin_compras') {
-      //   router.push('/admin/compras');
-      // } else {
-      //   router.push('/dashboard');
-      // }
-
-    // Redirigir al dashboard
-    router.push('/dashboard');
 
     } catch (error: any) {
       console.error('❌ Error en registro:', error);

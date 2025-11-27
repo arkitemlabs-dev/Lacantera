@@ -1,18 +1,14 @@
 'use server';
 
-import { adminDb } from '@/lib/firebase-admin';
+import { database } from '@/lib/database';
 import { Empresa, UsuarioEmpresa } from '@/lib/types';
 
 export async function getEmpresasByUsuario(usuarioId: string) {
   try {
-    // Obtener las empresas asignadas al usuario
-    const usuarioEmpresasSnapshot = await adminDb
-      .collection('usuarioEmpresas')
-      .where('usuarioId', '==', usuarioId)
-      .where('activo', '==', true)
-      .get();
+    // Obtener las empresas asignadas al usuario desde pNetUsuarioEmpresa
+    const usuarioEmpresas = await database.getEmpresasByUsuario(usuarioId);
 
-    if (usuarioEmpresasSnapshot.empty) {
+    if (usuarioEmpresas.length === 0) {
       return {
         success: true,
         data: [],
@@ -20,18 +16,9 @@ export async function getEmpresasByUsuario(usuarioId: string) {
       };
     }
 
-    const empresaIds = usuarioEmpresasSnapshot.docs.map(doc => doc.data().empresaId);
-
-    // Obtener los datos de las empresas
-    const empresasPromises = empresaIds.map(async (empresaId) => {
-      const empresaDoc = await adminDb.collection('empresas').doc(empresaId).get();
-      if (empresaDoc.exists) {
-        return {
-          id: empresaDoc.id,
-          ...empresaDoc.data()
-        } as Empresa;
-      }
-      return null;
+    // Obtener los datos completos de las empresas
+    const empresasPromises = usuarioEmpresas.map(async (ue) => {
+      return await database.getEmpresa(ue.empresaId);
     });
 
     const empresas = (await Promise.all(empresasPromises)).filter(Boolean) as Empresa[];
@@ -52,34 +39,32 @@ export async function getEmpresasByUsuario(usuarioId: string) {
 
 export async function crearEmpresa(empresaData: Omit<Empresa, 'id'>) {
   try {
-    const docRef = await adminDb.collection('empresas').add({
-      ...empresaData,
-      fechaCreacion: new Date().toISOString(),
-      activa: true
-    });
+    // Crear empresa en la base de datos
+    // NOTA: Esta función lanza error porque no se deben crear empresas desde el portal
+    // Las empresas vienen del ERP
+    const empresaId = await database.createEmpresa(empresaData);
 
     return {
       success: true,
-      data: { id: docRef.id, ...empresaData }
+      data: { id: empresaId, ...empresaData }
     };
 
   } catch (error) {
     console.error('Error creando empresa:', error);
     return {
       success: false,
-      error: 'Error al crear empresa'
+      error: 'Las empresas deben ser creadas en el ERP, no en el portal'
     };
   }
 }
 
 export async function asignarUsuarioAEmpresa(usuarioId: string, empresaId: string, rol: string) {
   try {
-    await adminDb.collection('usuarioEmpresas').add({
+    await database.createUsuarioEmpresa({
       usuarioId,
       empresaId,
-      rol,
       activo: true,
-      fechaAsignacion: new Date().toISOString()
+      createdAt: new Date(),
     });
 
     return {
@@ -98,17 +83,13 @@ export async function asignarUsuarioAEmpresa(usuarioId: string, empresaId: strin
 
 export async function verificarAccesoEmpresa(usuarioId: string, empresaId: string) {
   try {
-    const snapshot = await adminDb
-      .collection('usuarioEmpresas')
-      .where('usuarioId', '==', usuarioId)
-      .where('empresaId', '==', empresaId)
-      .where('activo', '==', true)
-      .get();
+    const usuarioEmpresas = await database.getEmpresasByUsuario(usuarioId);
+    const hasAccess = usuarioEmpresas.some(ue => ue.empresaId === empresaId && ue.activo);
 
     return {
       success: true,
-      hasAccess: !snapshot.empty,
-      rol: snapshot.empty ? null : snapshot.docs[0].data().rol
+      hasAccess,
+      rol: hasAccess ? 'proveedor' : null
     };
 
   } catch (error) {

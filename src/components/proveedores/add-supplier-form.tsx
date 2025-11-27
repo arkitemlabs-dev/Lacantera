@@ -54,7 +54,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { addSupplier } from '@/lib/firebase/firestore';
+// TODO: Implementar addSupplier usando SQL Server
+// import { addSupplier } from '@/lib/firebase/firestore';
 
 const formSchema = z.object({
   // Datos fiscales
@@ -120,12 +121,19 @@ export function AddSupplierForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      await addSupplier(values);
+      // TODO: Implementar con SQL Server
+      console.log('Datos del proveedor:', values);
       toast({
-        title: 'Proveedor Guardado',
-        description: `El proveedor ${values.name} ha sido guardado exitosamente.`,
+        title: 'Función no disponible',
+        description: 'La creación de proveedores desde el portal aún no está implementada.',
+        variant: 'destructive',
       });
-      form.reset();
+      // await addSupplier(values);
+      // toast({
+      //   title: 'Proveedor Guardado',
+      //   description: `El proveedor ${values.name} ha sido guardado exitosamente.`,
+      // });
+      // form.reset();
     } catch (error) {
       console.error('Error al guardar el proveedor:', error);
       toast({

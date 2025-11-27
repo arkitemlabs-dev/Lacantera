@@ -17,9 +17,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { auth } from '@/lib/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { registerUserWithRole } from '@/app/actions/auth'; // ← NUEVO
+import { signIn } from 'next-auth/react';
 import { useAuth } from '@/app/providers';
 import { useToast } from '@/hooks/use-toast';
 
@@ -64,41 +62,53 @@ export default function RegistroProveedorPage() {
     setLoading(true);
 
     try {
-      // ← CAMBIO PRINCIPAL: Usar Server Action en lugar de createUserWithEmailAndPassword
-      const result = await registerUserWithRole({
-        email,
-        password,
-        displayName: contactName,
-        role: 'proveedor',
-        userType: 'Proveedor',
-        empresa: razonSocial,
-        rfc,
-        razonSocial,
+      // Llamar al API endpoint de registro
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          nombre: contactName,
+          rfc,
+          razonSocial,
+        }),
       });
 
-      if (!result.success) {
-        setError(result.message);
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error || "Ocurrió un error al registrar la cuenta.");
         setLoading(false);
         return;
       }
 
-      // Login automático después de registrar
-      await signInWithEmailAndPassword(auth, email, password);
-      
-      // Esperar 2 segundos para sincronización de custom claims
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Forzar refresh del token para obtener custom claims
-      await auth.currentUser?.getIdToken(true);
-
       toast({
         title: "¡Registro exitoso!",
-        description: "Tu cuenta de proveedor ha sido creada con éxito.",
+        description: result.message || "Tu cuenta está pendiente de aprobación.",
       });
+
+      // Login automático después de registrar
+      const signInResult = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (signInResult?.error) {
+        setError("Registro exitoso pero hubo un error al iniciar sesión. Por favor inicia sesión manualmente.");
+        setLoading(false);
+        setTimeout(() => {
+          router.push('/login');
+        }, 3000);
+        return;
+      }
 
       // Redirigir al dashboard de proveedor
       router.push('/proveedores/dashboard');
-      
+
     } catch (error: any) {
       console.error('Error en registro:', error);
       setError(error.message || "Ocurrió un error al registrar la cuenta.");

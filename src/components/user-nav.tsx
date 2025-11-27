@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { signOut } from 'firebase/auth';
+import { signOut as nextAuthSignOut } from 'next-auth/react';
 
 import { notifications } from '@/lib/data';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -39,7 +39,7 @@ import { es } from 'date-fns/locale';
 import { ThemeToggle } from './theme-toggle';
 import { useAuth } from '@/app/providers';
 import { useEmpresa } from '@/contexts/EmpresaContext';
-import { auth } from '@/lib/firebase';
+// import { auth } from '@/lib/firebase'; // Ya no se usa Firebase Auth
 
 const notificationIcons: Record<string, React.ReactNode> = {
   new_supplier: <UserPlus className="h-5 w-5 text-blue-500" />,
@@ -64,16 +64,15 @@ export function UserNav() {
     try {
       // Marcar que estamos haciendo logout
       setIsLoggingOut(true);
-      
+
       // Limpiar sessionStorage
       sessionStorage.removeItem('userRole');
-      sessionStorage.removeItem('firebaseRole');
       sessionStorage.removeItem('userType');
       sessionStorage.removeItem('empresaSeleccionada');
-      
-      // Hacer signOut de Firebase
-      await signOut(auth);
-      
+
+      // Hacer signOut usando NextAuth
+      await nextAuthSignOut({ redirect: false });
+
       // Redirigir a login
       router.push('/login');
     } catch (error) {

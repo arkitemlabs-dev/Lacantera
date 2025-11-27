@@ -1,18 +1,10 @@
 'use server';
 
-import { adminDb } from '@/lib/firebase-admin';
+import { database } from '@/lib/database';
 
 export async function getAllEmpresas() {
   try {
-    const snapshot = await adminDb
-      .collection('empresas')
-      .where('activa', '==', true)
-      .get();
-
-    const empresas = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    const empresas = await database.getEmpresas({ activa: true });
 
     return {
       success: true,

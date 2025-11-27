@@ -2,28 +2,23 @@
 
 import { useCallback } from 'react';
 import { useEmpresa } from '@/contexts/EmpresaContext';
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, QueryConstraint } from 'firebase/firestore';
+
+// TODO: Reescribir este hook para usar SQL Server en lugar de Firebase
+// Por ahora está deshabilitado para evitar errores de build
 
 export const useEmpresaData = () => {
   const { empresaSeleccionada } = useEmpresa();
 
   const obtenerDatos = useCallback(async (
-    collectionName: string, 
-    filtrosAdicionales: QueryConstraint[] = []
+    collectionName: string,
+    filtrosAdicionales: any[] = []
   ) => {
     if (!empresaSeleccionada) {
       throw new Error('No hay empresa seleccionada');
     }
 
-    const q = query(
-      collection(db, collectionName),
-      where('empresaId', '==', empresaSeleccionada.id),
-      ...filtrosAdicionales
-    );
-
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // TODO: Implementar con SQL Server
+    throw new Error('No implementado - migrar a SQL Server');
   }, [empresaSeleccionada]);
 
   const crearDocumento = useCallback(async (collectionName: string, data: any) => {
@@ -31,34 +26,22 @@ export const useEmpresaData = () => {
       throw new Error('No hay empresa seleccionada');
     }
 
-    const docData = {
-      ...data,
-      empresaId: empresaSeleccionada.id,
-      fechaCreacion: new Date().toISOString()
-    };
-
-    const docRef = await addDoc(collection(db, collectionName), docData);
-    return { id: docRef.id, ...docData };
+    // TODO: Implementar con SQL Server
+    throw new Error('No implementado - migrar a SQL Server');
   }, [empresaSeleccionada]);
 
   const actualizarDocumento = useCallback(async (
-    collectionName: string, 
-    docId: string, 
+    collectionName: string,
+    docId: string,
     data: any
   ) => {
-    const docRef = doc(db, collectionName, docId);
-    const updateData = {
-      ...data,
-      fechaActualizacion: new Date().toISOString()
-    };
-    
-    await updateDoc(docRef, updateData);
-    return updateData;
+    // TODO: Implementar con SQL Server
+    throw new Error('No implementado - migrar a SQL Server');
   }, []);
 
   const eliminarDocumento = useCallback(async (collectionName: string, docId: string) => {
-    const docRef = doc(db, collectionName, docId);
-    await deleteDoc(docRef);
+    // TODO: Implementar con SQL Server
+    throw new Error('No implementado - migrar a SQL Server');
   }, []);
 
   return {
