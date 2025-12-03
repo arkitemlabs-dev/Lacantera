@@ -62,6 +62,20 @@ export {
   type RecuperarPasswordEmailData,
 } from './notificacion';
 
+// Templates de documentos
+export {
+  getDocumentoAprobadoEmail,
+  getDocumentoRechazadoEmail,
+  getDocumentoVencidoEmail,
+  getDocumentoProximoVencerEmail,
+  getDocumentoSolicitadoEmail,
+  type DocumentoAprobadoEmailData,
+  type DocumentoRechazadoEmailData,
+  type DocumentoVencidoEmailData,
+  type DocumentoProximoVencerEmailData,
+  type DocumentoSolicitadoEmailData,
+} from './documento';
+
 // ==================== HELPERS ====================
 
 /**
@@ -98,6 +112,13 @@ export function getEmailTemplate(
     'notificacion:resumen': require('./notificacion').getResumenSemanalEmail,
     'auth:cambioPassword': require('./notificacion').getCambioPasswordEmail,
     'auth:recuperarPassword': require('./notificacion').getRecuperarPasswordEmail,
+
+    // Documentos
+    'documento:aprobado': require('./documento').getDocumentoAprobadoEmail,
+    'documento:rechazado': require('./documento').getDocumentoRechazadoEmail,
+    'documento:vencido': require('./documento').getDocumentoVencidoEmail,
+    'documento:proximoVencer': require('./documento').getDocumentoProximoVencerEmail,
+    'documento:solicitado': require('./documento').getDocumentoSolicitadoEmail,
   };
 
   const templateFn = templates[type];
