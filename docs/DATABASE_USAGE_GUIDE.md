@@ -1,12 +1,12 @@
-# 📚 GUÍA DE USO - BASE DE DATOS PORTAL PROVEEDORES
+#  GUÍA DE USO - BASE DE DATOS PORTAL PROVEEDORES
 
-## 🎯 Resumen
+##  Resumen
 
 Esta guía muestra cómo usar las funciones de base de datos del Portal de Proveedores La Cantera.
 
 ---
 
-## 📦 Archivos Principales
+##  Archivos Principales
 
 ### 1. Base de Datos
 - **`sqlserver-pnet.ts`** - Funciones originales (auth, empresas básicas)

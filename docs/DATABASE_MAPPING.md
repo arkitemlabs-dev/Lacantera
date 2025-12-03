@@ -2,7 +2,7 @@
 
 ## 📋 RESUMEN EJECUTIVO
 
-Este documento mapea la especificación de Claude con las **plantillas pNet** existentes en la base de datos PP, reutilizando al máximo las tablas del ERP y creando solo las necesarias.
+Este documento mapea la especificación de las tablas de la app con las **plantillas pNet** existentes en la base de datos PP, reutilizando al máximo las tablas del ERP y creando solo las necesarias.
 
 ---
 
