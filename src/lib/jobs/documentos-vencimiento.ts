@@ -1,7 +1,8 @@
 // src/lib/jobs/documentos-vencimiento.ts
 // Job para verificar y notificar sobre documentos vencidos
 
-import { sql } from '@/lib/database/sqlserver';
+import { getConnection } from '@/lib/sql-connection';
+import sql from 'mssql';
 import {
   sendDocumentoVencidoEmail,
   sendDocumentoProximoVencerEmail,
@@ -34,8 +35,9 @@ export async function verificarDocumentosVencidos() {
 
   try {
     // Buscar documentos que vencieron y aún están en estado PENDIENTE o APROBADO
-    const result = await sql`
-      SELECT
+    const pool = await getConnection();
+const result = await pool.request().query(`
+        SELECT
         d.DocumentoID as documentoID,
         d.Proveedor as proveedor,
         d.Usuario as usuario,
@@ -52,7 +54,7 @@ export async function verificarDocumentosVencidos() {
         AND d.FechaVencimiento < GETDATE()
         AND d.Estatus IN ('PENDIENTE', 'APROBADO')
       ORDER BY d.Proveedor, d.FechaVencimiento
-    `;
+    `);
 
     const documentos = result.recordset as DocumentoVencimiento[];
 
@@ -81,13 +83,9 @@ export async function verificarDocumentosVencidos() {
       try {
         // Actualizar estatus a VENCIDO
         for (const doc of docs) {
-          await sql`
-            UPDATE ProvDocumentos
-            SET
-              Estatus = 'VENCIDO',
-              UpdatedAt = GETDATE()
-            WHERE DocumentoID = ${doc.documentoID}
-          `;
+          await pool.request()
+  .input('documentoID', sql.VarChar, doc.documentoID)
+  .query(`UPDATE ProvDocumentos SET Estatus = 'VENCIDO', UpdatedAt = GETDATE() WHERE DocumentoID = @documentoID`);
         }
 
         // Crear notificación en el portal
@@ -151,7 +149,8 @@ export async function verificarDocumentosProximosVencer() {
 
   try {
     // Buscar documentos que vencerán en 7, 15 o 30 días
-    const result = await sql`
+    const pool = await getConnection();
+const result = await pool.request().query(`
       SELECT
         d.DocumentoID as documentoID,
         d.Proveedor as proveedor,
@@ -169,7 +168,8 @@ export async function verificarDocumentosProximosVencer() {
         AND d.Estatus = 'APROBADO'
         AND DATEDIFF(day, GETDATE(), d.FechaVencimiento) IN (7, 15, 30)
       ORDER BY d.Proveedor, d.FechaVencimiento
-    `;
+    `);
+;
 
     const documentos = result.recordset as DocumentoVencimiento[];
 
