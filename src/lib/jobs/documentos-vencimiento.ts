@@ -6,7 +6,8 @@ import {
   sendDocumentoVencidoEmail,
   sendDocumentoProximoVencerEmail,
 } from '@/lib/helpers/email';
-import { createNotificacionPortal } from '@/lib/database/sqlserver-extended';
+import { extendedDb } from '@/lib/database/sqlserver-extended';
+import { v4 as uuidv4 } from 'uuid';
 
 // ==================== TIPOS ====================
 
@@ -90,8 +91,9 @@ export async function verificarDocumentosVencidos() {
         }
 
         // Crear notificación en el portal
-        await createNotificacionPortal({
-          usuario: proveedor.usuario,
+        await extendedDb.createNotificacion({
+          notificacionID: uuidv4(),
+          idUsuario: 1, // TODO: Obtener IDUsuario real del proveedor
           usuarioNombre: proveedor.razonSocial || proveedor.usuario,
           empresa: proveedor.empresa,
           tipo: 'documento_vencido',
@@ -104,7 +106,9 @@ export async function verificarDocumentosVencidos() {
               fechaVencimiento: d.fechaVencimiento,
             })),
           }),
-          prioridad: 'urgente',
+          leida: false,
+          emailEnviado: false,
+          prioridad: 'critica',
         });
 
         // Enviar email si tiene configurado
@@ -196,13 +200,14 @@ export async function verificarDocumentosProximosVencer() {
 
       try {
         // Determinar prioridad según días restantes
-        let prioridad: 'baja' | 'normal' | 'alta' | 'urgente' = 'normal';
-        if (minDias <= 7) prioridad = 'urgente';
+        let prioridad: 'normal' | 'alta' | 'critica' = 'normal';
+        if (minDias <= 7) prioridad = 'critica';
         else if (minDias <= 15) prioridad = 'alta';
 
         // Crear notificación en el portal
-        await createNotificacionPortal({
-          usuario: proveedor.usuario,
+        await extendedDb.createNotificacion({
+          notificacionID: uuidv4(),
+          idUsuario: 1, // TODO: Obtener IDUsuario real del proveedor
           usuarioNombre: proveedor.razonSocial || proveedor.usuario,
           empresa: proveedor.empresa,
           tipo: 'documento_proximo_vencer',
@@ -216,6 +221,8 @@ export async function verificarDocumentosProximosVencer() {
               diasRestantes: d.diasRestantes,
             })),
           }),
+          leida: false,
+          emailEnviado: false,
           prioridad,
         });
 
