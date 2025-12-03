@@ -22,19 +22,24 @@ export interface EmailOptions {
 
 // ==================== CONFIGURACIÓN ====================
 
-const transporter = nodemailer.createTransporter({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: process.env.SMTP_SECURE === 'true', // true para 465, false para otros puertos
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
-  },
-  // Configuración adicional para Gmail
-  ...(process.env.SMTP_HOST === 'smtp.gmail.com' && {
-    service: 'gmail',
-  }),
-});
+/**
+ * Obtiene o crea el transporter de nodemailer
+ */
+function getTransporter() {
+  return nodemailer.createTransporter({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true', // true para 465, false para otros puertos
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASSWORD,
+    },
+    // Configuración adicional para Gmail
+    ...(process.env.SMTP_HOST === 'smtp.gmail.com' && {
+      service: 'gmail',
+    }),
+  });
+}
 
 // ==================== FUNCIONES ====================
 
@@ -76,6 +81,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     };
 
     // Enviar email
+    const transporter = getTransporter();
     const info = await transporter.sendMail(mailOptions);
 
     console.log('Email enviado:', {
@@ -96,6 +102,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
  */
 export async function verifyEmailConnection(): Promise<boolean> {
   try {
+    const transporter = getTransporter();
     await transporter.verify();
     console.log('Conexión SMTP verificada correctamente');
     return true;

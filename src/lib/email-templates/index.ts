@@ -136,12 +136,4 @@ export function getEmailTemplate(
 }
 
 // ==================== EXPORTAR DEFAULT ====================
-
-export default {
-  getBaseTemplate,
-  getButton,
-  getAlert,
-  getCard,
-  getDivider,
-  getEmailTemplate,
-};
+// No es necesario exportar default, todas las funciones están exportadas individualmente
