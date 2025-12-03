@@ -6,6 +6,7 @@ import {
   getProveedorDocumentos,
   updateDocumentoEstatus,
 } from '@/lib/database/sqlserver-extended';
+import { audit } from '@/lib/helpers/audit';
 
 // GET - Obtener documentos de un proveedor
 export async function GET(request: NextRequest) {
@@ -76,6 +77,18 @@ export async function POST(request: NextRequest) {
       archivoTipo: archivoTipo || 'application/pdf',
       archivoTamanio,
       fechaVencimiento,
+    });
+
+    // Registrar en auditoría
+    await audit({
+      usuario: session.user.name || 'DEMO',
+      usuarioNombre: session.user.email || 'Usuario',
+      empresa,
+      accion: 'CREATE',
+      tablaAfectada: 'ProvDocumentos',
+      registroID: documento.documentoID,
+      valoresNuevos: documento,
+      request,
     });
 
     return NextResponse.json({ documento }, { status: 201 });
