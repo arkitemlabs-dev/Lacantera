@@ -81,13 +81,14 @@ async function limpiarNotificacionesAntiguas() {
   console.log('[JOB] Limpiando notificaciones antiguas...');
 
   try {
-    const { sql } = await import('@/lib/database/sqlserver');
+    const { getConnection } = await import('@/lib/sql-connection');
+    const pool = await getConnection();
 
-    const result = await sql`
+    const result = await pool.request().query(`
       DELETE FROM NotificacionPortal
       WHERE Leida = 1
         AND CreatedAt < DATEADD(day, -30, GETDATE())
-    `;
+    `);
 
     console.log(
       `[JOB] ${result.rowsAffected[0]} notificaciones antiguas eliminadas`
@@ -104,14 +105,14 @@ async function limpiarAuditLogsAntiguos() {
   console.log('[JOB] Limpiando logs de auditoría antiguos...');
 
   try {
-    const { sql } = await import('@/lib/database/sqlserver');
+    const { getConnection } = await import('@/lib/sql-connection');
+    const pool = await getConnection();
 
-    // Mantener logs de acciones críticas (DELETE, REJECT) por más tiempo
-    const result = await sql`
+    const result = await pool.request().query(`
       DELETE FROM AuditLog
       WHERE CreatedAt < DATEADD(year, -1, GETDATE())
         AND Accion NOT IN ('DELETE', 'REJECT')
-    `;
+    `);
 
     console.log(`[JOB] ${result.rowsAffected[0]} logs de auditoría eliminados`);
   } catch (error) {

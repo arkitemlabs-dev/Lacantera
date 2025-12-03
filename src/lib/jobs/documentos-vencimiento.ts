@@ -169,7 +169,7 @@ const result = await pool.request().query(`
         AND DATEDIFF(day, GETDATE(), d.FechaVencimiento) IN (7, 15, 30)
       ORDER BY d.Proveedor, d.FechaVencimiento
     `);
-;
+
 
     const documentos = result.recordset as DocumentoVencimiento[];
 
