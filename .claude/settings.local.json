@@ -15,7 +15,12 @@
       "Bash(dir /s /b \"c:\\Users\\Viviana Diaz\\Documents\\Trabajo Arkitem\\CANTERA\\App web\\Lacantera\\src\\app\")",
       "Bash(findstr:*)",
       "Bash(powershell -Command:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(dir /s /b \"c:\\Users\\Viviana Diaz\\Documents\\Trabajo Arkitem\\CANTERA\\App web\\Lacantera\\src\")",
+      "Bash(dir:*)",
+      "Bash(cd:*)",
+      "Bash(npx tsc:*)",
+      "Bash(timeout /t 15)"
     ],
     "deny": [],
     "ask": []

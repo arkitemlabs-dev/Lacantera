@@ -47,7 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 
 import { useMensajeria } from '@/hooks/useMensajeria';
 import type { Conversacion, Mensaje, ArchivoMensaje } from '@/types/backend';
