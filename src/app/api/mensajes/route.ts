@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import {
-  createConversacion,
-  getConversacionesByEmpresa,
-  createMensaje,
-  getMensajesByConversacion,
-  marcarMensajeLeido,
-} from '@/lib/database/sqlserver-extended';
+import { extendedDb } from '@/lib/database/sqlserver-extended';
+import { v4 as uuidv4 } from 'uuid';
 
 // GET - Obtener conversaciones o mensajes
 export async function GET(request: NextRequest) {
@@ -30,12 +25,12 @@ export async function GET(request: NextRequest) {
 
     // Si hay conversacionID, obtener mensajes
     if (conversacionID) {
-      const mensajes = await getMensajesByConversacion(conversacionID);
+      const mensajes = await extendedDb.getMensajesByConversacion(conversacionID);
       return NextResponse.json({ mensajes });
     }
 
     // Si no, obtener conversaciones
-    const conversaciones = await getConversacionesByEmpresa(empresa);
+    const conversaciones = await extendedDb.getConversacionesByEmpresa(empresa);
     return NextResponse.json({ conversaciones });
   } catch (error) {
     console.error('Error al obtener datos:', error);
@@ -68,10 +63,12 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const conversacion = await createConversacion({
+      const conversacion = await extendedDb.createConversacion({
+        conversacionID: uuidv4(),
         empresa,
         participantesJSON,
         asunto,
+        activa: true,
       });
 
       return NextResponse.json({ conversacion }, { status: 201 });
@@ -104,16 +101,18 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const nuevoMensaje = await createMensaje({
+      const nuevoMensaje = await extendedDb.createMensaje({
+        mensajeID: uuidv4(),
         conversacionID,
-        remitenteID,
+        remitenteID: parseInt(remitenteID),
         remitenteNombre,
         remitenteRol,
-        destinatarioID,
+        destinatarioID: parseInt(destinatarioID),
         destinatarioNombre,
         mensaje,
         asunto,
         archivosJSON,
+        leido: false,
       });
 
       return NextResponse.json({ mensaje: nuevoMensaje }, { status: 201 });
@@ -147,7 +146,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    await marcarMensajeLeido(mensajeID);
+    await extendedDb.marcarMensajeLeido(mensajeID);
 
     return NextResponse.json({ success: true });
   } catch (error) {

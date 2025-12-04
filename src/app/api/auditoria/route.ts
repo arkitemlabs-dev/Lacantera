@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { createAuditLog, getAuditLogByTabla } from '@/lib/database/sqlserver-extended';
+import { extendedDb } from '@/lib/database/sqlserver-extended';
 
 // GET - Obtener logs de auditoría
 export async function GET(request: NextRequest) {
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const logs = await getAuditLogByTabla(tabla, registroID || undefined);
+    const logs = await extendedDb.getAuditLogByTabla(tabla, registroID || undefined);
 
     return NextResponse.json({ logs });
   } catch (error) {
@@ -66,8 +66,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const log = await createAuditLog({
-      usuario,
+    const log = await extendedDb.createAuditLog({
+      idUsuario: parseInt(usuario),
       usuarioNombre,
       empresa,
       accion,

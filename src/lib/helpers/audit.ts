@@ -1,4 +1,4 @@
-import { createAuditLog } from '@/lib/database/sqlserver-extended';
+import { extendedDb } from '@/lib/database/sqlserver-extended';
 import { NextRequest } from 'next/server';
 
 interface AuditParams {
@@ -41,8 +41,8 @@ export async function audit(params: AuditParams) {
       userAgent = request.headers.get('user-agent') || undefined;
     }
 
-    await createAuditLog({
-      usuario,
+    await extendedDb.createAuditLog({
+      idUsuario: 1, // TODO: Get real IDUsuario
       usuarioNombre,
       empresa,
       accion,

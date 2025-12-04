@@ -1,49 +1,12 @@
 // src/app/admin/setup-empresas/page.tsx
 'use client';
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle, Building2, Loader2 } from 'lucide-react';
-import { inicializarEmpresasDefault } from '@/app/actions/empresas';
-import { useToast } from '@/hooks/use-toast';
+import { Building2, Info } from 'lucide-react';
 
 export default function SetupEmpresasPage() {
-  const [loading, setLoading] = useState(false);
-  const [empresasCreadas, setEmpresasCreadas] = useState<number | null>(null);
-  const { toast } = useToast();
-
-  const handleInicializarEmpresas = async () => {
-    setLoading(true);
-    
-    try {
-      const result = await inicializarEmpresasDefault();
-      
-      if (result.success && result.data) {
-        setEmpresasCreadas(result.data.empresasCreadas || 0);
-        toast({
-          title: 'Éxito',
-          description: result.data.message,
-        });
-      } else {
-        toast({
-          title: 'Error',
-          description: result.error || 'Ocurrió un error desconocido.',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      console.error('Error inicializando empresas:', error);
-      toast({
-        title: 'Error',
-        description: 'Error al inicializar empresas',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -52,74 +15,37 @@ export default function SetupEmpresasPage() {
           <div className="mx-auto w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center mb-4">
             <Building2 className="w-6 h-6 text-white" />
           </div>
-          <CardTitle>Configuración Inicial</CardTitle>
+          <CardTitle>Gestión de Empresas</CardTitle>
           <p className="text-muted-foreground text-sm">
-            Configuración de empresas para el portal multiempresa
+            Portal multiempresa - La Cantera
           </p>
         </CardHeader>
-        
+
         <CardContent className="space-y-4">
-          {empresasCreadas !== null ? (
-            <Alert>
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>
-                {empresasCreadas > 0 
-                  ? `Se crearon ${empresasCreadas} empresas exitosamente.`
-                  : 'Las empresas ya estaban inicializadas.'
-                }
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <>
-              <div className="text-sm text-muted-foreground space-y-2">
-                <p>Este proceso creará las siguientes empresas:</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li><strong>La Cantera</strong> (Código: LC)</li>
-                  <li><strong>Subsidiaria 1</strong> (Código: SUB1)</li>
-                </ul>
-                <p className="text-xs">
-                  Si las empresas ya existen, no se crearán duplicados.
-                </p>
-              </div>
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Las empresas se gestionan directamente desde el sistema ERP (pNet).
+              No es necesario crear empresas desde este portal.
+            </AlertDescription>
+          </Alert>
 
-              <Button 
-                onClick={handleInicializarEmpresas}
-                disabled={loading}
-                className="w-full"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Inicializando...
-                  </>
-                ) : (
-                  'Inicializar Empresas'
-                )}
-              </Button>
-            </>
-          )}
+          <div className="text-sm text-muted-foreground space-y-2">
+            <p><strong>Configuración automática:</strong></p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>Las empresas provienen de la tabla <code>pNetEmpresa</code></li>
+              <li>Los usuarios se asignan a empresas mediante <code>pNetUsuarioEmpresa</code></li>
+              <li>Los proveedores se vinculan automáticamente</li>
+            </ul>
+          </div>
 
-          {empresasCreadas !== null && (
-            <div className="space-y-2">
-              <Button 
-                variant="outline" 
-                className="w-full" 
-                onClick={() => window.location.href = '/login'}
-              >
-                Ir al Login
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="w-full" 
-                onClick={() => {
-                  setEmpresasCreadas(null);
-                }}
-              >
-                Reinicializar
-              </Button>
-            </div>
-          )}
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => window.location.href = '/'}
+          >
+            Ir al Dashboard
+          </Button>
         </CardContent>
       </Card>
     </div>

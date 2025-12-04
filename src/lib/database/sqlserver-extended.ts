@@ -736,6 +736,131 @@ export class ExtendedDatabase {
         WHERE MensajeID = @mensajeID
       `);
   }
+
+  // ============================================================================
+  // AUDITORÍA
+  // ============================================================================
+
+  /**
+   * Crear registro de auditoría
+   */
+  async createAuditLog(data: {
+    idUsuario: number;
+    usuarioNombre: string;
+    empresa?: string;
+    accion: string;
+    tablaAfectada: string;
+    registroID: string;
+    valoresAnterioresJSON?: string;
+    valoresNuevosJSON?: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }): Promise<string> {
+    const pool = await getConnection();
+
+    const result = await pool
+      .request()
+      .input('idUsuario', sql.Int, data.idUsuario)
+      .input('usuarioNombre', sql.NVarChar(255), data.usuarioNombre)
+      .input('empresa', sql.VarChar(10), data.empresa)
+      .input('accion', sql.VarChar(100), data.accion)
+      .input('tablaAfectada', sql.VarChar(100), data.tablaAfectada)
+      .input('registroID', sql.VarChar(100), data.registroID)
+      .input('valoresAnterioresJSON', sql.NVarChar(sql.MAX), data.valoresAnterioresJSON)
+      .input('valoresNuevosJSON', sql.NVarChar(sql.MAX), data.valoresNuevosJSON)
+      .input('ipAddress', sql.VarChar(45), data.ipAddress)
+      .input('userAgent', sql.VarChar(500), data.userAgent)
+      .query(`
+        INSERT INTO pNetAuditLog (
+          IDUsuario, UsuarioNombre, Empresa, Accion, TablaAfectada,
+          RegistroID, ValoresAnterioresJSON, ValoresNuevosJSON,
+          IPAddress, UserAgent
+        )
+        OUTPUT INSERTED.ID
+        VALUES (
+          @idUsuario, @usuarioNombre, @empresa, @accion, @tablaAfectada,
+          @registroID, @valoresAnterioresJSON, @valoresNuevosJSON,
+          @ipAddress, @userAgent
+        )
+      `);
+
+    return result.recordset[0].ID;
+  }
+
+  /**
+   * Obtener logs de auditoría por tabla
+   */
+  async getAuditLogByTabla(tabla: string, registroID?: string, limit = 100): Promise<any[]> {
+    const pool = await getConnection();
+
+    const request = pool
+      .request()
+      .input('tabla', sql.VarChar(100), tabla)
+      .input('limit', sql.Int, limit);
+
+    let query = `
+      SELECT TOP (@limit)
+        ID as id,
+        IDUsuario as idUsuario,
+        UsuarioNombre as usuarioNombre,
+        Empresa as empresa,
+        Accion as accion,
+        TablaAfectada as tablaAfectada,
+        RegistroID as registroID,
+        ValoresAnterioresJSON as valoresAnterioresJSON,
+        ValoresNuevosJSON as valoresNuevosJSON,
+        IPAddress as ipAddress,
+        UserAgent as userAgent,
+        CreatedAt as createdAt
+      FROM pNetAuditLog
+      WHERE TablaAfectada = @tabla
+    `;
+
+    if (registroID) {
+      request.input('registroID', sql.VarChar(100), registroID);
+      query += ' AND RegistroID = @registroID';
+    }
+
+    query += ' ORDER BY CreatedAt DESC';
+
+    const result = await request.query(query);
+    return result.recordset;
+  }
+
+  // ============================================================================
+  // CATÁLOGOS
+  // ============================================================================
+
+  /**
+   * Obtener todas las categorías de proveedores
+   */
+  async getAllProveedorCategorias(): Promise<any[]> {
+    const pool = await getConnection();
+
+    const result = await pool
+      .request()
+      .query(`
+        SELECT
+          ID as id,
+          Codigo as codigo,
+          Nombre as nombre,
+          Descripcion as descripcion,
+          DocumentosRequeridosJSON as documentosRequeridosJSON,
+          Activo as activo
+        FROM ProvCategoria
+        WHERE Activo = 1
+        ORDER BY Nombre
+      `);
+
+    return result.recordset;
+  }
+
+  /**
+   * Obtener todos los tipos de documentos (alias para compatibilidad)
+   */
+  async getAllTiposDocumento(categoria?: string): Promise<TipoDocumento[]> {
+    return this.getTiposDocumento(true);
+  }
 }
 
 // Instancia singleton

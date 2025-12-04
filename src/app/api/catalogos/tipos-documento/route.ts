@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getAllTiposDocumento } from '@/lib/database/sqlserver-extended';
+import { extendedDb } from '@/lib/database/sqlserver-extended';
 
 // GET - Obtener todos los tipos de documento
 export async function GET(request: NextRequest) {
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const categoria = searchParams.get('categoria');
 
-    const tiposDocumento = await getAllTiposDocumento(categoria || undefined);
+    const tiposDocumento = await extendedDb.getAllTiposDocumento(categoria || undefined);
 
     return NextResponse.json({ tiposDocumento });
   } catch (error) {

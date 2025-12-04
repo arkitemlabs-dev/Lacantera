@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getAllProveedorCategorias } from '@/lib/database/sqlserver-extended';
+import { extendedDb } from '@/lib/database/sqlserver-extended';
 
 // GET - Obtener todas las categorías de proveedores
 export async function GET(request: NextRequest) {
@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const categorias = await getAllProveedorCategorias();
+    const categorias = await extendedDb.getAllProveedorCategorias();
 
     return NextResponse.json({ categorias });
   } catch (error) {

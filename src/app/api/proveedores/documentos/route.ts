@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import {
-  createProveedorDocumento,
-  getProveedorDocumentos,
-  updateDocumentoEstatus,
-} from '@/lib/database/sqlserver-extended';
+import { extendedDb } from '@/lib/database/sqlserver-extended';
 import { audit } from '@/lib/helpers/audit';
+import { v4 as uuidv4 } from 'uuid';
 
 // GET - Obtener documentos de un proveedor
 export async function GET(request: NextRequest) {
@@ -27,7 +24,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const documentos = await getProveedorDocumentos(proveedor, empresa);
+    const documentos = await extendedDb.getProveedorDocumentos(proveedor, empresa);
 
     return NextResponse.json({ documentos });
   } catch (error) {
@@ -67,7 +64,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const documento = await createProveedorDocumento({
+    const documento = await extendedDb.createProveedorDocumento({
+      documentoID: uuidv4(),
       proveedor,
       usuario: session.user.name || 'DEMO', // Usuario de la sesión
       empresa,
@@ -77,6 +75,7 @@ export async function POST(request: NextRequest) {
       archivoTipo: archivoTipo || 'application/pdf',
       archivoTamanio,
       fechaVencimiento,
+      estatus: 'PENDIENTE',
     });
 
     // Registrar en auditoría
@@ -119,7 +118,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    await updateDocumentoEstatus(
+    await extendedDb.updateDocumentoEstatus(
       documentoID,
       estatus,
       session.user.name || 'DEMO',

@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import {
-  getNotificacionesByUsuario,
-  marcarNotificacionLeida,
-  createNotificacion,
-} from '@/lib/database/sqlserver-extended';
+import { extendedDb } from '@/lib/database/sqlserver-extended';
+import { v4 as uuidv4 } from 'uuid';
 
 // GET - Obtener notificaciones del usuario
 export async function GET(request: NextRequest) {
@@ -26,13 +23,21 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const notificaciones = await getNotificacionesByUsuario(
-      session.user.name || 'DEMO',
-      empresa,
-      soloNoLeidas
+    // Obtener IDUsuario desde session o desde la base de datos
+    // TODO: Mejorar para obtener IDUsuario real desde pNetUsuario
+    const idUsuario = parseInt(session.user.id || '1');
+
+    const notificaciones = await extendedDb.getNotificacionesUsuario(
+      idUsuario,
+      empresa
     );
 
-    return NextResponse.json({ notificaciones });
+    // Filtrar solo no leídas si se solicita
+    const resultado = soloNoLeidas
+      ? notificaciones.filter(n => !n.leida)
+      : notificaciones;
+
+    return NextResponse.json({ notificaciones: resultado });
   } catch (error) {
     console.error('Error al obtener notificaciones:', error);
     return NextResponse.json(
@@ -71,8 +76,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const notificacion = await createNotificacion({
-      usuario,
+    const notificacionID = await extendedDb.createNotificacion({
+      notificacionID: uuidv4(),
+      idUsuario: parseInt(usuario),
       usuarioNombre,
       empresa,
       tipo,
@@ -80,10 +86,12 @@ export async function POST(request: NextRequest) {
       mensaje,
       link,
       datosJSON,
+      leida: false,
+      emailEnviado: false,
       prioridad: prioridad || 'normal',
     });
 
-    return NextResponse.json({ notificacion }, { status: 201 });
+    return NextResponse.json({ notificacionID, success: true }, { status: 201 });
   } catch (error) {
     console.error('Error al crear notificación:', error);
     return NextResponse.json(
@@ -111,7 +119,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    await marcarNotificacionLeida(notificacionID);
+    await extendedDb.marcarNotificacionLeida(notificacionID);
 
     return NextResponse.json({ success: true });
   } catch (error) {
