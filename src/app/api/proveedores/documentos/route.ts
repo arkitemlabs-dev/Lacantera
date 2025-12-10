@@ -1,53 +1,114 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { withTenantContext } from '@/middleware/tenant';
 import { extendedDb } from '@/lib/database/sqlserver-extended';
 import { audit } from '@/lib/helpers/audit';
 import { v4 as uuidv4 } from 'uuid';
 
-// GET - Obtener documentos de un proveedor
-export async function GET(request: NextRequest) {
+/**
+ * GET /api/proveedores/documentos
+ * Obtener documentos del proveedor para la empresa actual
+ *
+ * Query params:
+ * - proveedor: string (opcional - si no se proporciona, usa el del tenant)
+ */
+export const GET = withTenantContext(async (request, { tenant, user }) => {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
     const searchParams = request.nextUrl.searchParams;
-    const proveedor = searchParams.get('proveedor');
-    const empresa = searchParams.get('empresa');
 
-    if (!proveedor || !empresa) {
+    // Usar el proveedor del query param o el del tenant
+    const proveedorParam = searchParams.get('proveedor');
+    const proveedor = proveedorParam || tenant.proveedorCodigo;
+
+    if (!proveedor) {
       return NextResponse.json(
-        { error: 'Proveedor y empresa son requeridos' },
+        {
+          success: false,
+          error: 'Usuario no está mapeado a un proveedor'
+        },
         { status: 400 }
       );
     }
 
-    const documentos = await extendedDb.getProveedorDocumentos(proveedor, empresa);
+    // Validar que si se proporciona un proveedor diferente, el usuario tenga permisos
+    if (proveedorParam && proveedorParam !== tenant.proveedorCodigo && user.role !== 'admin') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'No tiene permisos para ver documentos de otro proveedor'
+        },
+        { status: 403 }
+      );
+    }
 
-    return NextResponse.json({ documentos });
-  } catch (error) {
-    console.error('Error al obtener documentos:', error);
+    // Obtener documentos filtrados por proveedor y empresa actual
+    const documentos = await extendedDb.getProveedorDocumentos(
+      proveedor,
+      tenant.empresaCodigo
+    );
+
+    return NextResponse.json({
+      success: true,
+      documentos,
+      total: documentos.length,
+      tenant: {
+        empresa: tenant.tenantName,
+        codigo: tenant.empresaCodigo,
+        proveedor
+      }
+    });
+  } catch (error: any) {
+    console.error('[API] Error al obtener documentos:', error);
     return NextResponse.json(
-      { error: 'Error al obtener documentos' },
+      {
+        success: false,
+        error: 'Error al obtener documentos',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
       { status: 500 }
     );
   }
-}
+});
 
-// POST - Subir un nuevo documento
-export async function POST(request: NextRequest) {
+/**
+ * POST /api/proveedores/documentos
+ * Subir un nuevo documento para la empresa actual
+ *
+ * Body:
+ * {
+ *   tipoDocumento: string,
+ *   nombreArchivo: string,
+ *   archivoURL: string,
+ *   archivoTipo?: string,
+ *   archivoTamanio?: number,
+ *   fechaVencimiento?: Date
+ * }
+ */
+export const POST = withTenantContext(async (request, { tenant, user }) => {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    // Validar que sea proveedor o admin
+    if (user.role !== 'proveedor' && user.role !== 'admin') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Solo proveedores pueden subir documentos'
+        },
+        { status: 403 }
+      );
+    }
+
+    // Validar que tenga proveedor asignado
+    if (!tenant.proveedorCodigo) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Usuario no está mapeado a un proveedor'
+        },
+        { status: 400 }
+      );
     }
 
     const body = await request.json();
     const {
-      proveedor,
-      empresa,
       tipoDocumento,
       nombreArchivo,
       archivoURL,
@@ -57,18 +118,22 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validaciones
-    if (!proveedor || !empresa || !tipoDocumento || !nombreArchivo || !archivoURL) {
+    if (!tipoDocumento || !nombreArchivo || !archivoURL) {
       return NextResponse.json(
-        { error: 'Datos incompletos' },
+        {
+          success: false,
+          error: 'Datos incompletos. Se requiere: tipoDocumento, nombreArchivo, archivoURL'
+        },
         { status: 400 }
       );
     }
 
+    // Crear documento asociado a la empresa y proveedor actual
     const documento = await extendedDb.createProveedorDocumento({
       documentoID: uuidv4(),
-      proveedor,
-      usuario: session.user.name || 'DEMO', // Usuario de la sesión
-      empresa,
+      proveedor: tenant.proveedorCodigo,
+      usuario: user.name || user.email || 'Usuario',
+      empresa: tenant.empresaCodigo, // Asociar a la empresa actual del tenant
       tipoDocumento,
       nombreArchivo,
       archivoURL,
@@ -80,9 +145,9 @@ export async function POST(request: NextRequest) {
 
     // Registrar en auditoría
     await audit({
-      usuario: session.user.name || 'DEMO',
-      usuarioNombre: session.user.email || 'Usuario',
-      empresa,
+      usuario: user.id,
+      usuarioNombre: user.email || 'Usuario',
+      empresa: tenant.empresaCodigo,
       accion: 'CREATE',
       tablaAfectada: 'ProvDocumentos',
       registroID: documento.documentoID,
@@ -90,48 +155,91 @@ export async function POST(request: NextRequest) {
       request,
     });
 
-    return NextResponse.json({ documento }, { status: 201 });
-  } catch (error) {
-    console.error('Error al crear documento:', error);
+    return NextResponse.json({
+      success: true,
+      documento,
+      message: 'Documento creado exitosamente',
+      tenant: {
+        empresa: tenant.tenantName,
+        codigo: tenant.empresaCodigo,
+        proveedor: tenant.proveedorCodigo
+      }
+    }, { status: 201 });
+  } catch (error: any) {
+    console.error('[API] Error al crear documento:', error);
     return NextResponse.json(
-      { error: 'Error al crear documento' },
+      {
+        success: false,
+        error: 'Error al crear documento',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
       { status: 500 }
     );
   }
-}
+});
 
-// PATCH - Actualizar estatus de un documento
-export async function PATCH(request: NextRequest) {
+/**
+ * PATCH /api/proveedores/documentos
+ * Actualizar estatus de un documento
+ *
+ * Body:
+ * {
+ *   documentoID: string,
+ *   estatus: string,
+ *   comentarios?: string
+ * }
+ */
+export const PATCH = withTenantContext(async (request, { tenant, user }) => {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
     const body = await request.json();
     const { documentoID, estatus, comentarios } = body;
 
     if (!documentoID || !estatus) {
       return NextResponse.json(
-        { error: 'documentoID y estatus son requeridos' },
+        {
+          success: false,
+          error: 'documentoID y estatus son requeridos'
+        },
         { status: 400 }
       );
     }
 
+    // TODO: Validar que el documento pertenezca a la empresa actual del tenant
+    // antes de actualizarlo
+
     await extendedDb.updateDocumentoEstatus(
       documentoID,
       estatus,
-      session.user.name || 'DEMO',
-      session.user.email || 'Usuario',
+      user.id,
+      user.email || 'Usuario',
       comentarios
     );
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error al actualizar documento:', error);
+    // Registrar en auditoría
+    await audit({
+      usuario: user.id,
+      usuarioNombre: user.email || 'Usuario',
+      empresa: tenant.empresaCodigo,
+      accion: 'UPDATE',
+      tablaAfectada: 'ProvDocumentos',
+      registroID: documentoID,
+      valoresNuevos: { estatus, comentarios },
+      request,
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Documento actualizado exitosamente'
+    });
+  } catch (error: any) {
+    console.error('[API] Error al actualizar documento:', error);
     return NextResponse.json(
-      { error: 'Error al actualizar documento' },
+      {
+        success: false,
+        error: 'Error al actualizar documento',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
       { status: 500 }
     );
   }
-}
+});

@@ -1,79 +1,123 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { withTenantContext } from '@/middleware/tenant';
 import { extendedDb } from '@/lib/database/sqlserver-extended';
 import { v4 as uuidv4 } from 'uuid';
 
-// GET - Obtener conversaciones o mensajes
-export async function GET(request: NextRequest) {
+/**
+ * GET /api/mensajes
+ * Obtener conversaciones o mensajes de la empresa actual
+ *
+ * Query params:
+ * - conversacionID: string (opcional - si se proporciona, devuelve mensajes de esa conversación)
+ */
+export const GET = withTenantContext(async (request, { tenant, user }) => {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
     const searchParams = request.nextUrl.searchParams;
-    const empresa = searchParams.get('empresa');
     const conversacionID = searchParams.get('conversacionID');
 
-    if (!empresa) {
-      return NextResponse.json(
-        { error: 'Empresa es requerida' },
-        { status: 400 }
-      );
-    }
-
-    // Si hay conversacionID, obtener mensajes
+    // Si hay conversacionID, obtener mensajes de esa conversación
     if (conversacionID) {
       const mensajes = await extendedDb.getMensajesByConversacion(conversacionID);
-      return NextResponse.json({ mensajes });
+
+      return NextResponse.json({
+        success: true,
+        mensajes,
+        total: mensajes.length,
+        conversacionID
+      });
     }
 
-    // Si no, obtener conversaciones
-    const conversaciones = await extendedDb.getConversacionesByEmpresa(empresa);
-    return NextResponse.json({ conversaciones });
-  } catch (error) {
-    console.error('Error al obtener datos:', error);
+    // Si no, obtener todas las conversaciones de la empresa actual
+    const conversaciones = await extendedDb.getConversacionesByEmpresa(
+      tenant.empresaCodigo
+    );
+
+    return NextResponse.json({
+      success: true,
+      conversaciones,
+      total: conversaciones.length,
+      tenant: {
+        empresa: tenant.tenantName,
+        codigo: tenant.empresaCodigo
+      }
+    });
+  } catch (error: any) {
+    console.error('[API] Error al obtener datos de mensajería:', error);
     return NextResponse.json(
-      { error: 'Error al obtener datos' },
+      {
+        success: false,
+        error: 'Error al obtener datos',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
       { status: 500 }
     );
   }
-}
+});
 
-// POST - Crear conversación o mensaje
-export async function POST(request: NextRequest) {
+/**
+ * POST /api/mensajes
+ * Crear conversación o mensaje en la empresa actual
+ *
+ * Body para conversación:
+ * {
+ *   tipo: "conversacion",
+ *   participantesJSON: array,
+ *   asunto: string
+ * }
+ *
+ * Body para mensaje:
+ * {
+ *   tipo: "mensaje",
+ *   conversacionID: string,
+ *   remitenteID: number,
+ *   remitenteNombre: string,
+ *   remitenteRol: string,
+ *   destinatarioID: number,
+ *   destinatarioNombre: string,
+ *   mensaje: string,
+ *   asunto?: string,
+ *   archivosJSON?: array
+ * }
+ */
+export const POST = withTenantContext(async (request, { tenant, user }) => {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
     const body = await request.json();
     const { tipo, ...data } = body;
 
     if (tipo === 'conversacion') {
-      // Crear nueva conversación
-      const { empresa, participantesJSON, asunto } = data;
+      // Crear nueva conversación en la empresa actual
+      const { participantesJSON, asunto } = data;
 
-      if (!empresa || !participantesJSON || !asunto) {
+      if (!participantesJSON || !asunto) {
         return NextResponse.json(
-          { error: 'Datos incompletos para conversación' },
+          {
+            success: false,
+            error: 'Datos incompletos. Se requiere: participantesJSON, asunto'
+          },
           { status: 400 }
         );
       }
 
       const conversacion = await extendedDb.createConversacion({
         conversacionID: uuidv4(),
-        empresa,
+        empresa: tenant.empresaCodigo, // Asociar a la empresa actual del tenant
         participantesJSON,
         asunto,
         activa: true,
       });
 
-      return NextResponse.json({ conversacion }, { status: 201 });
+      return NextResponse.json({
+        success: true,
+        conversacion,
+        message: 'Conversación creada exitosamente',
+        tenant: {
+          empresa: tenant.tenantName,
+          codigo: tenant.empresaCodigo
+        }
+      }, { status: 201 });
+
     } else if (tipo === 'mensaje') {
-      // Crear nuevo mensaje
+      // Crear nuevo mensaje en una conversación existente
       const {
         conversacionID,
         remitenteID,
@@ -86,6 +130,7 @@ export async function POST(request: NextRequest) {
         archivosJSON,
       } = data;
 
+      // Validar datos requeridos
       if (
         !conversacionID ||
         !remitenteID ||
@@ -96,10 +141,16 @@ export async function POST(request: NextRequest) {
         !mensaje
       ) {
         return NextResponse.json(
-          { error: 'Datos incompletos para mensaje' },
+          {
+            success: false,
+            error: 'Datos incompletos. Se requiere: conversacionID, remitenteID, remitenteNombre, remitenteRol, destinatarioID, destinatarioNombre, mensaje'
+          },
           { status: 400 }
         );
       }
+
+      // TODO: Validar que la conversación pertenezca a la empresa actual del tenant
+      // antes de crear el mensaje
 
       const nuevoMensaje = await extendedDb.createMensaje({
         mensajeID: uuidv4(),
@@ -115,45 +166,75 @@ export async function POST(request: NextRequest) {
         leido: false,
       });
 
-      return NextResponse.json({ mensaje: nuevoMensaje }, { status: 201 });
+      return NextResponse.json({
+        success: true,
+        mensaje: nuevoMensaje,
+        message: 'Mensaje enviado exitosamente'
+      }, { status: 201 });
+
     } else {
       return NextResponse.json(
-        { error: 'Tipo inválido. Use "conversacion" o "mensaje"' },
+        {
+          success: false,
+          error: 'Tipo inválido. Use "conversacion" o "mensaje"'
+        },
         { status: 400 }
       );
     }
-  } catch (error) {
-    console.error('Error al crear:', error);
-    return NextResponse.json({ error: 'Error al crear' }, { status: 500 });
+  } catch (error: any) {
+    console.error('[API] Error al crear:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Error al crear',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
+      { status: 500 }
+    );
   }
-}
+});
 
-// PATCH - Marcar mensaje como leído
-export async function PATCH(request: NextRequest) {
+/**
+ * PATCH /api/mensajes
+ * Marcar mensaje como leído
+ *
+ * Body:
+ * {
+ *   mensajeID: string
+ * }
+ */
+export const PATCH = withTenantContext(async (request, { tenant, user }) => {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
     const body = await request.json();
     const { mensajeID } = body;
 
     if (!mensajeID) {
       return NextResponse.json(
-        { error: 'mensajeID es requerido' },
+        {
+          success: false,
+          error: 'mensajeID es requerido'
+        },
         { status: 400 }
       );
     }
 
+    // TODO: Validar que el mensaje pertenezca al usuario actual
+    // antes de marcarlo como leído
     await extendedDb.marcarMensajeLeido(mensajeID);
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error al marcar mensaje:', error);
+    return NextResponse.json({
+      success: true,
+      message: 'Mensaje marcado como leído'
+    });
+  } catch (error: any) {
+    console.error('[API] Error al marcar mensaje:', error);
     return NextResponse.json(
-      { error: 'Error al marcar mensaje' },
+      {
+        success: false,
+        error: 'Error al marcar mensaje',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
       { status: 500 }
     );
   }
-}
+});
