@@ -20,7 +20,10 @@
       "Bash(dir:*)",
       "Bash(cd:*)",
       "Bash(npx tsc:*)",
-      "Bash(timeout /t 15)"
+      "Bash(timeout /t 15)",
+      "Bash(timeout:*)",
+      "Bash(netstat:*)",
+      "Bash(tasklist:*)"
     ],
     "deny": [],
     "ask": []

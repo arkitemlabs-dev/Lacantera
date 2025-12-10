@@ -1,5 +1,6 @@
 // src/lib/database/sqlserver-extended.ts
 // Funciones extendidas para las nuevas tablas del portal
+// Actualizado: 2025-12-10 - Corregidas columnas Usuario, RemitenteID, DestinatarioID
 
 import sql from 'mssql';
 import { getConnection } from '@/lib/sql-connection';
@@ -606,10 +607,10 @@ export class ExtendedDatabase {
         .request()
         .input('mensajeID', sql.VarChar(100), data.mensajeID)
         .input('conversacionID', sql.UniqueIdentifier, data.conversacionID)
-        .input('remitenteID', sql.Int, data.remitenteID)
+        .input('remitenteID', sql.VarChar(10), String(data.remitenteID))
         .input('remitenteNombre', sql.NVarChar(255), data.remitenteNombre)
         .input('remitenteRol', sql.VarChar(50), data.remitenteRol)
-        .input('destinatarioID', sql.Int, data.destinatarioID)
+        .input('destinatarioID', sql.VarChar(10), String(data.destinatarioID))
         .input('destinatarioNombre', sql.NVarChar(255), data.destinatarioNombre)
         .input('mensaje', sql.NVarChar(sql.MAX), data.mensaje)
         .input('asunto', sql.NVarChar(500), data.asunto)
@@ -631,7 +632,7 @@ export class ExtendedDatabase {
         .request()
         .input('conversacionID', sql.UniqueIdentifier, data.conversacionID)
         .input('ultimoMensaje', sql.NVarChar(1000), data.mensaje.substring(0, 1000))
-        .input('remitenteID', sql.Int, data.remitenteID)
+        .input('remitenteID', sql.VarChar(10), String(data.remitenteID))
         .input('remitenteNombre', sql.NVarChar(255), data.remitenteNombre)
         .query(`
           UPDATE pNetConversaciones

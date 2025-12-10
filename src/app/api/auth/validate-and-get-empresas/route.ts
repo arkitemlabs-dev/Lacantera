@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserTenants } from '@/lib/database/hybrid-queries';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import sql from 'mssql';
 import { getConnection } from '@/lib/sql-connection';
 
