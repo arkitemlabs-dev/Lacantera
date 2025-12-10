@@ -2,13 +2,14 @@ import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcrypt';
 import sql from 'mssql';
+import { getUserTenants } from '@/lib/database/hybrid-queries';
 
-// Configuración de conexión a SQL Server
+// Configuración de conexión a SQL Server (Portal PP)
 const sqlConfig: sql.config = {
   user: process.env.MSSQL_USER!,
   password: process.env.MSSQL_PASSWORD!,
   server: process.env.MSSQL_SERVER!,
-  database: process.env.MSSQL_DATABASE!,
+  database: 'PP', // BD del Portal
   options: {
     encrypt: process.env.MSSQL_ENCRYPT === 'true',
     trustServerCertificate: process.env.MSSQL_TRUST_CERT === 'true',
@@ -129,14 +130,53 @@ export const authOptions: NextAuthOptions = {
   ],
 
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
+      // Login inicial: cargar datos del usuario
       if (user) {
         token.id = user.id;
         token.role = user.role;
         token.userType = user.userType;
         token.empresa = user.empresa;
         token.proveedor = user.proveedor;
+
+        // 🔥 MULTI-TENANT: Obtener empresas disponibles
+        try {
+          const tenants = await getUserTenants(user.id);
+
+          if (tenants.length === 0) {
+            console.warn(`[AUTH] Usuario ${user.id} sin empresas asignadas`);
+            token.empresasDisponibles = [];
+            token.empresaActual = undefined;
+          } else {
+            token.empresasDisponibles = tenants;
+            // Por defecto, seleccionar la primera empresa
+            token.empresaActual = tenants[0].tenantId;
+
+            console.log(`[AUTH] Usuario ${user.id} tiene acceso a ${tenants.length} empresa(s)`);
+          }
+        } catch (error) {
+          console.error('[AUTH] Error obteniendo empresas:', error);
+          token.empresasDisponibles = [];
+          token.empresaActual = undefined;
+        }
       }
+
+      // 🔥 CAMBIO DE EMPRESA: Actualizar empresa actual
+      if (trigger === 'update' && session?.empresaActual) {
+        // Validar que el usuario tiene acceso a la empresa
+        const empresasDisponibles = token.empresasDisponibles as any[] || [];
+        const hasAccess = empresasDisponibles.some(
+          (e: any) => e.tenantId === session.empresaActual
+        );
+
+        if (hasAccess) {
+          token.empresaActual = session.empresaActual;
+          console.log(`[AUTH] Empresa cambiada a: ${session.empresaActual}`);
+        } else {
+          console.warn(`[AUTH] Intento de acceso no autorizado a empresa: ${session.empresaActual}`);
+        }
+      }
+
       return token;
     },
 
@@ -147,6 +187,10 @@ export const authOptions: NextAuthOptions = {
         session.user.userType = token.userType as string;
         session.user.empresa = token.empresa as string;
         session.user.proveedor = token.proveedor as string;
+
+        // 🔥 MULTI-TENANT: Agregar empresas al session
+        session.user.empresaActual = token.empresaActual as string | undefined;
+        session.user.empresasDisponibles = token.empresasDisponibles as any;
       }
       return session;
     },

@@ -7,6 +7,16 @@ declare module 'next-auth' {
     name: string;
     role: string;
     userType: string;
+    empresa?: string;
+    proveedor?: string;
+    // Multi-tenant
+    empresaActual?: string;
+    empresasDisponibles?: Array<{
+      tenantId: string;
+      tenantName: string;
+      empresaCodigo: string;
+      proveedorCodigo: string;
+    }>;
   }
 
   interface Session {
@@ -16,6 +26,16 @@ declare module 'next-auth' {
       name: string;
       role: string;
       userType: string;
+      empresa?: string;
+      proveedor?: string;
+      // Multi-tenant
+      empresaActual?: string;
+      empresasDisponibles?: Array<{
+        tenantId: string;
+        tenantName: string;
+        empresaCodigo: string;
+        proveedorCodigo: string;
+      }>;
     };
   }
 }
@@ -25,5 +45,15 @@ declare module 'next-auth/jwt' {
     id: string;
     role: string;
     userType: string;
+    empresa?: string;
+    proveedor?: string;
+    // Multi-tenant
+    empresaActual?: string;
+    empresasDisponibles?: Array<{
+      tenantId: string;
+      tenantName: string;
+      empresaCodigo: string;
+      proveedorCodigo: string;
+    }>;
   }
 }
