@@ -462,7 +462,7 @@ export class ExtendedDatabase {
     const result = await pool
       .request()
       .input('notificacionID', sql.VarChar(100), data.notificacionID)
-      .input('idUsuario', sql.Int, data.idUsuario)
+      .input('usuario', sql.VarChar(10), String(data.idUsuario))
       .input('usuarioNombre', sql.NVarChar(255), data.usuarioNombre)
       .input('empresa', sql.VarChar(10), data.empresa)
       .input('tipo', sql.VarChar(50), data.tipo)
@@ -473,12 +473,12 @@ export class ExtendedDatabase {
       .input('prioridad', sql.VarChar(20), data.prioridad)
       .query(`
         INSERT INTO pNetNotificaciones (
-          NotificacionID, IDUsuario, UsuarioNombre, Empresa, Tipo,
+          NotificacionID, Usuario, UsuarioNombre, Empresa, Tipo,
           Titulo, Mensaje, Link, DatosJSON, Prioridad
         )
         OUTPUT INSERTED.ID
         VALUES (
-          @notificacionID, @idUsuario, @usuarioNombre, @empresa, @tipo,
+          @notificacionID, @usuario, @usuarioNombre, @empresa, @tipo,
           @titulo, @mensaje, @link, @datosJSON, @prioridad
         )
       `);
@@ -498,14 +498,14 @@ export class ExtendedDatabase {
 
     const result = await pool
       .request()
-      .input('idUsuario', sql.Int, idUsuario)
+      .input('usuario', sql.VarChar(10), String(idUsuario))
       .input('empresa', sql.VarChar(10), empresa)
       .input('limit', sql.Int, limit)
       .query(`
         SELECT TOP (@limit)
           ID as id,
           NotificacionID as notificacionID,
-          IDUsuario as idUsuario,
+          Usuario as idUsuario,
           UsuarioNombre as usuarioNombre,
           Empresa as empresa,
           Tipo as tipo,
@@ -520,7 +520,7 @@ export class ExtendedDatabase {
           Prioridad as prioridad,
           CreatedAt as createdAt
         FROM pNetNotificaciones
-        WHERE IDUsuario = @idUsuario AND Empresa = @empresa
+        WHERE Usuario = @usuario AND Empresa = @empresa
         ORDER BY Prioridad DESC, CreatedAt DESC
       `);
 
@@ -551,12 +551,12 @@ export class ExtendedDatabase {
 
     const result = await pool
       .request()
-      .input('idUsuario', sql.Int, idUsuario)
+      .input('usuario', sql.VarChar(10), String(idUsuario))
       .input('empresa', sql.VarChar(10), empresa)
       .query(`
         SELECT COUNT(*) as count
         FROM pNetNotificaciones
-        WHERE IDUsuario = @idUsuario AND Empresa = @empresa AND Leida = 0
+        WHERE Usuario = @usuario AND Empresa = @empresa AND Leida = 0
       `);
 
     return result.recordset[0].count;

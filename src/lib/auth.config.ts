@@ -120,6 +120,7 @@ export const authOptions: NextAuthOptions = {
             userType: user.TipoUsuario,
             empresa: user.Empresa,
             proveedor: user.Usuario, // La clave del proveedor
+            empresaId: credentials.empresaId, // 🔥 NUEVO: Empresa seleccionada en login
           };
         } catch (error: any) {
           console.error('Error en authorize:', error);
@@ -149,8 +150,22 @@ export const authOptions: NextAuthOptions = {
             token.empresaActual = undefined;
           } else {
             token.empresasDisponibles = tenants;
-            // Por defecto, seleccionar la primera empresa
-            token.empresaActual = tenants[0].tenantId;
+
+            // 🔥 NUEVO: Si viene empresaId desde el login, usarlo
+            // De lo contrario, seleccionar la primera empresa
+            if (user.empresaId) {
+              const hasAccess = tenants.some(t => t.tenantId === user.empresaId);
+              if (hasAccess) {
+                token.empresaActual = user.empresaId;
+                console.log(`[AUTH] Usuario ${user.id} seleccionó empresa: ${user.empresaId}`);
+              } else {
+                console.warn(`[AUTH] Usuario ${user.id} intentó seleccionar empresa sin acceso: ${user.empresaId}`);
+                token.empresaActual = tenants[0].tenantId;
+              }
+            } else {
+              // Por defecto, seleccionar la primera empresa
+              token.empresaActual = tenants[0].tenantId;
+            }
 
             console.log(`[AUTH] Usuario ${user.id} tiene acceso a ${tenants.length} empresa(s)`);
           }
