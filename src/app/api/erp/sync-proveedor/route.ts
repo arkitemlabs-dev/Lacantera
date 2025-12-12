@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     const portalUserId = userId || session.user.id;
-    const empresas = ['la-cantera', 'peralillo', 'plaza-galerena'];
+    const empresas = ['la-cantera', 'peralillo', 'plaza-galerena', 'inmobiliaria-galerena', 'icrear'];
     const syncResults: Record<string, any> = {};
     const portalPool = await getPortalConnection();
 

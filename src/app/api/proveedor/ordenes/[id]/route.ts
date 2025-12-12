@@ -149,7 +149,9 @@ export async function GET(
         Empresa: empresa,
         EmpresaNombre: empresa === 'la-cantera' ? 'La Cantera' :
                        empresa === 'peralillo' ? 'Peralillo' :
-                       empresa === 'plaza-galerena' ? 'Plaza Galereña' : empresa,
+                       empresa === 'plaza-galerena' ? 'Plaza Galereña' :
+                       empresa === 'inmobiliaria-galerena' ? 'Inmobiliaria Galereña' :
+                       empresa === 'icrear' ? 'Icrear' : empresa,
       },
       detalle: detalleResult.recordset,
       proveedor,

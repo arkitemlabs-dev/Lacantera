@@ -116,7 +116,9 @@ export async function GET(request: NextRequest) {
           Empresa: empresa_code,
           EmpresaNombre: empresa_code === 'la-cantera' ? 'La Cantera' :
                          empresa_code === 'peralillo' ? 'Peralillo' :
-                         empresa_code === 'plaza-galerena' ? 'Plaza Galereña' : empresa_code,
+                         empresa_code === 'plaza-galerena' ? 'Plaza Galereña' :
+                         empresa_code === 'inmobiliaria-galerena' ? 'Inmobiliaria Galereña' :
+                         empresa_code === 'icrear' ? 'Icrear' : empresa_code,
         }));
 
         todasLasOrdenes.push(...ordenes);

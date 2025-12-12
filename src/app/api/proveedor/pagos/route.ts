@@ -127,7 +127,9 @@ export async function GET(request: NextRequest) {
           Empresa: empresa_code,
           EmpresaNombre: empresa_code === 'la-cantera' ? 'La Cantera' :
                          empresa_code === 'peralillo' ? 'Peralillo' :
-                         empresa_code === 'plaza-galerena' ? 'Plaza Galereña' : empresa_code,
+                         empresa_code === 'plaza-galerena' ? 'Plaza Galereña' :
+                         empresa_code === 'inmobiliaria-galerena' ? 'Inmobiliaria Galereña' :
+                         empresa_code === 'icrear' ? 'Icrear' : empresa_code,
           MontoPagado: (pago.Total || 0) - (pago.Saldo || 0),
           PorcentajePagado: pago.Total > 0 ? (((pago.Total - pago.Saldo) / pago.Total) * 100).toFixed(2) : 0,
         }));
