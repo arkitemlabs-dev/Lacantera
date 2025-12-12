@@ -17,31 +17,31 @@ const TENANT_CONFIGS: Record<string, TenantERPConfig> = {
   'la-cantera': {
     id: 'la-cantera',
     nombre: 'La Cantera Desarrollos Mineros',
-    erpDatabase: 'LaCantera_DB',
+    erpDatabase: 'Cantera_ajustes', // Base real
     codigoEmpresa: 'LCDM',
   },
   'peralillo': {
     id: 'peralillo',
     nombre: 'Peralillo S.A de C.V',
-    erpDatabase: 'Peralillo_DB',
+    erpDatabase: 'Peralillo_Ajustes', // Base real (con A mayúscula)
     codigoEmpresa: 'PERA',
   },
   'plaza-galerena': {
     id: 'plaza-galerena',
     nombre: 'Plaza Galereña',
-    erpDatabase: 'Galerena_DB',
+    erpDatabase: 'GALBD_PRUEBAS', // Base real
     codigoEmpresa: 'PLAZ',
   },
   'icrear': {
     id: 'icrear',
     nombre: 'Icrear',
-    erpDatabase: 'Icrear_DB',
+    erpDatabase: 'ICREAR_PRUEBAS', // Base real
     codigoEmpresa: 'ICRE',
   },
   'inmobiliaria-galerena': {
     id: 'inmobiliaria-galerena',
     nombre: 'Inmobiliaria Galereña',
-    erpDatabase: 'Galerena_DB',
+    erpDatabase: 'GALBD_PRUEBAS', // Comparte BD con Plaza Galereña
     codigoEmpresa: 'INMO',
   },
 };
@@ -57,9 +57,9 @@ let portalPool: sql.ConnectionPool | null = null;
 const erpPools = new Map<string, sql.ConnectionPool>();
 
 /**
- * Configuración base de conexión SQL Server
+ * Configuración base de conexión SQL Server - PORTAL
  */
-const baseConfig = {
+const portalConfig = {
   server: process.env.MSSQL_SERVER!,
   user: process.env.MSSQL_USER!,
   password: process.env.MSSQL_PASSWORD!,
@@ -71,12 +71,26 @@ const baseConfig = {
 };
 
 /**
+ * Configuración base de conexión SQL Server - ERP
+ */
+const erpConfig = {
+  server: process.env.MSSQL_ERP_SERVER!,
+  user: process.env.MSSQL_ERP_USER!,
+  password: process.env.MSSQL_ERP_PASSWORD!,
+  options: {
+    encrypt: process.env.MSSQL_ERP_ENCRYPT === 'true',
+    trustServerCertificate: process.env.MSSQL_ERP_TRUST_CERT === 'true',
+    enableArithAbort: true,
+  },
+};
+
+/**
  * Obtiene el pool de conexión para la BD del Portal (PP)
  */
 export async function getPortalConnection(): Promise<sql.ConnectionPool> {
   if (!portalPool) {
     const config: sql.config = {
-      ...baseConfig,
+      ...portalConfig,
       database: 'PP', // Tu BD del portal
       pool: {
         max: 20,
@@ -87,7 +101,7 @@ export async function getPortalConnection(): Promise<sql.ConnectionPool> {
 
     portalPool = new sql.ConnectionPool(config);
     await portalPool.connect();
-    console.log('[PORTAL] Connected to PP database');
+    console.log('[PORTAL] Connected to PP database at', portalConfig.server);
   }
 
   return portalPool;
@@ -111,7 +125,7 @@ export async function getERPConnection(
   // Reutilizar pool si ya existe para esta BD
   if (!erpPools.has(erpDatabase)) {
     const config: sql.config = {
-      ...baseConfig,
+      ...erpConfig,
       database: erpDatabase,
       pool: {
         max: 10, // Menos conexiones para ERP (solo lectura)
@@ -123,7 +137,7 @@ export async function getERPConnection(
     const pool = new sql.ConnectionPool(config);
     await pool.connect();
     erpPools.set(erpDatabase, pool);
-    console.log(`[ERP] Connected to ${erpDatabase} for tenant ${tenantId}`);
+    console.log(`[ERP] Connected to ${erpDatabase} at ${erpConfig.server} for tenant ${tenantId}`);
   }
 
   return erpPools.get(erpDatabase)!;
