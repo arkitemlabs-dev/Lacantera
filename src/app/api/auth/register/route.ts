@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import sql from 'mssql';
 import bcrypt from 'bcrypt';
 import { getConnection } from '@/lib/sql-connection';
+import { getPortalConnection } from '@/lib/database/multi-tenant-connection';
+import { autoSyncProveedorByRFC } from '@/lib/services/auto-sync-proveedor';
 
 export async function POST(request: NextRequest) {
   try {
@@ -143,6 +145,18 @@ export async function POST(request: NextRequest) {
 
       await transaction.commit();
 
+      // 8. AUTO-SINCRONIZACIÓN: Buscar al proveedor en todos los ERPs
+      console.log(`🔄 Iniciando auto-sincronización para RFC: ${rfc}`);
+      let syncResult = null;
+
+      try {
+        syncResult = await autoSyncProveedorByRFC(String(userId), rfc);
+        console.log(`✅ Auto-sync completado: ${syncResult.mappingsCreados} mappings creados en ${syncResult.empresasEncontradas.length} empresas`);
+      } catch (syncError: any) {
+        console.error('⚠️ Error en auto-sincronización (no crítico):', syncError.message);
+        // No fallar el registro si falla la sincronización
+      }
+
       return NextResponse.json(
         {
           success: true,
@@ -150,6 +164,11 @@ export async function POST(request: NextRequest) {
             'Registro exitoso. Tu cuenta está pendiente de aprobación por el administrador.',
           userId: String(userId),
           proveedorCodigo,
+          autoSync: syncResult ? {
+            empresasEncontradas: syncResult.empresasEncontradas,
+            mappingsCreados: syncResult.mappingsCreados,
+            detalles: syncResult.detalles
+          } : null
         },
         { status: 201 }
       );

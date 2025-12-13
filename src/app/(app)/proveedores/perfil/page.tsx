@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -52,9 +53,10 @@ const InfoField = ({
     <dd className="col-span-2">
        <Input
         id={label.toLowerCase()}
-        defaultValue={value}
+        value={value || ''}
         className="bg-background/40 border-border/60 h-8"
         disabled={!isEditing}
+        readOnly
       />
     </dd>
   </div>
@@ -62,7 +64,7 @@ const InfoField = ({
 
 type DocStatus = 'aprobado' | 'pendiente' | 'rechazado';
 
-type TipoDocumento = 
+type TipoDocumento =
   | 'acta_constitutiva'
   | 'comprobante_domicilio'
   | 'identificacion_representante'
@@ -171,6 +173,7 @@ const docStatusConfig = {
 };
 
 export default function PerfilProveedorPage() {
+  const { data: session } = useSession();
   const userAvatar = PlaceHolderImages.find(
     (img) => img.id === 'user-avatar-1'
   );
@@ -179,7 +182,11 @@ export default function PerfilProveedorPage() {
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isEditing, setIsEditing] = useState(false);
-  
+
+  // Estados para datos del proveedor
+  const [proveedorInfo, setProveedorInfo] = useState<any>(null);
+  const [loadingInfo, setLoadingInfo] = useState(true);
+
   // Estados para documentos
   const [documentos, setDocumentos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -188,11 +195,33 @@ export default function PerfilProveedorPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const proveedorId = 'proveedor-1'; // TODO: obtener del usuario autenticado
+  const proveedorId = session?.user?.id || 'proveedor-1';
 
   useEffect(() => {
+    cargarInfoProveedor();
     cargarDocumentos();
-  }, []);
+  }, [session]);
+
+  const cargarInfoProveedor = async () => {
+    if (!session) return;
+
+    setLoadingInfo(true);
+    try {
+      const response = await fetch('/api/proveedor/info');
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('✅ Información del proveedor cargada:', result.data);
+        setProveedorInfo(result.data);
+      } else {
+        console.error('❌ Error cargando información:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ Error:', error);
+    } finally {
+      setLoadingInfo(false);
+    }
+  };
 
   const cargarDocumentos = async () => {
     setLoading(true);
@@ -286,6 +315,15 @@ export default function PerfilProveedorPage() {
   const documentosAprobados = documentos.filter((d) => d.status === 'aprobado').length;
   const porcentajeCompletado = Math.round((documentosAprobados / totalDocumentos) * 100);
 
+  // Obtener iniciales para el avatar
+  const getInitials = () => {
+    if (proveedorInfo?.razonSocial) {
+      const words = proveedorInfo.razonSocial.split(' ');
+      return words.slice(0, 2).map((w: string) => w[0]).join('').toUpperCase();
+    }
+    return session?.user?.name?.slice(0, 2).toUpperCase() || 'PR';
+  };
+
   return (
     <main className="flex-1 space-y-8 p-4 md:p-8">
       <h1 className="text-3xl font-bold tracking-tight">Perfil del Proveedor</h1>
@@ -300,10 +338,10 @@ export default function PerfilProveedorPage() {
                   <div>
                     <CardTitle>Información General</CardTitle>
                     <CardDescription>
-                      Mantenga su información fiscal, de contacto y bancaria actualizada.
+                      Información del proveedor obtenida del ERP de la empresa seleccionada.
                     </CardDescription>
                   </div>
-                  <div className="flex justify-end gap-2">
+                  {/* <div className="flex justify-end gap-2">
                     {isEditing ? (
                       <>
                         <Button variant="outline" onClick={handleCancel}>Cancelar</Button>
@@ -312,78 +350,93 @@ export default function PerfilProveedorPage() {
                     ) : (
                       <Button onClick={handleEdit}>Editar</Button>
                     )}
-                  </div>
+                  </div> */}
               </CardHeader>
               <CardContent className="space-y-8">
-                <div className="flex items-center gap-6">
-                    <div
-                    className={cn("relative group", isEditing && "cursor-pointer")}
-                    onClick={() => isEditing && fileInputRef.current?.click()}
-                    >
-                    <Avatar className="h-24 w-24">
-                        {avatarPreview ? (
-                        <Image
-                            src={avatarPreview}
-                            alt="User avatar"
-                            width={96}
-                            height={96}
-                            className="rounded-full object-cover"
+                {loadingInfo ? (
+                  <div className="flex items-center justify-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <span className="ml-2">Cargando información del proveedor...</span>
+                  </div>
+                ) : !proveedorInfo ? (
+                  <div className="flex items-center justify-center p-8">
+                    <AlertCircle className="h-8 w-8 text-yellow-500 mr-2" />
+                    <span>No se pudo cargar la información del proveedor</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-6">
+                        <div
+                        className={cn("relative group", isEditing && "cursor-pointer")}
+                        onClick={() => isEditing && fileInputRef.current?.click()}
+                        >
+                        <Avatar className="h-24 w-24">
+                            {avatarPreview ? (
+                            <Image
+                                src={avatarPreview}
+                                alt="User avatar"
+                                width={96}
+                                height={96}
+                                className="rounded-full object-cover"
+                            />
+                            ) : <AvatarFallback>{getInitials()}</AvatarFallback>}
+                        </Avatar>
+                        {isEditing && (
+                            <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Camera className="h-8 w-8 text-white" />
+                            </div>
+                        )}
+                        <Input
+                            type="file"
+                            ref={fileInputRef}
+                            className="hidden"
+                            accept="image/*"
+                            onChange={handleAvatarChange}
+                            disabled={!isEditing}
                         />
-                        ) : <AvatarFallback>SH</AvatarFallback>}
-                    </Avatar>
-                    {isEditing && (
-                        <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Camera className="h-8 w-8 text-white" />
                         </div>
-                    )}
-                    <Input
-                        type="file"
-                        ref={fileInputRef}
-                        className="hidden"
-                        accept="image/*"
-                        onChange={handleAvatarChange}
-                        disabled={!isEditing}
-                    />
+                         <div className="flex-1 space-y-4">
+                             <h3 className="text-lg font-semibold">Datos Fiscales</h3>
+                             <InfoField label="Razón Social" value={proveedorInfo.razonSocial} isEditing={isEditing} />
+                             <InfoField label="RFC" value={proveedorInfo.rfc} isEditing={isEditing} />
+                             <InfoField label="Código Proveedor" value={proveedorInfo.codigo} isEditing={isEditing} />
+                             <InfoField label="Dirección Fiscal" value={proveedorInfo.direccionFiscal} isEditing={isEditing} />
+                        </div>
                     </div>
-                     <div className="flex-1 space-y-4">
-                         <h3 className="text-lg font-semibold">Datos Fiscales</h3>
-                         <InfoField label="Razón Social" value="Soluciones Industriales SH S.A. de C.V." isEditing={isEditing} />
-                         <InfoField label="RFC" value="SISH890101ABC" isEditing={isEditing} />
-                         <InfoField label="Dirección Fiscal" value="Av. Siempre Viva 742, Springfield" isEditing={isEditing} />
+
+                    <Separator />
+
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Datos de Contacto</h3>
+                      <div className="space-y-4">
+                        <InfoField label="Nombre del Contacto" value={proveedorInfo.nombreContacto} isEditing={isEditing} />
+                        <InfoField label="Email" value={proveedorInfo.email} isEditing={isEditing} />
+                        <InfoField label="Teléfono" value={proveedorInfo.telefono} isEditing={isEditing} />
+                      </div>
                     </div>
-                </div>
 
-                <Separator />
-                
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Datos de Contacto</h3>
-                  <div className="space-y-4">
-                    <InfoField label="Nombre del Contacto" value="Shirley Hendricks" isEditing={isEditing} />
-                    <InfoField label="Email" value="shirley.h@proveedor.com" isEditing={isEditing} />
-                    <InfoField label="Teléfono" value="55 1234 5678" isEditing={isEditing} />
-                  </div>
-                </div>
+                     <Separator />
 
-                 <Separator />
-                
-                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Representante Legal</h3>
-                  <div className="space-y-4">
-                    <InfoField label="Nombre" value="Shirley Hendricks" isEditing={isEditing} />
-                     <InfoField label="Email" value="shirley.h@proveedor.com" isEditing={isEditing} />
-                  </div>
-                </div>
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Información Bancaria</h3>
+                       <div className="space-y-4">
+                         <InfoField label="CLABE" value={proveedorInfo.clabe} isEditing={isEditing} />
+                         <InfoField label="Número de cuenta" value={proveedorInfo.numeroCuenta} isEditing={isEditing} />
+                      </div>
+                    </div>
 
-                <Separator />
+                    <Separator />
 
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Información Bancaria</h3>
-                   <div className="space-y-4">
-                     <InfoField label="Banco" value="BBVA Bancomer" isEditing={isEditing} />
-                     <InfoField label="CLABE" value="012180012345678901" isEditing={isEditing} />
-                     <InfoField label="Número de cuenta" value="0123456789" isEditing={isEditing} />
-                  </div>
-                </div>
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Contexto</h3>
+                      <div className="space-y-4">
+                        <InfoField label="Empresa Actual" value={session?.user?.empresaActual} isEditing={false} />
+                        <InfoField label="Código en ERP" value={proveedorInfo.codigoProveedorERP} isEditing={false} />
+                        <InfoField label="Estado" value={proveedorInfo.estatus} isEditing={false} />
+                      </div>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -424,7 +477,7 @@ export default function PerfilProveedorPage() {
                       {documentosRequeridos.map((docReq) => {
                         const doc = getDocumentoStatus(docReq.tipo);
                         const config = doc ? docStatusConfig[doc.status as DocStatus] : docStatusConfig.pendiente;
-                        
+
                         return (
                           <TableRow key={docReq.tipo}>
                             <TableCell>
@@ -445,7 +498,7 @@ export default function PerfilProveedorPage() {
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              {doc 
+                              {doc
                                 ? new Date(doc.uploadedAt).toLocaleDateString('es-MX', {
                                     year: 'numeric',
                                     month: '2-digit',
@@ -455,8 +508,8 @@ export default function PerfilProveedorPage() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
-                                <Button 
-                                  variant="outline" 
+                                <Button
+                                  variant="outline"
                                   size="sm"
                                   onClick={() => openUploadDialog(docReq.tipo)}
                                 >

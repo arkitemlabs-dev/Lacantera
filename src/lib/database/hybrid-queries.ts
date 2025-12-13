@@ -438,20 +438,26 @@ export async function getUserTenants(userId: string) {
     { userId }
   );
 
-  // Mapear códigos de empresa a tenantIds
-  const empresaToTenantMap: Record<string, string> = {
-    LCDM: 'la-cantera',
-    PERA: 'peralillo',
-    PLAZ: 'plaza-galerena',
-    ICRE: 'icrear',
-    INMO: 'inmobiliaria-galerena',
+  // Mapear códigos de empresa a nombres amigables
+  const empresaToNameMap: Record<string, string> = {
+    'la-cantera': 'La Cantera',
+    'peralillo': 'Peralillo',
+    'plaza-galerena': 'Plaza Galereña',
+    'inmobiliaria-galerena': 'Inmobiliaria Galereña',
+    'icrear': 'Icrear',
+    // Códigos legacy (por compatibilidad)
+    'LCDM': 'La Cantera',
+    'PERA': 'Peralillo',
+    'PLAZ': 'Plaza Galereña',
+    'ICRE': 'Icrear',
+    'INMO': 'Inmobiliaria Galereña',
   };
 
   return result.recordset.map(row => ({
-    tenantId: empresaToTenantMap[row.empresa_code],
+    tenantId: row.empresa_code, // Ahora empresa_code ES el tenantId (la-cantera, peralillo, etc.)
     empresaCodigo: row.empresa_code,
     proveedorCodigo: row.erp_proveedor_code,
     permisos: row.permisos ? JSON.parse(row.permisos) : [],
-    tenantName: getTenantConfig(empresaToTenantMap[row.empresa_code]).nombre,
+    tenantName: empresaToNameMap[row.empresa_code] || row.empresa_code,
   }));
 }
