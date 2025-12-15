@@ -76,11 +76,16 @@ export async function GET(request: NextRequest) {
           Nombre AS RazonSocial,
           RFC,
           Direccion AS DireccionFiscal,
+          Colonia,
+          Poblacion,
+          Estado,
+          CodigoPostal,
           Contacto1 AS NombreContacto,
           eMail1 AS Email,
-          Telefonos AS Telefono,
-          Estatus,
-          CuentaBancaria AS NumeroCuenta
+          Telefonos,
+          ProvCuenta AS NumeroCuenta,
+          ProvBancoSucursal AS BancoSucursal,
+          Estatus
         FROM Prov
         WHERE Proveedor = @proveedorCode
           AND Estatus = 'ALTA'
@@ -102,20 +107,24 @@ export async function GET(request: NextRequest) {
       success: true,
       data: {
         // Datos fiscales
-        razonSocial: proveedor.RazonSocial,
-        rfc: proveedor.RFC,
-        direccionFiscal: proveedor.DireccionFiscal,
+        razonSocial: proveedor.RazonSocial || 'N/A',
+        rfc: proveedor.RFC || 'N/A',
+        direccionFiscal: proveedor.DireccionFiscal || 'N/A',
+        colonia: proveedor.Colonia || 'N/A',
+        poblacion: proveedor.Poblacion || 'N/A',
+        estado: proveedor.Estado || 'N/A',
+        codigoPostal: proveedor.CodigoPostal || 'N/A',
         codigo: proveedor.Codigo,
         estatus: proveedor.Estatus,
 
         // Datos de contacto
-        nombreContacto: proveedor.NombreContacto,
-        email: proveedor.Email,
-        telefono: proveedor.Telefonos,
+        nombreContacto: proveedor.NombreContacto || 'N/A',
+        email: proveedor.Email || 'N/A',
+        telefono: proveedor.Telefonos || 'N/A',
 
         // Información bancaria
-        numeroCuenta: proveedor.NumeroCuenta,
-        clabe: proveedor.CLABE,
+        numeroCuenta: proveedor.NumeroCuenta || 'N/A',
+        bancoSucursal: proveedor.BancoSucursal || 'N/A',
 
         // Contexto
         empresaActual: empresaActual,

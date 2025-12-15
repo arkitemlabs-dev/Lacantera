@@ -107,12 +107,7 @@ export async function GET(request: NextRequest) {
           Nombre AS RazonSocial,
           RFC,
           Direccion AS DireccionFiscal,
-          Contacto1 AS NombreContacto,
-          eMail1 AS Email,
-          Telefonos AS Telefono,
-          Estatus,
-          CuentaBancaria AS NumeroCuenta,
-          CuentaBancariaCLABE AS CLABE
+          Estatus
         FROM Prov
         WHERE Proveedor = @proveedorCode
           AND Estatus = 'ALTA'
@@ -134,12 +129,7 @@ export async function GET(request: NextRequest) {
             Nombre AS RazonSocial,
             RFC,
             Direccion AS DireccionFiscal,
-            Contacto1 AS NombreContacto,
-            eMail1 AS Email,
-            Telefonos AS Telefono,
-            Estatus,
-            CuentaBancaria AS NumeroCuenta,
-            CuentaBancariaCLABE AS CLABE
+            Estatus
           FROM Prov
           WHERE Proveedor = @proveedorCode
         `);

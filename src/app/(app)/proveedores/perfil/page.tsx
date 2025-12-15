@@ -188,7 +188,9 @@ export default function PerfilProveedorPage() {
   const [loadingInfo, setLoadingInfo] = useState(true);
 
   // Estados para documentos
-  const [documentos, setDocumentos] = useState<any[]>([]);
+  const [documentos, setDocumentos] = useState<any[]>([]); // Documentos con archivo
+  const [documentosERP, setDocumentosERP] = useState<any[]>([]); // Todos los documentos del ERP
+  const [estadisticas, setEstadisticas] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedDocTipo, setSelectedDocTipo] = useState<TipoDocumento | null>(null);
@@ -224,17 +226,50 @@ export default function PerfilProveedorPage() {
   };
 
   const cargarDocumentos = async () => {
+    if (!session) return;
+
     setLoading(true);
-    console.log("🔍 Cargando documentos para proveedorId:", proveedorId);
-    const result = await getDocumentosByProveedor(proveedorId);
-    console.log("📦 Resultado:", result);
-    if (result.success) {
-      console.log("✅ Documentos cargados:", result.data);
-      setDocumentos(result.data || []);
-    } else {
-      console.error("❌ Error cargando documentos:", result.error);
+    try {
+      console.log("🔍 Cargando documentos desde ERP...");
+      const response = await fetch('/api/proveedor/documentos');
+      const result = await response.json();
+
+      if (result.success) {
+        console.log("✅ Documentos del ERP cargados:", result.data);
+
+        // Guardar TODOS los documentos del ERP
+        setDocumentosERP(result.data.documentos || []);
+
+        // Guardar estadísticas
+        setEstadisticas(result.data.estadisticas || null);
+
+        // Transformar solo los documentos con archivo para la lista de documentos subidos
+        const documentosConArchivo = result.data.documentos
+          .filter((doc: any) => doc.tieneArchivo)
+          .map((doc: any) => ({
+            id: doc.idr?.toString() || '',
+            proveedorId: proveedorId,
+            tipoDocumento: doc.documentoRequerido.toLowerCase().replace(/\s+/g, '_'),
+            fileName: doc.nombreArchivo || doc.documentoRequerido,
+            fileUrl: doc.rutaArchivo || '',
+            uploadedAt: doc.fechaAlta || new Date().toISOString(),
+            status: doc.autorizado ? 'aprobado' : (doc.rechazado ? 'rechazado' : 'pendiente'),
+            reviewedBy: doc.usuario || null,
+            reviewedAt: doc.fechaUltimoCambio || null,
+            observaciones: doc.observaciones || null,
+          }));
+
+        setDocumentos(documentosConArchivo);
+        console.log("📦 Documentos ERP:", result.data.documentos);
+        console.log("📦 Estadísticas:", result.data.estadisticas);
+      } else {
+        console.error("❌ Error cargando documentos:", result.error);
+      }
+    } catch (error) {
+      console.error("❌ Error:", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
 
@@ -307,13 +342,18 @@ export default function PerfilProveedorPage() {
     }
   };
 
-  const getDocumentoStatus = (tipo: TipoDocumento) => {
-    return documentos.find((d) => d.tipoDocumento === tipo);
+  const getDocumentoStatus = (documentoRequerido: string) => {
+    // Buscar en documentosERP por el nombre del documento
+    const docERP = documentosERP.find((d: any) =>
+      d.documentoRequerido.toLowerCase() === documentoRequerido.toLowerCase()
+    );
+    return docERP;
   };
 
-  const totalDocumentos = documentosRequeridos.length;
-  const documentosAprobados = documentos.filter((d) => d.status === 'aprobado').length;
-  const porcentajeCompletado = Math.round((documentosAprobados / totalDocumentos) * 100);
+  const totalDocumentos = documentosERP.length || 14; // Usar documentos del ERP o default
+  const documentosAprobados = estadisticas?.documentosAutorizados || 0;
+  const documentosConArchivo = estadisticas?.documentosConArchivo || 0;
+  const porcentajeCompletado = Math.round((documentosConArchivo / totalDocumentos) * 100);
 
   // Obtener iniciales para el avatar
   const getInitials = () => {
@@ -401,6 +441,10 @@ export default function PerfilProveedorPage() {
                              <InfoField label="RFC" value={proveedorInfo.rfc} isEditing={isEditing} />
                              <InfoField label="Código Proveedor" value={proveedorInfo.codigo} isEditing={isEditing} />
                              <InfoField label="Dirección Fiscal" value={proveedorInfo.direccionFiscal} isEditing={isEditing} />
+                             <InfoField label="Colonia" value={proveedorInfo.colonia} isEditing={isEditing} />
+                             <InfoField label="Ciudad/Población" value={proveedorInfo.poblacion} isEditing={isEditing} />
+                             <InfoField label="Estado" value={proveedorInfo.estado} isEditing={isEditing} />
+                             <InfoField label="Código Postal" value={proveedorInfo.codigoPostal} isEditing={isEditing} />
                         </div>
                     </div>
 
@@ -420,7 +464,6 @@ export default function PerfilProveedorPage() {
                     <div>
                       <h3 className="text-lg font-semibold mb-4">Información Bancaria</h3>
                        <div className="space-y-4">
-                         <InfoField label="CLABE" value={proveedorInfo.clabe} isEditing={isEditing} />
                          <InfoField label="Número de cuenta" value={proveedorInfo.numeroCuenta} isEditing={isEditing} />
                       </div>
                     </div>
@@ -453,7 +496,10 @@ export default function PerfilProveedorPage() {
                   <div className="text-right">
                     <div className="text-2xl font-bold">{porcentajeCompletado}%</div>
                     <div className="text-xs text-muted-foreground">
-                      {documentosAprobados}/{totalDocumentos} aprobados
+                      {documentosConArchivo}/{totalDocumentos} con archivo
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {documentosAprobados} aprobados
                     </div>
                   </div>
                 </div>
@@ -474,69 +520,76 @@ export default function PerfilProveedorPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {documentosRequeridos.map((docReq) => {
-                        const doc = getDocumentoStatus(docReq.tipo);
-                        const config = doc ? docStatusConfig[doc.status as DocStatus] : docStatusConfig.pendiente;
+                      {documentosERP.length > 0 ? (
+                        documentosERP.map((docERP: any) => {
+                          // Determinar el estado del documento
+                          const status = docERP.autorizado ? 'aprobado' : (docERP.rechazado ? 'rechazado' : (docERP.tieneArchivo ? 'pendiente' : 'pendiente'));
+                          const config = docStatusConfig[status as DocStatus];
 
-                        return (
-                          <TableRow key={docReq.tipo}>
-                            <TableCell>
-                              <div>
-                                <div className="font-medium">{docReq.nombre}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {docReq.descripcion}
-                                  {docReq.vigencia && ` • Vigencia: ${docReq.vigencia}`}
+                          return (
+                            <TableRow key={docERP.orden}>
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium">{docERP.documentoRequerido}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {docERP.grupo}
+                                    {docERP.requerido && ' • Requerido'}
+                                  </div>
                                 </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                className={cn('gap-1 font-normal', config.className)}
-                              >
-                                {config.icon}
-                                {config.label}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {doc
-                                ? new Date(doc.uploadedAt).toLocaleDateString('es-MX', {
-                                    year: 'numeric',
-                                    month: '2-digit',
-                                    day: '2-digit',
-                                  })
-                                : 'N/A'}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openUploadDialog(docReq.tipo)}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  className={cn('gap-1 font-normal', config.className)}
                                 >
-                                  <Upload className="mr-2 h-4 w-4" />
-                                  {doc ? 'Reemplazar' : 'Subir'}
-                                </Button>
-                                {doc && (
-                                  <>
-                                    <Button variant="ghost" size="sm" asChild>
-                                      <a href={doc.archivoUrl} target="_blank" rel="noopener noreferrer">
+                                  {config.icon}
+                                  {config.label}
+                                  {!docERP.tieneArchivo && ' - Sin archivo'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {docERP.fechaAlta
+                                  ? new Date(docERP.fechaAlta).toLocaleDateString('es-MX', {
+                                      year: 'numeric',
+                                      month: '2-digit',
+                                      day: '2-digit',
+                                    })
+                                  : 'N/A'}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openUploadDialog(docERP.documentoRequerido as TipoDocumento)}
+                                  >
+                                    <Upload className="mr-2 h-4 w-4" />
+                                    {docERP.tieneArchivo ? 'Reemplazar' : 'Subir'}
+                                  </Button>
+                                  {docERP.tieneArchivo && docERP.rutaArchivo && (
+                                    <>
+                                      <Button variant="ghost" size="sm" title={`Archivo: ${docERP.rutaArchivo}`}>
                                         <Eye className="mr-2 h-4 w-4" />
                                         Ver
-                                      </a>
-                                    </Button>
-                                    <Button variant="ghost" size="sm" asChild>
-                                      <a href={doc.archivoUrl} download>
+                                      </Button>
+                                      <Button variant="ghost" size="sm" title="Descargar archivo">
                                         <Download className="h-4 w-4" />
                                         <span className="sr-only">Descargar</span>
-                                      </a>
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center p-8">
+                            <AlertCircle className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
+                            <p>No se encontraron documentos en el ERP</p>
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 )}
