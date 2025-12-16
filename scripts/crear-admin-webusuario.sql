@@ -1,8 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════════
--- SCRIPT PARA CREAR USUARIO ADMINISTRADOR
+-- CREAR USUARIO ADMINISTRADOR EN WebUsuario
 -- ═══════════════════════════════════════════════════════════════════════════════
 --
--- Este script crea el usuario administrador del portal
+-- Este script crea el usuario administrador en la tabla WebUsuario
 -- Ejecutar en: Servidor Portal (cloud.arkitem.com) - Database: PP
 --
 -- CREDENCIALES:
@@ -16,42 +16,61 @@ USE PP;
 GO
 
 PRINT '═══════════════════════════════════════════════════════════════════════════════';
-PRINT '👤 CREANDO USUARIO ADMINISTRADOR';
+PRINT '👤 CREANDO USUARIO ADMINISTRADOR EN WebUsuario';
 PRINT '═══════════════════════════════════════════════════════════════════════════════';
 PRINT '';
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 1. VERIFICAR SI YA EXISTE EL USUARIO
+-- 1. VERIFICAR SI EXISTE LA TABLA WebUsuario
 -- ═══════════════════════════════════════════════════════════════════════════════
 
+IF OBJECT_ID('dbo.WebUsuario', 'U') IS NULL
+BEGIN
+    PRINT '❌ ERROR: La tabla WebUsuario NO existe.';
+    PRINT '';
+    RAISERROR('Tabla WebUsuario no existe', 16, 1);
+    RETURN;
+END
+
+PRINT '✅ La tabla WebUsuario existe.';
+PRINT '';
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 2. VERIFICAR SI YA EXISTE EL USUARIO
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+DECLARE @Email VARCHAR(100) = 'admin@lacantera.com';
 DECLARE @UsuarioExiste INT;
+
 SELECT @UsuarioExiste = COUNT(*)
-FROM portal_usuarios
-WHERE Email = 'admin@lacantera.com';
+FROM WebUsuario
+WHERE eMail = @Email;
 
 IF @UsuarioExiste > 0
 BEGIN
-    PRINT '⚠️  El usuario admin@lacantera.com ya existe en el sistema.';
+    PRINT '⚠️  El usuario admin@lacantera.com ya existe en WebUsuario.';
     PRINT '';
-    PRINT 'Usuario existente:';
+
     SELECT
-        IDUsuario,
+        UsuarioWeb,
         Nombre,
-        Email,
-        RFC,
+        eMail,
         Rol,
-        Activo,
-        FechaCreacion
-    FROM portal_usuarios
-    WHERE Email = 'admin@lacantera.com';
+        Estatus,
+        FORMAT(Alta, 'dd/MM/yyyy HH:mm', 'es-MX') AS FechaAlta,
+        Empresa,
+        Telefono
+    FROM WebUsuario
+    WHERE eMail = @Email;
 
     PRINT '';
-    PRINT '💡 Si deseas actualizar la contraseña, ejecuta el script de actualización.';
+    PRINT '💡 El usuario ya está configurado. Puedes usar estas credenciales para iniciar sesión.';
+    PRINT '';
 END
 ELSE
 BEGIN
     -- ═══════════════════════════════════════════════════════════════════════════════
-    -- 2. CREAR EL USUARIO ADMINISTRADOR
+    -- 3. CREAR EL USUARIO ADMINISTRADOR
     -- ═══════════════════════════════════════════════════════════════════════════════
 
     PRINT '✨ Creando nuevo usuario administrador...';
@@ -60,84 +79,80 @@ BEGIN
     BEGIN TRANSACTION;
 
     BEGIN TRY
-        -- Insertar el usuario
-        -- Hash bcrypt de "admin123456": $2a$10$YourBcryptHashHereForAdmin123456
-        -- Este hash será generado por la aplicación cuando el admin inicie sesión por primera vez
-        -- Por ahora usamos un hash temporal que DEBE ser cambiado en el primer login
+        -- Hash bcrypt de "admin123456"
+        DECLARE @PasswordHash VARCHAR(255) = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhkO';
+        DECLARE @UsuarioWeb VARCHAR(50) = 'ADMIN001';
 
-        INSERT INTO portal_usuarios (
-            IDUsuario,
+        INSERT INTO WebUsuario (
+            UsuarioWeb,
             Nombre,
-            RFC,
-            Email,
-            PasswordHash,
+            eMail,
+            Contrasena,
             Rol,
-            Activo,
-            FechaCreacion,
-            UltimaActualizacion,
-            RequiereCambioPassword
+            Estatus,
+            Alta,
+            UltimoCambio
         )
         VALUES (
-            NEXT VALUE FOR seq_portal_usuarios,
+            @UsuarioWeb,
             'Administrador del Sistema',
-            'XAXX010101000', -- RFC genérico para admin
-            'admin@lacantera.com',
-            '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhkO', -- Hash de "admin123456"
+            @Email,
+            @PasswordHash,
             'super-admin',
-            1,
+            'ACTIVO',
             GETDATE(),
-            GETDATE(),
-            0 -- No requiere cambio de password inicialmente
+            GETDATE()
         );
 
-        DECLARE @NuevoIDUsuario INT = SCOPE_IDENTITY();
+        COMMIT TRANSACTION;
 
         PRINT '✅ Usuario administrador creado exitosamente!';
         PRINT '';
-        PRINT '📋 Detalles del usuario:';
+        PRINT '📋 Detalles:';
         PRINT '─────────────────────────────────────────────────────────────────────────────';
 
         SELECT
-            IDUsuario,
+            UsuarioWeb,
             Nombre,
-            Email,
-            RFC,
+            eMail,
             Rol,
-            Activo,
-            FechaCreacion,
-            RequiereCambioPassword
-        FROM portal_usuarios
-        WHERE IDUsuario = @NuevoIDUsuario;
+            Estatus,
+            FORMAT(Alta, 'dd/MM/yyyy HH:mm', 'es-MX') AS FechaAlta
+        FROM WebUsuario
+        WHERE UsuarioWeb = @UsuarioWeb;
 
         PRINT '';
-        PRINT '🔑 CREDENCIALES DE ACCESO:';
+        PRINT '🔑 CREDENCIALES:';
         PRINT '─────────────────────────────────────────────────────────────────────────────';
+        PRINT 'URL:        http://localhost:3000/login  (o tu URL de producción)';
         PRINT 'Email:      admin@lacantera.com';
         PRINT 'Contraseña: admin123456';
         PRINT 'Rol:        super-admin';
         PRINT '';
-        PRINT '⚠️  IMPORTANTE: Por seguridad, cambia esta contraseña después del primer login.';
+        PRINT '⚠️  IMPORTANTE: Cambia esta contraseña después del primer login.';
         PRINT '';
-
-        COMMIT TRANSACTION;
 
     END TRY
     BEGIN CATCH
         ROLLBACK TRANSACTION;
 
         PRINT '';
-        PRINT '═══════════════════════════════════════════════════════════════════════════════';
-        PRINT '❌ ERROR AL CREAR EL USUARIO ADMINISTRADOR';
-        PRINT '═══════════════════════════════════════════════════════════════════════════════';
+        PRINT '❌ ERROR AL CREAR EL USUARIO';
+        PRINT '─────────────────────────────────────────────────────────────────────────────';
+        PRINT CONCAT('Error: ', ERROR_MESSAGE());
+        PRINT CONCAT('Línea: ', ERROR_LINE());
         PRINT '';
-        PRINT 'Error: ' + ERROR_MESSAGE();
-        PRINT 'Línea: ' + CAST(ERROR_LINE() AS VARCHAR(10));
-        PRINT '';
-        PRINT 'La transacción ha sido revertida.';
     END CATCH;
 END
 
-PRINT '';
 PRINT '═══════════════════════════════════════════════════════════════════════════════';
 PRINT '✅ SCRIPT COMPLETADO';
 PRINT '═══════════════════════════════════════════════════════════════════════════════';
+PRINT '';
+PRINT '📝 NOTAS IMPORTANTES:';
+PRINT '─────────────────────────────────────────────────────────────────────────────';
+PRINT '• El sistema ahora usa la tabla WebUsuario para todos los usuarios web';
+PRINT '• Los usuarios legacy en pNetUsuario siguen funcionando';
+PRINT '• Nuevos administradores se registran desde /admin/registro';
+PRINT '• El campo Rol en WebUsuario determina los permisos del usuario';
+PRINT '';

@@ -47,9 +47,75 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
+          console.log(`[AUTH] Intentando autenticar: ${credentials.email}`);
           const pool = await getPool();
 
-          // Buscar usuario en pNetUsuario
+          // 🔥 PASO 1: Intentar buscar en WebUsuario (tabla principal de usuarios web)
+          console.log(`[AUTH] Buscando en WebUsuario...`);
+          const webUserResult = await pool
+            .request()
+            .input('email', sql.VarChar(100), credentials.email)
+            .query(`
+              SELECT
+                UsuarioWeb,
+                Nombre,
+                eMail,
+                Contrasena,
+                Rol,
+                Estatus,
+                Empresa,
+                Proveedor,
+                Cliente
+              FROM WebUsuario
+              WHERE eMail = @email AND Estatus = 'ACTIVO'
+            `);
+
+          if (webUserResult.recordset.length > 0) {
+            // Usuario encontrado en WebUsuario
+            const webUser = webUserResult.recordset[0];
+            console.log(`[AUTH] Usuario encontrado en WebUsuario: ${webUser.eMail}, Rol: ${webUser.Rol}, Estatus: ${webUser.Estatus}`);
+
+            // Verificar contraseña (bcrypt)
+            console.log(`[AUTH] Verificando contraseña...`);
+            const isValidPassword = await bcrypt.compare(
+              credentials.password,
+              webUser.Contrasena
+            );
+
+            if (!isValidPassword) {
+              console.log(`[AUTH] Contraseña inválida para ${webUser.eMail}`);
+              throw new Error('Credenciales inválidas');
+            }
+
+            console.log(`[AUTH] Usuario web autenticado: ${webUser.eMail} (Rol: ${webUser.Rol})`);
+
+            // Determinar userType basado en el rol
+            let userType = 'Usuario';
+            let role = webUser.Rol || 'user';
+
+            if (role === 'super-admin' || role === 'admin') {
+              userType = 'Administrador';
+            } else if (webUser.Proveedor) {
+              userType = 'Proveedor';
+              role = 'proveedor';
+            } else if (webUser.Cliente) {
+              userType = 'Cliente';
+            }
+
+            return {
+              id: String(webUser.UsuarioWeb),
+              email: webUser.eMail,
+              name: webUser.Nombre,
+              role: role,
+              userType: userType,
+              empresa: webUser.Empresa,
+              proveedor: webUser.Proveedor,
+              empresaId: credentials.empresaId,
+              requiresPasswordChange: false,
+            };
+          }
+
+          // 🔥 PASO 2: Si no está en portal_usuarios, buscar en pNetUsuario (usuarios antiguos)
           const userResult = await pool
             .request()
             .input('email', sql.VarChar(50), credentials.email)
@@ -142,7 +208,8 @@ export const authOptions: NextAuthOptions = {
 
         // 🔥 MULTI-TENANT: Obtener empresas disponibles
         try {
-          const tenants = await getUserTenants(user.id);
+          // Pasar el rol del usuario para determinar acceso a empresas
+          const tenants = await getUserTenants(user.id, user.role);
 
           if (tenants.length === 0) {
             console.warn(`[AUTH] Usuario ${user.id} sin empresas asignadas`);
@@ -167,7 +234,7 @@ export const authOptions: NextAuthOptions = {
               token.empresaActual = tenants[0].tenantId;
             }
 
-            console.log(`[AUTH] Usuario ${user.id} tiene acceso a ${tenants.length} empresa(s)`);
+            console.log(`[AUTH] Usuario ${user.id} (rol: ${user.role}) tiene acceso a ${tenants.length} empresa(s)`);
           }
         } catch (error) {
           console.error('[AUTH] Error obteniendo empresas:', error);

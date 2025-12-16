@@ -109,6 +109,7 @@ export default function LoginPage() {
         redirect: false,
         email,
         password,
+        userType: tipoUsuario,
         empresaId: empresaSeleccionada,
       });
 

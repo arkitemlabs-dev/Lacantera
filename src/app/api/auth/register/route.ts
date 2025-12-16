@@ -1,5 +1,5 @@
 // src/app/api/auth/register/route.ts
-// API endpoint para registro de proveedores
+// API endpoint para registro de proveedores y administradores
 
 import { NextRequest, NextResponse } from 'next/server';
 import sql from 'mssql';
@@ -11,10 +11,10 @@ import { autoSyncProveedorByRFC } from '@/lib/services/auto-sync-proveedor';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, nombre, rfc, razonSocial } = body;
+    const { email, password, nombre, rfc, razonSocial, rol, telefono, datosAdicionales } = body;
 
     // Validaciones
-    if (!email || !password || !nombre || !rfc || !razonSocial) {
+    if (!email || !password || !nombre || !rfc) {
       return NextResponse.json(
         { error: 'Todos los campos son requeridos' },
         { status: 400 }
@@ -27,7 +27,117 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email inválido' }, { status: 400 });
     }
 
-    // Validar RFC (formato básico)
+    // Validar contraseña (mínimo 6 caracteres)
+    if (password.length < 6) {
+      return NextResponse.json(
+        { error: 'La contraseña debe tener al menos 6 caracteres' },
+        { status: 400 }
+      );
+    }
+
+    // Determinar si es registro de admin o proveedor
+    const esAdmin = rol && (rol === 'super-admin' || rol === 'admin');
+
+    // Si es admin, usar WebUsuario
+    if (esAdmin) {
+      console.log('🔧 [REGISTRO] Registrando administrador en WebUsuario');
+
+      const portalPool = await getPortalConnection();
+      const transaction = portalPool.transaction();
+
+      try {
+        await transaction.begin();
+
+        // 1. Verificar que el email no esté registrado en WebUsuario
+        const existingEmail = await transaction
+          .request()
+          .input('email', sql.VarChar(100), email)
+          .query('SELECT UsuarioWeb FROM WebUsuario WHERE eMail = @email');
+
+        if (existingEmail.recordset.length > 0) {
+          await transaction.rollback();
+          return NextResponse.json(
+            { error: 'Este email ya está registrado' },
+            { status: 409 }
+          );
+        }
+
+        // 2. Crear hash de contraseña
+        const passwordHash = await bcrypt.hash(password, 10);
+
+        // 3. Generar código único para UsuarioWeb
+        const usuarioWebCode = `ADMIN${Date.now().toString().slice(-6)}`;
+
+        // 4. Crear usuario administrador en WebUsuario
+        await transaction
+          .request()
+          .input('usuarioWeb', sql.VarChar(50), usuarioWebCode)
+          .input('nombre', sql.VarChar(100), nombre)
+          .input('email', sql.VarChar(100), email)
+          .input('contrasena', sql.VarChar(255), passwordHash)
+          .input('rol', sql.VarChar(50), rol)
+          .input('telefono', sql.VarChar(50), telefono || null)
+          .input('empresa', sql.VarChar(50), razonSocial || null)
+          .query(`
+            INSERT INTO WebUsuario (
+              UsuarioWeb,
+              Nombre,
+              eMail,
+              Contrasena,
+              Rol,
+              Estatus,
+              Alta,
+              UltimoCambio,
+              Telefono,
+              Empresa
+            )
+            VALUES (
+              @usuarioWeb,
+              @nombre,
+              @email,
+              @contrasena,
+              @rol,
+              'ACTIVO',
+              GETDATE(),
+              GETDATE(),
+              @telefono,
+              @empresa
+            )
+          `);
+
+        await transaction.commit();
+
+        console.log(`✅ [REGISTRO] Administrador creado: ${email} (Usuario: ${usuarioWebCode})`);
+
+        return NextResponse.json(
+          {
+            success: true,
+            message: 'Registro de administrador exitoso.',
+            usuarioWeb: usuarioWebCode,
+            rol: rol
+          },
+          { status: 201 }
+        );
+      } catch (error: any) {
+        await transaction.rollback();
+        console.error('❌ [REGISTRO] Error en transacción de admin:', error);
+
+        // Verificar si es un error de violación de restricción única
+        if (error.number === 2627 || error.number === 2601) {
+          return NextResponse.json(
+            { error: 'Ya existe un registro con estos datos' },
+            { status: 409 }
+          );
+        }
+
+        throw error;
+      }
+    }
+
+    // Si es proveedor, usar el flujo existente
+    console.log('🔧 [REGISTRO] Registrando proveedor en pNetUsuario');
+
+    // Validar RFC (formato básico) - solo para proveedores
     if (rfc.length < 12 || rfc.length > 13) {
       return NextResponse.json(
         { error: 'RFC inválido (debe tener 12 o 13 caracteres)' },
@@ -35,10 +145,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validar contraseña (mínimo 8 caracteres, al menos una mayúscula y un número)
-    if (password.length < 8) {
+    if (!razonSocial) {
       return NextResponse.json(
-        { error: 'La contraseña debe tener al menos 8 caracteres' },
+        { error: 'La razón social es requerida para proveedores' },
         { status: 400 }
       );
     }

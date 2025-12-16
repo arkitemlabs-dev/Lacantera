@@ -423,21 +423,10 @@ export async function validateUserTenantAccess(
 
 /**
  * Obtiene las empresas a las que un usuario tiene acceso
+ * - Administradores (super-admin, admin): acceso a todas las empresas
+ * - Proveedores: acceso según portal_proveedor_mapping
  */
-export async function getUserTenants(userId: string) {
-  const result = await hybridDB.queryPortal(
-    `
-    SELECT DISTINCT
-      ppm.empresa_code,
-      ppm.erp_proveedor_code,
-      ppm.permisos
-    FROM portal_proveedor_mapping ppm
-    WHERE ppm.portal_user_id = @userId
-      AND ppm.activo = 1
-    `,
-    { userId }
-  );
-
+export async function getUserTenants(userId: string, userRole?: string) {
   // Mapear códigos de empresa a nombres amigables
   const empresaToNameMap: Record<string, string> = {
     'la-cantera': 'La Cantera',
@@ -452,6 +441,39 @@ export async function getUserTenants(userId: string) {
     'ICRE': 'Icrear',
     'INMO': 'Inmobiliaria Galereña',
   };
+
+  // Si es administrador, dar acceso a todas las empresas
+  if (userRole === 'super-admin' || userRole === 'admin') {
+    const todasLasEmpresas = [
+      'la-cantera',
+      'peralillo',
+      'plaza-galerena',
+      'inmobiliaria-galerena',
+      'icrear',
+    ];
+
+    return todasLasEmpresas.map(empresaCode => ({
+      tenantId: empresaCode,
+      empresaCodigo: empresaCode,
+      proveedorCodigo: null, // Los admins no tienen código de proveedor
+      permisos: ['admin'], // Permisos completos
+      tenantName: empresaToNameMap[empresaCode] || empresaCode,
+    }));
+  }
+
+  // Para proveedores, buscar en portal_proveedor_mapping
+  const result = await hybridDB.queryPortal(
+    `
+    SELECT DISTINCT
+      ppm.empresa_code,
+      ppm.erp_proveedor_code,
+      ppm.permisos
+    FROM portal_proveedor_mapping ppm
+    WHERE ppm.portal_user_id = @userId
+      AND ppm.activo = 1
+    `,
+    { userId }
+  );
 
   return result.recordset.map(row => ({
     tenantId: row.empresa_code, // Ahora empresa_code ES el tenantId (la-cantera, peralillo, etc.)

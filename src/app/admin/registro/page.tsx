@@ -25,12 +25,12 @@ import { useAuth } from '@/app/providers';
 import { initialRoles } from '@/lib/roles';
 import { useToast } from '@/hooks/use-toast';
 
-// Mapeo de roles de UI a roles de Firebase
-const roleMapping: Record<string, 'admin_super' | 'admin_compras'> = {
-  'Super Admin': 'admin_super',
-  'Compras': 'admin_compras',
-  'Contabilidad': 'admin_super', // Ajusta según necesites
-  'Solo lectura': 'admin_super', // Ajusta según necesites
+// Mapeo de roles de UI a roles del portal
+const roleMapping: Record<string, 'super-admin' | 'admin'> = {
+  'Super Admin': 'super-admin',
+  'Compras': 'admin',
+  'Contabilidad': 'admin',
+  'Solo lectura': 'admin',
 };
 
 export default function RegistroAdminPage() {
@@ -81,23 +81,48 @@ export default function RegistroAdminPage() {
     setLoading(true);
 
     try {
-      // TODO: Implementar registro de administradores usando SQL Server
-      // Por ahora, los administradores deben ser creados directamente en el ERP
+      console.log('🔧 [REGISTRO ADMIN] Enviando datos:', { email, nombre: fullName, rol: roleMapping[role] });
 
-      setError(
-        'El registro de administradores no está disponible en este portal. ' +
-        'Los usuarios administrativos deben ser creados en el sistema ERP.'
-      );
-      setLoading(false);
-
-      toast({
-        title: "Función no disponible",
-        description: "Contacta al administrador del sistema para crear cuentas administrativas.",
-        variant: "destructive",
+      // Llamar al API endpoint de registro
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          nombre: fullName,
+          rfc: 'XAXX010101000', // RFC genérico para administradores
+          razonSocial: razonSocial,
+          rol: roleMapping[role] || 'admin',
+          telefono: telefono,
+          datosAdicionales: additionalContact,
+        }),
       });
 
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error || "Ocurrió un error al registrar la cuenta.");
+        setLoading(false);
+        return;
+      }
+
+      toast({
+        title: "¡Registro exitoso!",
+        description: result.message || "Tu cuenta de administrador ha sido creada exitosamente.",
+      });
+
+      console.log('✅ [REGISTRO ADMIN] Cuenta creada exitosamente');
+
+      // Redirigir al login después de 2 segundos
+      setTimeout(() => {
+        router.push('/login');
+      }, 2000);
+
     } catch (error: any) {
-      console.error('❌ Error en registro:', error);
+      console.error('❌ [REGISTRO ADMIN] Error:', error);
       setError(error.message || "Ocurrió un error al registrar la cuenta.");
       setLoading(false);
     }
