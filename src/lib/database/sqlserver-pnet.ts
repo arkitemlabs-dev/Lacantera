@@ -234,8 +234,160 @@ export class SqlServerPNetDatabase implements Database {
   // ==================== PROVEEDORES ====================
 
   async getProveedor(uid: string): Promise<ProveedorUser | null> {
-    const pool = await getConnection();
+    try {
+      // Verificar si es un proveedor solo del ERP (no registrado en portal)
+      if (uid.startsWith('erp_')) {
+        const codigoERP = uid.replace('erp_', '');
+        return await this.getProveedorFromERP(codigoERP);
+      }
 
+      // Proveedor registrado en el portal - buscar por UsuarioWeb
+      const portalPool = await getConnection();
+      const portalResult = await portalPool
+        .request()
+        .input('userId', sql.Int, parseInt(uid))
+        .query(`
+          SELECT
+            wu.UsuarioWeb,
+            wu.eMail,
+            wu.Nombre as UsuarioNombre,
+            wu.Telefono as UsuarioTelefono,
+            wu.Estatus as UsuarioEstatus,
+            wu.Empresa,
+            wu.Proveedor,
+            wu.Alta as FechaRegistro
+          FROM WebUsuario wu
+          WHERE wu.UsuarioWeb = @userId
+        `);
+
+      if (portalResult.recordset.length === 0) {
+        // Intentar buscar en pNetUsuario (sistema antiguo)
+        return await this.getProveedorFromPNetUsuario(uid);
+      }
+
+      const portalUsuario = portalResult.recordset[0];
+      const codigoERP = portalUsuario.Proveedor?.trim();
+
+      if (!codigoERP) {
+        console.warn(`[getProveedor] Usuario ${uid} no tiene proveedor asociado`);
+        return null;
+      }
+
+      // Obtener datos del ERP
+      const erpPool = await getERPConnection('la-cantera');
+      const erpResult = await erpPool
+        .request()
+        .input('proveedor', sql.VarChar(20), codigoERP)
+        .query(`
+          SELECT
+            p.Proveedor,
+            p.Nombre as ProveedorNombre,
+            p.NombreCorto,
+            p.RFC,
+            p.Direccion,
+            p.DireccionNumero,
+            p.Colonia,
+            p.Poblacion,
+            p.Estado,
+            p.Pais,
+            p.CodigoPostal,
+            p.Telefonos as ProveedorTelefono,
+            p.eMail1 as ProveedorEmail,
+            p.eMail2 as ProveedorEmail2,
+            p.Contacto1,
+            p.Contacto2,
+            p.Categoria,
+            p.Condicion as CondicionPago,
+            p.Estatus as ProveedorEstatus,
+            p.Situacion,
+            p.SituacionNota,
+            p.Alta as FechaAltaERP,
+            p.ProvBancoSucursal as Banco,
+            p.ProvCuenta as CuentaBancaria,
+            p.FormaPago
+          FROM Prov p
+          WHERE p.Proveedor = @proveedor
+        `);
+
+      if (erpResult.recordset.length === 0) {
+        console.warn(`[getProveedor] Proveedor ${codigoERP} no encontrado en ERP`);
+        return null;
+      }
+
+      const erpRow = erpResult.recordset[0];
+
+      // Combinar datos del portal y ERP
+      return this.mapRowToProveedorUserFromERP({
+        ...erpRow,
+        IDUsuario: portalUsuario.UsuarioWeb,
+        eMail: portalUsuario.eMail,
+        UsuarioNombre: portalUsuario.UsuarioNombre,
+        UsuarioEstatus: portalUsuario.UsuarioEstatus,
+        UsuarioTelefono: portalUsuario.UsuarioTelefono,
+        FechaRegistro: portalUsuario.FechaRegistro,
+        RegistradoEnPortal: 1,
+      });
+
+    } catch (error: any) {
+      console.error('[getProveedor] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene un proveedor directamente del ERP (no registrado en portal)
+   */
+  private async getProveedorFromERP(codigoERP: string): Promise<ProveedorUser | null> {
+    const erpPool = await getERPConnection('la-cantera');
+    const erpResult = await erpPool
+      .request()
+      .input('proveedor', sql.VarChar(20), codigoERP)
+      .query(`
+        SELECT
+          p.Proveedor,
+          p.Nombre as ProveedorNombre,
+          p.NombreCorto,
+          p.RFC,
+          p.Direccion,
+          p.DireccionNumero,
+          p.Colonia,
+          p.Poblacion,
+          p.Estado,
+          p.Pais,
+          p.CodigoPostal,
+          p.Telefonos as ProveedorTelefono,
+          p.eMail1 as ProveedorEmail,
+          p.eMail2 as ProveedorEmail2,
+          p.Contacto1,
+          p.Contacto2,
+          p.Categoria,
+          p.Condicion as CondicionPago,
+          p.Estatus as ProveedorEstatus,
+          p.Situacion,
+          p.SituacionNota,
+          p.Alta as FechaAltaERP,
+          p.ProvBancoSucursal as Banco,
+          p.ProvCuenta as CuentaBancaria,
+          p.FormaPago
+        FROM Prov p
+        WHERE p.Proveedor = @proveedor
+      `);
+
+    if (erpResult.recordset.length === 0) {
+      return null;
+    }
+
+    return this.mapRowToProveedorUserFromERP({
+      ...erpResult.recordset[0],
+      RegistradoEnPortal: 0,
+    });
+  }
+
+  /**
+   * Busca un proveedor en el sistema antiguo pNetUsuario
+   */
+  private async getProveedorFromPNetUsuario(uid: string): Promise<ProveedorUser | null> {
+    const pool = await getConnection();
     const result = await pool
       .request()
       .input('userId', sql.Int, parseInt(uid))
@@ -248,23 +400,59 @@ export class SqlServerPNetDatabase implements Database {
           u.Telefono,
           u.Estatus,
           u.Empresa,
-          p.Proveedor,
-          p.Nombre as ProveedorNombre,
-          p.RFC,
-          p.Direccion,
-          p.Colonia,
-          p.Poblacion,
-          p.Estado,
-          p.CodigoPostal,
-          p.Estatus as ProveedorEstatus
+          u.FechaRegistro
         FROM pNetUsuario u
-        INNER JOIN Prov p ON u.Usuario = p.Proveedor
         WHERE u.IDUsuario = @userId AND u.IDUsuarioTipo = 4
       `);
 
     if (result.recordset.length === 0) return null;
 
-    return this.mapRowToProveedorUser(result.recordset[0]);
+    const usuario = result.recordset[0];
+    const codigoERP = usuario.Usuario?.trim();
+
+    if (!codigoERP) return null;
+
+    // Obtener datos del ERP
+    const erpPool = await getERPConnection('la-cantera');
+    const erpResult = await erpPool
+      .request()
+      .input('proveedor', sql.VarChar(20), codigoERP)
+      .query(`
+        SELECT
+          p.Proveedor,
+          p.Nombre as ProveedorNombre,
+          p.NombreCorto,
+          p.RFC,
+          p.Direccion,
+          p.DireccionNumero,
+          p.Colonia,
+          p.Poblacion,
+          p.Estado,
+          p.CodigoPostal,
+          p.Telefonos as ProveedorTelefono,
+          p.eMail1 as ProveedorEmail,
+          p.Categoria,
+          p.Condicion as CondicionPago,
+          p.Estatus as ProveedorEstatus,
+          p.Alta as FechaAltaERP,
+          p.ProvBancoSucursal as Banco,
+          p.ProvCuenta as CuentaBancaria
+        FROM Prov p
+        WHERE p.Proveedor = @proveedor
+      `);
+
+    if (erpResult.recordset.length === 0) return null;
+
+    return this.mapRowToProveedorUserFromERP({
+      ...erpResult.recordset[0],
+      IDUsuario: usuario.IDUsuario,
+      eMail: usuario.eMail,
+      UsuarioNombre: usuario.Nombre,
+      UsuarioEstatus: usuario.Estatus,
+      UsuarioTelefono: usuario.Telefono,
+      FechaRegistro: usuario.FechaRegistro,
+      RegistradoEnPortal: 1,
+    });
   }
 
   async updateProveedor(uid: string, data: Partial<ProveedorUser>): Promise<void> {
@@ -428,7 +616,7 @@ export class SqlServerPNetDatabase implements Database {
       const erpResult = await erpRequest.query(erpQuery);
       console.log(`[ERP-QUERY] Encontrados ${erpResult.recordset.length} proveedores en ERP`);
 
-      // 2. Obtener usuarios registrados en el portal
+      // 2. Obtener usuarios registrados en el portal (tabla WebUsuario)
       const portalPool = await getConnection();
       const portalQuery = `
         SELECT
@@ -438,26 +626,34 @@ export class SqlServerPNetDatabase implements Database {
           wu.Estatus as UsuarioEstatus,
           wu.Alta as FechaRegistro,
           wu.Telefono as UsuarioTelefono,
-          wu.Proveedor as ProveedorRef
+          wu.Proveedor,
+          wu.Rol
         FROM WebUsuario wu
-        WHERE wu.Rol = 'proveedor'
+        WHERE wu.Proveedor IS NOT NULL
+          AND wu.Proveedor != ''
       `;
 
       console.log('[PORTAL-QUERY] Obteniendo usuarios del portal...');
       const portalResult = await portalPool.request().query(portalQuery);
       console.log(`[PORTAL-QUERY] Encontrados ${portalResult.recordset.length} usuarios proveedores en portal`);
 
+      // Debug: mostrar los proveedores encontrados en el portal
+      if (portalResult.recordset.length > 0) {
+        console.log('[PORTAL-QUERY] Proveedores registrados:', portalResult.recordset.map(u => u.Proveedor).join(', '));
+      }
+
       // 3. Crear mapa de proveedores registrados en el portal (por código de proveedor)
       const portalUsuariosMap = new Map<string, any>();
       for (const usuario of portalResult.recordset) {
-        if (usuario.ProveedorRef) {
-          portalUsuariosMap.set(usuario.ProveedorRef, usuario);
+        if (usuario.Proveedor) {
+          portalUsuariosMap.set(usuario.Proveedor.trim(), usuario);
         }
       }
 
       // 4. Combinar datos: ERP + Portal
       let proveedores: ProveedorUser[] = erpResult.recordset.map(erpRow => {
-        const portalUsuario = portalUsuariosMap.get(erpRow.Proveedor);
+        const codigoERP = erpRow.Proveedor?.trim() || '';
+        const portalUsuario = portalUsuariosMap.get(codigoERP);
         return this.mapRowToProveedorUserFromERP({
           ...erpRow,
           // Datos del portal si existe

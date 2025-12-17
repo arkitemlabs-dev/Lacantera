@@ -233,6 +233,7 @@ export async function getProveedoresConDatosERP(
               p.DefMoneda
             FROM Prov p
             WHERE p.Proveedor = @proveedorCode
+              AND p.Estatus = 'ALTA'
             `,
             { proveedorCode: primeraEmpresa.erpProveedorCode }
           );
