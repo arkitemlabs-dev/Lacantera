@@ -4,6 +4,7 @@
 import sql from 'mssql';
 import bcrypt from 'bcrypt';
 import { getConnection } from '@/lib/sql-connection';
+import { getERPConnection } from './multi-tenant-connection';
 import type {
   Database,
   ProveedorFilters,
@@ -348,71 +349,162 @@ export class SqlServerPNetDatabase implements Database {
   }
 
   async getProveedores(filters?: ProveedorFilters): Promise<ProveedorUser[]> {
-    const pool = await getConnection();
-    const conditions: string[] = ['u.IDUsuarioTipo = 4']; // Solo tipo Proveedor
-    const request = pool.request();
+    try {
+      // 1. Obtener proveedores del ERP de La Cantera
+      const erpPool = await getERPConnection('la-cantera');
+      const erpRequest = erpPool.request();
 
-    // Filtros de estatus (mapear a estatus de Prov)
-    if (filters?.status) {
-      const statusMap: { [key: string]: string } = {
-        aprobado: 'ALTA',
-        pendiente: 'BAJA',
-        rechazado: 'BAJA',
-      };
+      // Construir condiciones para el ERP
+      const erpConditions: string[] = [
+        "p.Tipo = 'Proveedor Nal'", // Solo proveedores nacionales, no estructuras
+      ];
 
-      if (Array.isArray(filters.status)) {
-        const sqlStatuses = filters.status.map(s => statusMap[s] || 'ALTA');
-        const placeholders = sqlStatuses.map((_, i) => `@status${i}`).join(',');
-        conditions.push(`p.Estatus IN (${placeholders})`);
-        sqlStatuses.forEach((s, i) => {
-          request.input(`status${i}`, sql.VarChar(15), s);
-        });
-      } else {
-        const sqlStatus = statusMap[filters.status] || 'ALTA';
-        conditions.push('p.Estatus = @status');
-        request.input('status', sql.VarChar(15), sqlStatus);
+      // Filtros de estatus del ERP
+      if (filters?.status) {
+        const statusMap: { [key: string]: string } = {
+          activo: 'ALTA',
+          pendiente_validacion: 'BLOQUEADO',
+          rechazado: 'BAJA',
+          suspendido: 'BLOQUEADO',
+        };
+
+        if (Array.isArray(filters.status)) {
+          const sqlStatuses = filters.status.map(s => statusMap[s] || 'ALTA');
+          const placeholders = sqlStatuses.map((_, i) => `@status${i}`).join(',');
+          erpConditions.push(`p.Estatus IN (${placeholders})`);
+          sqlStatuses.forEach((s, i) => {
+            erpRequest.input(`status${i}`, sql.VarChar(15), s);
+          });
+        } else {
+          const sqlStatus = statusMap[filters.status] || 'ALTA';
+          erpConditions.push('p.Estatus = @status');
+          erpRequest.input('status', sql.VarChar(15), sqlStatus);
+        }
       }
+
+      const erpWhereClause = erpConditions.length > 0 ? `WHERE ${erpConditions.join(' AND ')}` : '';
+
+      // Query al ERP - Solo columnas necesarias para el portal
+      const erpQuery = `
+        SELECT
+          p.Proveedor,
+          p.Nombre as ProveedorNombre,
+          p.NombreCorto,
+          p.RFC,
+          p.Direccion,
+          p.DireccionNumero,
+          p.Colonia,
+          p.Poblacion,
+          p.Estado,
+          p.Pais,
+          p.CodigoPostal,
+          p.Telefonos as ProveedorTelefono,
+          p.eMail1 as ProveedorEmail,
+          p.eMail2 as ProveedorEmail2,
+          p.Contacto1,
+          p.Contacto2,
+          p.Categoria,
+          p.Condicion as CondicionPago,
+          p.Estatus as ProveedorEstatus,
+          p.Situacion,
+          p.SituacionFecha,
+          p.SituacionNota,
+          p.Alta as FechaAltaERP,
+          p.UltimoCambio,
+          p.Tipo,
+          p.ProvBancoSucursal as Banco,
+          p.ProvCuenta as CuentaBancaria,
+          p.FormaPago,
+          p.DiaRevision1,
+          p.DiaRevision2,
+          p.DiaPago1,
+          p.DiaPago2
+        FROM Prov p
+        ${erpWhereClause}
+        ORDER BY p.Nombre ASC
+      `;
+
+      console.log('[ERP-QUERY] Obteniendo proveedores de Cantera_ajustes...');
+      const erpResult = await erpRequest.query(erpQuery);
+      console.log(`[ERP-QUERY] Encontrados ${erpResult.recordset.length} proveedores en ERP`);
+
+      // 2. Obtener usuarios registrados en el portal
+      const portalPool = await getConnection();
+      const portalQuery = `
+        SELECT
+          wu.UsuarioWeb,
+          wu.eMail,
+          wu.Nombre as UsuarioNombre,
+          wu.Estatus as UsuarioEstatus,
+          wu.Alta as FechaRegistro,
+          wu.Telefono as UsuarioTelefono,
+          wu.Proveedor as ProveedorRef
+        FROM WebUsuario wu
+        WHERE wu.Rol = 'proveedor'
+      `;
+
+      console.log('[PORTAL-QUERY] Obteniendo usuarios del portal...');
+      const portalResult = await portalPool.request().query(portalQuery);
+      console.log(`[PORTAL-QUERY] Encontrados ${portalResult.recordset.length} usuarios proveedores en portal`);
+
+      // 3. Crear mapa de proveedores registrados en el portal (por código de proveedor)
+      const portalUsuariosMap = new Map<string, any>();
+      for (const usuario of portalResult.recordset) {
+        if (usuario.ProveedorRef) {
+          portalUsuariosMap.set(usuario.ProveedorRef, usuario);
+        }
+      }
+
+      // 4. Combinar datos: ERP + Portal
+      let proveedores: ProveedorUser[] = erpResult.recordset.map(erpRow => {
+        const portalUsuario = portalUsuariosMap.get(erpRow.Proveedor);
+        return this.mapRowToProveedorUserFromERP({
+          ...erpRow,
+          // Datos del portal si existe
+          IDUsuario: portalUsuario?.UsuarioWeb || null,
+          eMail: portalUsuario?.eMail || null,
+          UsuarioNombre: portalUsuario?.UsuarioNombre || null,
+          UsuarioEstatus: portalUsuario?.UsuarioEstatus || null,
+          FechaRegistro: portalUsuario?.FechaRegistro || null,
+          UsuarioTelefono: portalUsuario?.UsuarioTelefono || null,
+          RegistradoEnPortal: portalUsuario ? 1 : 0,
+        });
+      });
+
+      // 5. Filtro por estado de registro en portal
+      if (filters?.registradoEnPortal !== undefined) {
+        proveedores = proveedores.filter(p =>
+          filters.registradoEnPortal ? p.registradoEnPortal : !p.registradoEnPortal
+        );
+      }
+
+      // 6. Filtrado por búsqueda
+      if (filters?.searchTerm) {
+        const term = filters.searchTerm.toLowerCase();
+        proveedores = proveedores.filter(
+          p =>
+            p.razonSocial.toLowerCase().includes(term) ||
+            p.rfc.toLowerCase().includes(term) ||
+            p.email.toLowerCase().includes(term) ||
+            (p.codigoERP && p.codigoERP.toLowerCase().includes(term))
+        );
+      }
+
+      // 7. Ordenar: primero registrados, luego por nombre
+      proveedores.sort((a, b) => {
+        // Primero los registrados
+        if (a.registradoEnPortal && !b.registradoEnPortal) return -1;
+        if (!a.registradoEnPortal && b.registradoEnPortal) return 1;
+        // Luego por nombre
+        return a.razonSocial.localeCompare(b.razonSocial);
+      });
+
+      return proveedores;
+
+    } catch (error: any) {
+      console.error('[getProveedores] Error:', error.message);
+      throw error;
     }
-
-    const query = `
-      SELECT
-        u.IDUsuario,
-        u.Usuario,
-        u.eMail,
-        u.Nombre,
-        u.Telefono,
-        u.Estatus,
-        u.Empresa,
-        p.Proveedor,
-        p.Nombre as ProveedorNombre,
-        p.RFC,
-        p.Direccion,
-        p.Colonia,
-        p.Poblacion,
-        p.Estado,
-        p.CodigoPostal,
-        p.Estatus as ProveedorEstatus
-      FROM pNetUsuario u
-      INNER JOIN Prov p ON u.Usuario = p.Proveedor
-      WHERE ${conditions.join(' AND ')}
-      ORDER BY u.FechaRegistro DESC
-    `;
-
-    const result = await request.query(query);
-    let proveedores = result.recordset.map(row => this.mapRowToProveedorUser(row));
-
-    // Filtrado en memoria para searchTerm
-    if (filters?.searchTerm) {
-      const term = filters.searchTerm.toLowerCase();
-      proveedores = proveedores.filter(
-        p =>
-          p.razonSocial.toLowerCase().includes(term) ||
-          p.rfc.toLowerCase().includes(term) ||
-          p.email.toLowerCase().includes(term)
-      );
-    }
-
-    return proveedores;
   }
 
   async updateProveedorStatus(uid: string, status: ProveedorUser['status']): Promise<void> {
@@ -559,7 +651,59 @@ export class SqlServerPNetDatabase implements Database {
       },
       status: row.ProveedorEstatus === 'ALTA' ? 'aprobado' : 'pendiente',
       documentosValidados: false,
+      registradoEnPortal: true,
+      fechaRegistroPortal: row.FechaRegistro || null,
+      codigoERP: row.Proveedor,
       createdAt: new Date(),
+    };
+  }
+
+  /**
+   * Mapea un registro que viene del ERP (Prov) con posible usuario de portal
+   * Usado para mostrar todos los proveedores incluyendo los no registrados
+   */
+  private mapRowToProveedorUserFromERP(row: any): ProveedorUser {
+    const registradoEnPortal = row.RegistradoEnPortal === 1;
+
+    // Mapear estatus del ERP a estatus del portal
+    let status: ProveedorUser['status'] = 'pendiente_validacion';
+    if (row.ProveedorEstatus === 'ALTA') {
+      status = 'activo';
+    } else if (row.ProveedorEstatus === 'BLOQUEADO') {
+      status = 'suspendido';
+    } else if (row.ProveedorEstatus === 'BAJA') {
+      status = 'rechazado';
+    }
+
+    // Construir dirección completa
+    const direccionParts = [row.Direccion, row.DireccionNumero].filter(Boolean);
+    const direccionCompleta = direccionParts.join(' ');
+
+    return {
+      // Si está registrado en portal, usar IDUsuario; si no, usar código del ERP como identificador
+      uid: registradoEnPortal ? String(row.IDUsuario) : `erp_${row.Proveedor}`,
+      // Si está registrado, usar email del portal; si no, usar email del ERP
+      email: registradoEnPortal ? (row.eMail || row.ProveedorEmail || '') : (row.ProveedorEmail || ''),
+      displayName: row.ProveedorNombre || row.UsuarioNombre || '',
+      role: 'proveedor',
+      userType: 'Proveedor',
+      empresa: 'la-cantera', // Por ahora solo La Cantera
+      isActive: registradoEnPortal ? (row.UsuarioEstatus === 'ACTIVO') : (row.ProveedorEstatus === 'ALTA'),
+      rfc: row.RFC || '',
+      razonSocial: row.ProveedorNombre || '',
+      telefono: registradoEnPortal ? (row.UsuarioTelefono || row.ProveedorTelefono || '') : (row.ProveedorTelefono || ''),
+      direccion: {
+        calle: direccionCompleta || '',
+        ciudad: row.Poblacion || '',
+        estado: row.Estado || '',
+        cp: row.CodigoPostal || '',
+      },
+      status,
+      documentosValidados: false,
+      registradoEnPortal: registradoEnPortal,
+      fechaRegistroPortal: registradoEnPortal && row.FechaRegistro ? new Date(row.FechaRegistro) : null,
+      codigoERP: row.Proveedor,
+      createdAt: registradoEnPortal && row.FechaRegistro ? new Date(row.FechaRegistro) : (row.FechaAltaERP ? new Date(row.FechaAltaERP) : new Date()),
     };
   }
 

@@ -32,6 +32,12 @@ export interface ProveedorUser extends BaseUser {
   };
   status: 'activo' | 'pendiente_validacion' | 'rechazado' | 'suspendido';
   documentosValidados: boolean;
+  // Indica si el proveedor ya se registró en el portal (tiene usuario en pNetUsuario)
+  registradoEnPortal: boolean;
+  // Fecha de registro en el portal (null si no se ha registrado)
+  fechaRegistroPortal?: Date | null;
+  // Código del proveedor en el ERP
+  codigoERP?: string;
 }
 
 export interface AdminUser extends BaseUser {

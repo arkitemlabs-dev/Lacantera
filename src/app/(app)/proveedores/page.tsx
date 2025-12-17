@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { MoreHorizontal, PlusCircle, Eye, ListFilter, Loader2 } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Eye, ListFilter, Loader2, UserCheck, UserX } from 'lucide-react';
 import type { SupplierStatus, SupplierType } from '@/lib/types';
 import { getProveedores } from '@/app/actions/proveedores';
 
@@ -38,6 +38,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 const statusStyles: Record<
@@ -70,9 +76,10 @@ export default function ProveedoresPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [registroFilter, setRegistroFilter] = useState('all'); // Nuevo filtro para estado de registro
   const [proveedores, setProveedores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   useEffect(() => {
     cargarProveedores();
   }, []);
@@ -82,7 +89,7 @@ export default function ProveedoresPage() {
     console.log('🔍 Cargando proveedores...');
     const result = await getProveedores();
     console.log('📦 Resultado:', result);
-    
+
     if (result.success) {
       console.log('✅ Proveedores cargados:', result.data);
       console.log("🔍 Primer proveedor:", result.data[0]);
@@ -101,14 +108,28 @@ export default function ProveedoresPage() {
           supplier.rfc?.toLowerCase().includes(searchTerm.toLowerCase());
         const status = statusFilter === 'all' || supplier.status === statusFilter;
         const type = typeFilter === 'all' || supplier.tipoProveedor === typeFilter;
-        return searchFilter && status && type;
+        // Filtro de registro en portal
+        const registro =
+          registroFilter === 'all' ||
+          (registroFilter === 'registrado' && supplier.registradoEnPortal === true) ||
+          (registroFilter === 'no_registrado' && supplier.registradoEnPortal === false);
+        return searchFilter && status && type && registro;
       });
-  }, [proveedores, searchTerm, statusFilter, typeFilter]);
+  }, [proveedores, searchTerm, statusFilter, typeFilter, registroFilter]);
+
+  // Calcular estadísticas
+  const stats = useMemo(() => {
+    const total = proveedores.length;
+    const registrados = proveedores.filter(p => p.registradoEnPortal === true).length;
+    const noRegistrados = proveedores.filter(p => p.registradoEnPortal === false).length;
+    return { total, registrados, noRegistrados };
+  }, [proveedores]);
 
   const clearFilters = () => {
     setSearchTerm('');
     setStatusFilter('all');
     setTypeFilter('all');
+    setRegistroFilter('all');
   };
 
   return (
@@ -129,6 +150,39 @@ export default function ProveedoresPage() {
           </Button>
         </div>
 
+        {/* Tarjetas de estadísticas */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Proveedores</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.total}</div>
+              <p className="text-xs text-muted-foreground">En el sistema ERP</p>
+            </CardContent>
+          </Card>
+          <Card className="border-green-500/20">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-green-600 dark:text-green-400">Registrados en Portal</CardTitle>
+              <UserCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.registrados}</div>
+              <p className="text-xs text-muted-foreground">Con acceso al portal</p>
+            </CardContent>
+          </Card>
+          <Card className="border-orange-500/20">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-orange-600 dark:text-orange-400">Sin Registrar</CardTitle>
+              <UserX className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{stats.noRegistrados}</div>
+              <p className="text-xs text-muted-foreground">Pendientes de registro</p>
+            </CardContent>
+          </Card>
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle>Filtrar Proveedores</CardTitle>
@@ -142,16 +196,24 @@ export default function ProveedoresPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
+              <Select value={registroFilter} onValueChange={setRegistroFilter}>
+                <SelectTrigger className="w-full md:w-[200px]">
+                  <SelectValue placeholder="Estado de registro" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los proveedores</SelectItem>
+                  <SelectItem value="registrado">Registrados en portal</SelectItem>
+                  <SelectItem value="no_registrado">Sin registrar</SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-full md:w-[180px]">
-                  <SelectValue placeholder="Estado" />
+                  <SelectValue placeholder="Estado ERP" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="active">Activo</SelectItem>
-                  <SelectItem value="inactive">Inactivo</SelectItem>
-                  <SelectItem value="attention">Requiere atención</SelectItem>
-                  <SelectItem value="review">En revisión</SelectItem>
+                  <SelectItem value="activo">Activo</SelectItem>
+                  <SelectItem value="pendiente_validacion">Pendiente</SelectItem>
                 </SelectContent>
               </Select>
                <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -182,75 +244,136 @@ export default function ProveedoresPage() {
                 No se encontraron proveedores.
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre del Proveedor</TableHead>
-                    <TableHead>Contacto</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Fecha de Registro</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">
-                      <span className="sr-only">Acciones</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {displayedSuppliers.map((supplier) => (
-                    <TableRow key={supplier.uid}>
-                      <TableCell className="font-medium">
-                        <Link href={`/proveedores/${supplier.uid}`} className="hover:underline">
-                          {supplier.razonSocial}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{supplier.nombreContacto || supplier.email}</TableCell>
-                      <TableCell>{typeText[supplier.tipoProveedor as SupplierType] || supplier.tipoProveedor}</TableCell>
-                      <TableCell>
-                        {supplier.createdAt 
-                          ? new Date(supplier.createdAt).toLocaleDateString("es-MX")
-                          : "N/A"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={statusStyles[supplier.status as SupplierStatus]?.variant || "secondary"} 
-                          className={cn(statusStyles[supplier.status as SupplierStatus]?.className)}
-                        >
-                          {statusText[supplier.status as SupplierStatus] || supplier.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button asChild variant="ghost" size="icon">
-                             <Link href={`/proveedores/${supplier.uid}`}>
-                               <Eye className="h-4 w-4" />
-                               <span className="sr-only">Ver Detalles</span>
-                             </Link>
-                           </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                aria-haspopup="true"
-                                size="icon"
-                                variant="ghost"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Toggle menu</span>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                              <DropdownMenuItem>Editar</DropdownMenuItem>
-                              <DropdownMenuItem>
-                                {supplier.status === "active" ? "Desactivar" : "Activar"}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
+              <TooltipProvider>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[50px]">Portal</TableHead>
+                      <TableHead>Nombre del Proveedor</TableHead>
+                      <TableHead>RFC</TableHead>
+                      <TableHead>Contacto</TableHead>
+                      <TableHead>Fecha de Registro</TableHead>
+                      <TableHead>Estado ERP</TableHead>
+                      <TableHead className="text-right">
+                        <span className="sr-only">Acciones</span>
+                      </TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {displayedSuppliers.map((supplier) => (
+                      <TableRow
+                        key={supplier.uid}
+                        className={cn(
+                          !supplier.registradoEnPortal && "bg-orange-50/50 dark:bg-orange-950/10"
+                        )}
+                      >
+                        <TableCell>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center justify-center">
+                                {supplier.registradoEnPortal ? (
+                                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+                                    <UserCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                  </div>
+                                ) : (
+                                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30">
+                                    <UserX className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                                  </div>
+                                )}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {supplier.registradoEnPortal
+                                ? "Registrado en el portal"
+                                : "Sin registro en el portal"}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {supplier.registradoEnPortal ? (
+                            <Link href={`/proveedores/${supplier.uid}`} className="hover:underline">
+                              {supplier.razonSocial}
+                            </Link>
+                          ) : (
+                            <span className="text-muted-foreground">{supplier.razonSocial}</span>
+                          )}
+                          {supplier.codigoERP && (
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              ({supplier.codigoERP})
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{supplier.rfc || "-"}</TableCell>
+                        <TableCell>{supplier.email || "-"}</TableCell>
+                        <TableCell>
+                          {supplier.registradoEnPortal && supplier.fechaRegistroPortal ? (
+                            <span className="text-green-600 dark:text-green-400">
+                              {new Date(supplier.fechaRegistroPortal).toLocaleDateString("es-MX")}
+                            </span>
+                          ) : (
+                            <Badge variant="outline" className="text-orange-600 dark:text-orange-400 border-orange-300">
+                              Sin registrar
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={supplier.status === 'activo' ? 'default' : 'secondary'}
+                            className={cn(
+                              supplier.status === 'activo'
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'
+                            )}
+                          >
+                            {supplier.status === 'activo' ? 'Alta' : 'Baja'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {supplier.registradoEnPortal && (
+                              <Button asChild variant="ghost" size="icon">
+                                <Link href={`/proveedores/${supplier.uid}`}>
+                                  <Eye className="h-4 w-4" />
+                                  <span className="sr-only">Ver Detalles</span>
+                                </Link>
+                              </Button>
+                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  aria-haspopup="true"
+                                  size="icon"
+                                  variant="ghost"
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                  <span className="sr-only">Toggle menu</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                {supplier.registradoEnPortal ? (
+                                  <>
+                                    <DropdownMenuItem>Ver perfil</DropdownMenuItem>
+                                    <DropdownMenuItem>Editar</DropdownMenuItem>
+                                    <DropdownMenuItem>
+                                      {supplier.status === "activo" ? "Desactivar" : "Activar"}
+                                    </DropdownMenuItem>
+                                  </>
+                                ) : (
+                                  <>
+                                    <DropdownMenuItem>Invitar al portal</DropdownMenuItem>
+                                    <DropdownMenuItem>Ver datos ERP</DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TooltipProvider>
             )}
           </CardContent>
         </Card>

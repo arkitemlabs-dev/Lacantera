@@ -120,6 +120,8 @@ export interface ProveedorFilters {
   empresa?: string;
   documentosValidados?: boolean;
   searchTerm?: string;
+  // Filtro para mostrar solo proveedores registrados o no registrados en el portal
+  registradoEnPortal?: boolean;
 }
 
 export interface OrdenCompraFilters {
