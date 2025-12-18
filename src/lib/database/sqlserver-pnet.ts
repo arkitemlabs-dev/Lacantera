@@ -553,7 +553,7 @@ export class SqlServerPNetDatabase implements Database {
       const erpPool = await getERPConnection('la-cantera');
       const erpRequest = erpPool.request();
 
-      // Filtro por defecto: solo proveedores ALTA (excluir BLOQUEADO)
+      // Filtro por defecto: solo proveedores ALTA
       const erpConditions: string[] = ["p.Estatus = 'ALTA'"];
 
       // Filtros de estatus del ERP

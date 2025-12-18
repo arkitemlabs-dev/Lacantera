@@ -147,7 +147,7 @@ export async function getProveedoresConDatosERP(
         p.DefMoneda
       FROM Prov p`;
     
-    // Aplicar filtro de estatus (por defecto solo ALTA, excluir BLOQUEADO)
+    // Aplicar filtro de estatus (por defecto solo ALTA)
     if (estatusERP) {
       erpQuery += ` WHERE p.Estatus = '${estatusERP.toUpperCase()}'`;
     } else {
