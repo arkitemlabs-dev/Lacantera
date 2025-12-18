@@ -23,8 +23,13 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     // No redirigir si estamos en login
     if (pathname === '/login' || pathname === '/') return;
     
+    // Verificar si es vista de admin en perfil de proveedor
+    const isAdminViewingSupplier = pathname.startsWith('/proveedores/perfil') && 
+                                  typeof window !== 'undefined' && 
+                                  new URLSearchParams(window.location.search).get('id');
+    
     // Rutas exclusivas para PROVEEDORES (portal de proveedores)
-    const isSupplierRoute = pathname.startsWith('/proveedores/perfil') ||
+    const isSupplierRoute = (pathname.startsWith('/proveedores/perfil') && !isAdminViewingSupplier) ||
                            pathname.startsWith('/proveedores/dashboard') ||
                            pathname.startsWith('/proveedores/ordenes') ||
                            pathname.startsWith('/proveedores/facturas') ||

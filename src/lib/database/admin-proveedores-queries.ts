@@ -310,7 +310,13 @@ export async function getProveedoresConDatosERP(
  */
 export async function getProveedorCompleto(portalUserId: string) {
   try {
-    // Buscar específicamente el proveedor solicitado
+    // Verificar si es un proveedor solo del ERP (no registrado en portal)
+    if (portalUserId.startsWith('erp_')) {
+      const codigoERP = portalUserId.replace('erp_', '');
+      return await getProveedorSoloERP(codigoERP);
+    }
+
+    // Buscar específicamente el proveedor registrado en portal
     const portalResult = await hybridDB.queryPortal(
       `
       SELECT
@@ -428,7 +434,7 @@ export async function getProveedorCompleto(portalUserId: string) {
             descuento: erp.Descuento,
             banco: erp.ProvBancoSucursal,
             cuenta: erp.ProvCuenta,
-            estatus: erp.Estatus,
+            estatus: 'ALTA', // Forzar ALTA ya que solo consultamos proveedores activos
             situacion: erp.Situacion,
             situacionFecha: erp.SituacionFecha,
             situacionNota: erp.SituacionNota,
@@ -466,6 +472,119 @@ export async function getProveedorCompleto(portalUserId: string) {
     console.error('Error en getProveedorCompleto:', error);
     throw error;
   }
+}
+
+/**
+ * Obtiene un proveedor que solo existe en el ERP (no registrado en portal)
+ */
+async function getProveedorSoloERP(codigoERP: string): Promise<ProveedorCompleto> {
+  const erpResult = await hybridDB.queryERP('la-cantera', `
+    SELECT
+      p.Proveedor,
+      p.Nombre,
+      p.RFC,
+      p.eMail1,
+      p.eMail2,
+      p.Telefono,
+      p.Contacto1,
+      p.Direccion,
+      p.Colonia,
+      p.Poblacion,
+      p.Estado,
+      p.Pais,
+      p.CodigoPostal,
+      p.Condicion,
+      p.FormaPago,
+      p.Categoria,
+      p.Descuento,
+      p.ProvBancoSucursal,
+      p.ProvCuenta,
+      p.Estatus,
+      p.Situacion,
+      p.SituacionFecha,
+      p.SituacionNota,
+      p.SituacionUsuario,
+      p.Alta,
+      p.UltimoCambio,
+      p.TieneMovimientos,
+      p.Tipo,
+      p.DiaRevision1,
+      p.DiaRevision2,
+      p.DiaPago1,
+      p.DiaPago2,
+      p.Comprador,
+      p.Agente,
+      p.CentroCostos,
+      p.DefMoneda
+    FROM Prov p
+    WHERE p.Proveedor = @proveedorCode AND UPPER(p.Estatus) = 'ALTA'
+  `, { proveedorCode: codigoERP });
+
+  if (erpResult.recordset.length === 0) {
+    throw new Error('Proveedor no encontrado en ERP');
+  }
+
+  const erp = erpResult.recordset[0];
+
+  const diasRevision: string[] = [];
+  if (erp.DiaRevision1) diasRevision.push(erp.DiaRevision1);
+  if (erp.DiaRevision2) diasRevision.push(erp.DiaRevision2);
+
+  const diasPago: string[] = [];
+  if (erp.DiaPago1) diasPago.push(erp.DiaPago1);
+  if (erp.DiaPago2) diasPago.push(erp.DiaPago2);
+
+  return {
+    portalUserId: `erp_${codigoERP}`,
+    portalEmail: erp.eMail1 || '',
+    portalNombre: erp.Nombre,
+    portalEstatus: 'INACTIVO', // No registrado en portal
+    portalFechaRegistro: null,
+    portalRol: 'proveedor',
+    portalTelefono: erp.Telefono || '',
+    empresasAsignadas: [{
+      empresaCode: 'la-cantera',
+      empresaName: 'La Cantera',
+      erpProveedorCode: erp.Proveedor,
+      mappingActivo: true,
+    }],
+    erpDatos: {
+      proveedor: erp.Proveedor,
+      nombre: erp.Nombre,
+      rfc: erp.RFC,
+      email1: erp.eMail1,
+      email2: erp.eMail2,
+      telefono: erp.Telefono,
+      contacto1: erp.Contacto1,
+      direccion: erp.Direccion,
+      colonia: erp.Colonia,
+      ciudad: erp.Poblacion,
+      estado: erp.Estado,
+      pais: erp.Pais,
+      codigoPostal: erp.CodigoPostal,
+      condicionPago: erp.Condicion,
+      formaPago: erp.FormaPago,
+      categoria: erp.Categoria,
+      descuento: erp.Descuento,
+      banco: erp.ProvBancoSucursal,
+      cuenta: erp.ProvCuenta,
+      estatus: 'ALTA', // Forzar ALTA ya que solo consultamos proveedores activos
+      situacion: erp.Situacion,
+      situacionFecha: erp.SituacionFecha,
+      situacionNota: erp.SituacionNota,
+      situacionUsuario: erp.SituacionUsuario,
+      alta: erp.Alta,
+      ultimoCambio: erp.UltimoCambio,
+      tieneMovimientos: erp.TieneMovimientos === 1,
+      tipo: erp.Tipo,
+      diasRevision,
+      diasPago,
+      comprador: erp.Comprador,
+      agente: erp.Agente,
+      centroCostos: erp.CentroCostos,
+      moneda: erp.DefMoneda,
+    },
+  };
 }
 
 /**

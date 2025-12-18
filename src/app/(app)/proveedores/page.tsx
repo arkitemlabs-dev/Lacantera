@@ -298,7 +298,7 @@ export default function ProveedoresPage() {
                             <TooltipTrigger asChild>
                               <div>
                                 {supplier.registradoEnPortal ? (
-                                  <Link href={`/proveedores/${supplier.uid}`} className="hover:underline">
+                                  <Link href={`/proveedores/perfil?id=${supplier.uid}`} className="hover:underline">
                                     {supplier.razonSocial}
                                   </Link>
                                 ) : (
@@ -392,7 +392,7 @@ export default function ProveedoresPage() {
                           <div className="flex items-center justify-end gap-2">
                             {supplier.registradoEnPortal && (
                               <Button asChild variant="ghost" size="icon">
-                                <Link href={`/proveedores/${supplier.uid}`}>
+                                <Link href={`/proveedores/perfil?id=${supplier.uid}`}>
                                   <Eye className="h-4 w-4" />
                                   <span className="sr-only">Ver Detalles</span>
                                 </Link>
@@ -413,7 +413,11 @@ export default function ProveedoresPage() {
                                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                                 {supplier.registradoEnPortal ? (
                                   <>
-                                    <DropdownMenuItem>Ver perfil</DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/proveedores/perfil?id=${supplier.uid}`}>
+                                        Ver perfil completo
+                                      </Link>
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem>Editar</DropdownMenuItem>
                                     <DropdownMenuItem>
                                       {supplier.status === "activo" ? "Desactivar" : "Activar"}

@@ -174,6 +174,22 @@ const docStatusConfig = {
 
 export default function PerfilProveedorPage() {
   const { data: session } = useSession();
+  
+  // Verificar si es vista de admin
+  const [isAdminView, setIsAdminView] = useState(false);
+  
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const idFromQuery = urlParams.get('id');
+    setIsAdminView(!!idFromQuery);
+    
+    // Si es vista de admin, cargar datos inmediatamente
+    if (idFromQuery) {
+      setProveedorId(idFromQuery);
+      cargarInfoProveedor(idFromQuery);
+      cargarDocumentos(idFromQuery);
+    }
+  }, []);
   const userAvatar = PlaceHolderImages.find(
     (img) => img.id === 'user-avatar-1'
   );
@@ -197,24 +213,57 @@ export default function PerfilProveedorPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const proveedorId = session?.user?.id || 'proveedor-1';
+  // Obtener ID del proveedor desde query params o usar el usuario logueado
+  const [proveedorId, setProveedorId] = useState<string>('');
 
   useEffect(() => {
-    cargarInfoProveedor();
-    cargarDocumentos();
-  }, [session]);
+    // Solo para vista normal (no admin)
+    if (!isAdminView && session?.user?.id) {
+      const finalId = session.user.id;
+      setProveedorId(finalId);
+      cargarInfoProveedor(finalId);
+      cargarDocumentos(finalId);
+    }
+  }, [session, isAdminView]);
 
-  const cargarInfoProveedor = async () => {
-    if (!session) return;
+  const cargarInfoProveedor = async (id: string) => {
+    if (!id) return;
 
     setLoadingInfo(true);
     try {
-      const response = await fetch('/api/proveedor/info');
+      // Si hay un parámetro 'id' en la URL, es vista de admin
+      const isAdminView = new URLSearchParams(window.location.search).get('id');
+      const endpoint = isAdminView ? `/api/admin/proveedores/${id}` : '/api/proveedor/info';
+      
+      const response = await fetch(endpoint);
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
       const result = await response.json();
 
-      if (result.success) {
-        console.log('✅ Información del proveedor cargada:', result.data);
-        setProveedorInfo(result.data);
+      if (result.success || result.erpDatos) {
+        // Mapear datos desde el endpoint de admin
+        const data = result.erpDatos ? {
+          razonSocial: result.erpDatos.nombre,
+          rfc: result.erpDatos.rfc,
+          codigo: result.erpDatos.proveedor,
+          direccionFiscal: result.erpDatos.direccion,
+          colonia: result.erpDatos.colonia,
+          poblacion: result.erpDatos.ciudad,
+          estado: result.erpDatos.estado,
+          codigoPostal: result.erpDatos.codigoPostal,
+          nombreContacto: result.erpDatos.contacto1,
+          email: result.erpDatos.email1 || result.portalEmail,
+          telefono: result.erpDatos.telefono || result.portalTelefono,
+          numeroCuenta: result.erpDatos.cuenta,
+          codigoProveedorERP: result.erpDatos.proveedor,
+          estatus: result.erpDatos.estatus
+        } : result.data;
+        
+        console.log('✅ Información del proveedor cargada:', data);
+        setProveedorInfo(data);
       } else {
         console.error('❌ Error cargando información:', result.error);
       }
@@ -225,12 +274,13 @@ export default function PerfilProveedorPage() {
     }
   };
 
-  const cargarDocumentos = async () => {
-    if (!session) return;
+  const cargarDocumentos = async (id: string) => {
+    if (!id) return;
 
     setLoading(true);
     try {
       console.log("🔍 Cargando documentos desde ERP...");
+      // Si es un ID de admin, usar el endpoint de admin (por ahora usar el mismo)
       const response = await fetch('/api/proveedor/documentos');
       const result = await response.json();
 
@@ -328,7 +378,7 @@ export default function PerfilProveedorPage() {
       });
 
       if (result.success) {
-        await cargarDocumentos(); // This re-fetches the documents, including the new date
+        await cargarDocumentos(proveedorId); // This re-fetches the documents, including the new date
         setUploadDialogOpen(false);
         setSelectedFile(null);
         setSelectedDocTipo(null);
