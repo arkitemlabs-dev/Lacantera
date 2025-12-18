@@ -246,20 +246,79 @@ export default function PerfilProveedorPage() {
       if (result.success || result.erpDatos) {
         // Mapear datos desde el endpoint de admin
         const data = result.erpDatos ? {
+          // Datos fiscales
           razonSocial: result.erpDatos.nombre,
+          nombreCorto: result.erpDatos.nombreCorto,
           rfc: result.erpDatos.rfc,
+          curp: result.erpDatos.curp,
           codigo: result.erpDatos.proveedor,
+          
+          // Dirección completa
           direccionFiscal: result.erpDatos.direccion,
+          direccionNumero: result.erpDatos.direccionNumero,
+          direccionNumeroInt: result.erpDatos.direccionNumeroInt,
+          entreCalles: result.erpDatos.entreCalles,
           colonia: result.erpDatos.colonia,
           poblacion: result.erpDatos.ciudad,
           estado: result.erpDatos.estado,
+          pais: result.erpDatos.pais,
           codigoPostal: result.erpDatos.codigoPostal,
+          
+          // Datos de contacto
           nombreContacto: result.erpDatos.contacto1,
+          contacto2: result.erpDatos.contacto2,
           email: result.erpDatos.email1 || result.portalEmail,
+          email2: result.erpDatos.email2,
           telefono: result.erpDatos.telefono || result.portalTelefono,
+          fax: result.erpDatos.fax,
+          extension1: result.erpDatos.extension1,
+          extension2: result.erpDatos.extension2,
+          
+          // Datos bancarios
           numeroCuenta: result.erpDatos.cuenta,
+          banco: result.erpDatos.banco,
+          beneficiario: result.erpDatos.beneficiario,
+          beneficiarioNombre: result.erpDatos.beneficiarioNombre,
+          leyendaCheque: result.erpDatos.leyendaCheque,
+          
+          // Condiciones comerciales
+          condicionPago: result.erpDatos.condicionPago,
+          formaPago: result.erpDatos.formaPago,
+          categoria: result.erpDatos.categoria,
+          familia: result.erpDatos.familia,
+          descuento: result.erpDatos.descuento,
+          moneda: result.erpDatos.moneda,
+          comision: result.erpDatos.comision,
+          
+          // Información operativa
+          diasRevision: result.erpDatos.diasRevision?.join(', '),
+          diasPago: result.erpDatos.diasPago?.join(', '),
+          comprador: result.erpDatos.comprador,
+          agente: result.erpDatos.agente,
+          centroCostos: result.erpDatos.centroCostos,
+          
+          // Información contable
+          cuentaContable: result.erpDatos.cuentaContable,
+          cuentaRetencion: result.erpDatos.cuentaRetencion,
+          fiscalRegimen: result.erpDatos.fiscalRegimen,
+          importe1: result.erpDatos.importe1,
+          importe2: result.erpDatos.importe2,
+          
+          // Estado y fechas
+          estatus: result.erpDatos.estatus,
+          situacion: result.erpDatos.situacion,
+          situacionFecha: result.erpDatos.situacionFecha,
+          situacionNota: result.erpDatos.situacionNota,
+          situacionUsuario: result.erpDatos.situacionUsuario,
+          alta: result.erpDatos.alta,
+          ultimoCambio: result.erpDatos.ultimoCambio,
+          tieneMovimientos: result.erpDatos.tieneMovimientos,
+          tipo: result.erpDatos.tipo,
+          
+          // Contexto
           codigoProveedorERP: result.erpDatos.proveedor,
-          estatus: result.erpDatos.estatus
+          portalEstatus: result.portalEstatus,
+          portalFechaRegistro: result.portalFechaRegistro
         } : result.data;
         
         console.log('✅ Información del proveedor cargada:', data);
@@ -488,14 +547,29 @@ export default function PerfilProveedorPage() {
                          <div className="flex-1 space-y-4">
                              <h3 className="text-lg font-semibold">Datos Fiscales</h3>
                              <InfoField label="Razón Social" value={proveedorInfo.razonSocial} isEditing={isEditing} />
+                             <InfoField label="Nombre Corto" value={proveedorInfo.nombreCorto} isEditing={isEditing} />
                              <InfoField label="RFC" value={proveedorInfo.rfc} isEditing={isEditing} />
+                             <InfoField label="CURP" value={proveedorInfo.curp} isEditing={isEditing} />
                              <InfoField label="Código Proveedor" value={proveedorInfo.codigo} isEditing={isEditing} />
-                             <InfoField label="Dirección Fiscal" value={proveedorInfo.direccionFiscal} isEditing={isEditing} />
-                             <InfoField label="Colonia" value={proveedorInfo.colonia} isEditing={isEditing} />
-                             <InfoField label="Ciudad/Población" value={proveedorInfo.poblacion} isEditing={isEditing} />
-                             <InfoField label="Estado" value={proveedorInfo.estado} isEditing={isEditing} />
-                             <InfoField label="Código Postal" value={proveedorInfo.codigoPostal} isEditing={isEditing} />
+                             <InfoField label="Régimen Fiscal" value={proveedorInfo.fiscalRegimen} isEditing={isEditing} />
                         </div>
+                    </div>
+
+                    <Separator />
+
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Dirección Completa</h3>
+                      <div className="space-y-4">
+                        <InfoField label="Dirección" value={proveedorInfo.direccionFiscal} isEditing={isEditing} />
+                        <InfoField label="Número Exterior" value={proveedorInfo.direccionNumero} isEditing={isEditing} />
+                        <InfoField label="Número Interior" value={proveedorInfo.direccionNumeroInt} isEditing={isEditing} />
+                        <InfoField label="Entre Calles" value={proveedorInfo.entreCalles} isEditing={isEditing} />
+                        <InfoField label="Colonia" value={proveedorInfo.colonia} isEditing={isEditing} />
+                        <InfoField label="Ciudad/Población" value={proveedorInfo.poblacion} isEditing={isEditing} />
+                        <InfoField label="Estado" value={proveedorInfo.estado} isEditing={isEditing} />
+                        <InfoField label="País" value={proveedorInfo.pais} isEditing={isEditing} />
+                        <InfoField label="Código Postal" value={proveedorInfo.codigoPostal} isEditing={isEditing} />
+                      </div>
                     </div>
 
                     <Separator />
@@ -503,9 +577,14 @@ export default function PerfilProveedorPage() {
                     <div>
                       <h3 className="text-lg font-semibold mb-4">Datos de Contacto</h3>
                       <div className="space-y-4">
-                        <InfoField label="Nombre del Contacto" value={proveedorInfo.nombreContacto} isEditing={isEditing} />
-                        <InfoField label="Email" value={proveedorInfo.email} isEditing={isEditing} />
+                        <InfoField label="Contacto Principal" value={proveedorInfo.nombreContacto} isEditing={isEditing} />
+                        <InfoField label="Contacto Secundario" value={proveedorInfo.contacto2} isEditing={isEditing} />
+                        <InfoField label="Email Principal" value={proveedorInfo.email} isEditing={isEditing} />
+                        <InfoField label="Email Secundario" value={proveedorInfo.email2} isEditing={isEditing} />
                         <InfoField label="Teléfono" value={proveedorInfo.telefono} isEditing={isEditing} />
+                        <InfoField label="Fax" value={proveedorInfo.fax} isEditing={isEditing} />
+                        <InfoField label="Extensión 1" value={proveedorInfo.extension1} isEditing={isEditing} />
+                        <InfoField label="Extensión 2" value={proveedorInfo.extension2} isEditing={isEditing} />
                       </div>
                     </div>
 
@@ -514,18 +593,88 @@ export default function PerfilProveedorPage() {
                     <div>
                       <h3 className="text-lg font-semibold mb-4">Información Bancaria</h3>
                        <div className="space-y-4">
-                         <InfoField label="Número de cuenta" value={proveedorInfo.numeroCuenta} isEditing={isEditing} />
+                         <InfoField label="Banco/Sucursal" value={proveedorInfo.banco} isEditing={isEditing} />
+                         <InfoField label="Número de Cuenta" value={proveedorInfo.numeroCuenta} isEditing={isEditing} />
+                         <InfoField label="Beneficiario" value={proveedorInfo.beneficiario} isEditing={isEditing} />
+                         <InfoField label="Nombre del Beneficiario" value={proveedorInfo.beneficiarioNombre} isEditing={isEditing} />
+                         <InfoField label="Leyenda del Cheque" value={proveedorInfo.leyendaCheque} isEditing={isEditing} />
                       </div>
                     </div>
 
                     <Separator />
 
                     <div>
-                      <h3 className="text-lg font-semibold mb-4">Contexto</h3>
+                      <h3 className="text-lg font-semibold mb-4">Condiciones Comerciales</h3>
+                      <div className="space-y-4">
+                        <InfoField label="Condición de Pago" value={proveedorInfo.condicionPago} isEditing={isEditing} />
+                        <InfoField label="Forma de Pago" value={proveedorInfo.formaPago} isEditing={isEditing} />
+                        <InfoField label="Categoría" value={proveedorInfo.categoria} isEditing={isEditing} />
+                        <InfoField label="Familia" value={proveedorInfo.familia} isEditing={isEditing} />
+                        <InfoField label="Descuento" value={proveedorInfo.descuento?.toString()} isEditing={isEditing} />
+                        <InfoField label="Comisión" value={proveedorInfo.comision?.toString()} isEditing={isEditing} />
+                        <InfoField label="Moneda" value={proveedorInfo.moneda} isEditing={isEditing} />
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Información Operativa</h3>
+                      <div className="space-y-4">
+                        <InfoField label="Días de Revisión" value={proveedorInfo.diasRevision} isEditing={isEditing} />
+                        <InfoField label="Días de Pago" value={proveedorInfo.diasPago} isEditing={isEditing} />
+                        <InfoField label="Comprador" value={proveedorInfo.comprador} isEditing={isEditing} />
+                        <InfoField label="Agente" value={proveedorInfo.agente} isEditing={isEditing} />
+                        <InfoField label="Centro de Costos" value={proveedorInfo.centroCostos} isEditing={isEditing} />
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Información Contable</h3>
+                      <div className="space-y-4">
+                        <InfoField label="Cuenta Contable" value={proveedorInfo.cuentaContable} isEditing={isEditing} />
+                        <InfoField label="Cuenta de Retención" value={proveedorInfo.cuentaRetencion} isEditing={isEditing} />
+                        <InfoField label="Importe 1" value={proveedorInfo.importe1?.toString()} isEditing={isEditing} />
+                        <InfoField label="Importe 2" value={proveedorInfo.importe2?.toString()} isEditing={isEditing} />
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Estado y Situación</h3>
+                      <div className="space-y-4">
+                        <InfoField label="Estatus" value={proveedorInfo.estatus} isEditing={false} />
+                        <InfoField label="Situación" value={proveedorInfo.situacion} isEditing={false} />
+                        <InfoField label="Fecha de Situación" value={proveedorInfo.situacionFecha ? new Date(proveedorInfo.situacionFecha).toLocaleDateString('es-MX') : ''} isEditing={false} />
+                        <InfoField label="Nota de Situación" value={proveedorInfo.situacionNota} isEditing={false} />
+                        <InfoField label="Usuario de Situación" value={proveedorInfo.situacionUsuario} isEditing={false} />
+                        <InfoField label="Tiene Movimientos" value={proveedorInfo.tieneMovimientos ? 'Sí' : 'No'} isEditing={false} />
+                        <InfoField label="Tipo" value={proveedorInfo.tipo} isEditing={false} />
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Fechas Importantes</h3>
+                      <div className="space-y-4">
+                        <InfoField label="Fecha de Alta" value={proveedorInfo.alta ? new Date(proveedorInfo.alta).toLocaleDateString('es-MX') : ''} isEditing={false} />
+                        <InfoField label="Último Cambio" value={proveedorInfo.ultimoCambio ? new Date(proveedorInfo.ultimoCambio).toLocaleDateString('es-MX') : ''} isEditing={false} />
+                        <InfoField label="Registro en Portal" value={proveedorInfo.portalFechaRegistro ? new Date(proveedorInfo.portalFechaRegistro).toLocaleDateString('es-MX') : 'No registrado'} isEditing={false} />
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Contexto del Sistema</h3>
                       <div className="space-y-4">
                         <InfoField label="Empresa Actual" value={session?.user?.empresaActual} isEditing={false} />
                         <InfoField label="Código en ERP" value={proveedorInfo.codigoProveedorERP} isEditing={false} />
-                        <InfoField label="Estado" value={proveedorInfo.estatus} isEditing={false} />
+                        <InfoField label="Estatus en Portal" value={proveedorInfo.portalEstatus} isEditing={false} />
                       </div>
                     </div>
                   </>

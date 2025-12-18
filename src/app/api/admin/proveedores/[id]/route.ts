@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
-import { getProveedorCompleto } from '@/lib/database/admin-proveedores-queries';
+import { getProveedorCompleto, getProveedorPorRFC, getProveedorPorID, getProveedorPorNombreORFC, getProveedorPorCodigoERP } from '@/lib/database/admin-proveedores-queries';
 
 /**
  * GET /api/admin/proveedores/[id]
@@ -44,8 +44,26 @@ export async function GET(
 
     console.log(`[API PROVEEDOR DETALLE] Admin ${session.user.id} solicitando detalles del proveedor ${id}`);
 
-    // Obtener detalles completos del proveedor
-    const proveedor = await getProveedorCompleto(id);
+    // Determinar tipo de búsqueda por prioridad
+    let proveedor;
+    
+    // 1. Si es código ERP (formato P00XXX)
+    if (id.match(/^P\d{5}$/)) {
+      proveedor = await getProveedorPorCodigoERP(id);
+    }
+    // 2. Si es ID numérico
+    else if (!isNaN(Number(id))) {
+      proveedor = await getProveedorPorID(id);
+    }
+    // 3. Intentar búsqueda flexible
+    else {
+      try {
+        proveedor = await getProveedorPorNombreORFC(id);
+      } catch (error) {
+        // Último recurso: búsqueda original
+        proveedor = await getProveedorCompleto(id);
+      }
+    }
 
     return NextResponse.json(proveedor, { status: 200 });
 
