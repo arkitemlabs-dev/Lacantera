@@ -80,7 +80,6 @@ export interface ProveedorCompleto {
 interface FiltrosProveedores {
   empresaCode?: string;
   estatusPortal?: string;
-  estatusERP?: string;
   busqueda?: string;
   page?: number;
   limit?: number;
@@ -95,7 +94,6 @@ export async function getProveedoresConDatosERP(
   const {
     empresaCode,
     estatusPortal,
-    estatusERP,
     busqueda,
     page = 1,
     limit = 50,
@@ -147,12 +145,8 @@ export async function getProveedoresConDatosERP(
         p.DefMoneda
       FROM Prov p`;
     
-    // Aplicar filtro de estatus (por defecto solo ALTA)
-    if (estatusERP) {
-      erpQuery += ` WHERE p.Estatus = '${estatusERP.toUpperCase()}'`;
-    } else {
-      erpQuery += ` WHERE p.Estatus = 'ALTA'`;
-    }
+    // SOLO permitir proveedores con estatus ALTA
+    erpQuery += ` WHERE UPPER(p.Estatus) = 'ALTA'`;
     
     erpQuery += ` ORDER BY p.Nombre`;
     
@@ -191,10 +185,14 @@ export async function getProveedoresConDatosERP(
       }
     });
 
-    // 4. Procesar TODOS los proveedores del ERP
+    // 4. Procesar SOLO los proveedores del ERP con estatus ALTA
     const proveedores: ProveedorCompleto[] = [];
     
     for (const erpProv of erpResult.recordset) {
+      // Filtro adicional: SOLO procesar proveedores con estatus ALTA
+      if (!erpProv.Estatus || erpProv.Estatus.toUpperCase() !== 'ALTA') {
+        continue;
+      }
       // Buscar usuario del portal por múltiples criterios
       let portalUser = null;
       
@@ -238,7 +236,7 @@ export async function getProveedoresConDatosERP(
         descuento: erpProv.Descuento,
         banco: erpProv.ProvBancoSucursal,
         cuenta: erpProv.ProvCuenta,
-        estatus: erpProv.Estatus,
+        estatus: 'ALTA', // Forzar ALTA ya que solo consultamos proveedores con este estatus
         situacion: erpProv.Situacion,
         situacionFecha: erpProv.SituacionFecha,
         situacionNota: erpProv.SituacionNota,

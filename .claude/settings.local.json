@@ -24,8 +24,9 @@
       "Bash(timeout:*)",
       "Bash(netstat:*)",
       "Bash(tasklist:*)",
-      "Bash(del \"src\\app\\(app)\\proveedores\\perfil\\page.tsx\")",
-      "Bash(ren \"src\\app\\(app)\\proveedores\\perfil\\page_nuevo.tsx\" \"page.tsx\")"
+      "Bash(del:*)",
+      "Bash(ren:*)",
+      "Bash(move:*)"
     ],
     "deny": [],
     "ask": []

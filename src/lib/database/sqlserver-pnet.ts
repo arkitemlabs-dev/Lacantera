@@ -553,31 +553,8 @@ export class SqlServerPNetDatabase implements Database {
       const erpPool = await getERPConnection('la-cantera');
       const erpRequest = erpPool.request();
 
-      // Filtro por defecto: solo proveedores ALTA
-      const erpConditions: string[] = ["p.Estatus = 'ALTA'"];
-
-      // Filtros de estatus del ERP
-      if (filters?.status) {
-        const statusMap: { [key: string]: string } = {
-          activo: 'ALTA',
-          pendiente_validacion: 'BLOQUEADO',
-          rechazado: 'BAJA',
-          suspendido: 'BLOQUEADO',
-        };
-
-        if (Array.isArray(filters.status)) {
-          const sqlStatuses = filters.status.map(s => statusMap[s] || 'ALTA');
-          const placeholders = sqlStatuses.map((_, i) => `@status${i}`).join(',');
-          erpConditions.push(`p.Estatus IN (${placeholders})`);
-          sqlStatuses.forEach((s, i) => {
-            erpRequest.input(`status${i}`, sql.VarChar(15), s);
-          });
-        } else {
-          const sqlStatus = statusMap[filters.status] || 'ALTA';
-          erpConditions.push('p.Estatus = @status');
-          erpRequest.input('status', sql.VarChar(15), sqlStatus);
-        }
-      }
+      // SIEMPRE filtrar solo proveedores con estatus ALTA (excluir BAJA y BLOQUEADO)
+      const erpConditions: string[] = ["UPPER(p.Estatus) = 'ALTA'"];
 
       const erpWhereClause = erpConditions.length > 0 ? `WHERE ${erpConditions.join(' AND ')}` : '';
 
@@ -930,15 +907,8 @@ export class SqlServerPNetDatabase implements Database {
   private mapRowToProveedorUserFromERP(row: any): ProveedorUser {
     const registradoEnPortal = row.RegistradoEnPortal === 1;
 
-    // Mapear estatus del ERP a estatus del portal
-    let status: ProveedorUser['status'] = 'pendiente_validacion';
-    if (row.ProveedorEstatus === 'ALTA') {
-      status = 'activo';
-    } else if (row.ProveedorEstatus === 'BLOQUEADO') {
-      status = 'suspendido';
-    } else if (row.ProveedorEstatus === 'BAJA') {
-      status = 'rechazado';
-    }
+    // Como solo consultamos proveedores con estatus ALTA, siempre mapear a 'activo'
+    const status: ProveedorUser['status'] = 'activo';
 
     // Construir dirección completa
     const direccionParts = [row.Direccion, row.DireccionNumero].filter(Boolean);

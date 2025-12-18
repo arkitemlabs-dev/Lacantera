@@ -34,19 +34,18 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const empresaCode = searchParams.get('empresa'); // Filtro por empresa
     const estatusPortal = searchParams.get('estatusPortal'); // ACTIVO/INACTIVO/PENDIENTE
-    const estatusERP = searchParams.get('estatusERP'); // ALTA/BAJA/BLOQUEADO
     const busqueda = searchParams.get('q'); // Búsqueda por nombre/email/RFC
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10000');
 
     console.log(`[API PROVEEDORES] Admin ${session.user.id} solicitando proveedores`);
-    console.log(`[API PROVEEDORES] Filtros: empresa=${empresaCode}, estatusPortal=${estatusPortal}, estatusERP=${estatusERP}, búsqueda=${busqueda}`);
+    console.log(`[API PROVEEDORES] Filtros: empresa=${empresaCode}, estatusPortal=${estatusPortal}, búsqueda=${busqueda}`);
+    console.log(`[API PROVEEDORES] Nota: Solo se consultan proveedores con estatus ALTA (BAJA y BLOQUEADO excluidos)`);
 
-    // Obtener proveedores
+    // Obtener proveedores (solo estatus ALTA, excluye BAJA y BLOQUEADO)
     const result = await getProveedoresConDatosERP({
       empresaCode: empresaCode || undefined,
       estatusPortal: estatusPortal || undefined,
-      estatusERP: estatusERP || undefined,
       busqueda: busqueda || undefined,
       page,
       limit,
