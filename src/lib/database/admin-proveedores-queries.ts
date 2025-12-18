@@ -103,218 +103,195 @@ export async function getProveedoresConDatosERP(
 
   const offset = (page - 1) * limit;
 
+  console.log('[getProveedoresConDatosERP] Iniciando con filtros:', filtros);
+
   try {
-    // 1. Obtener proveedores del portal con sus mapeos
-    let portalQuery = `
+    // 1. Construir consulta ERP con filtros
+    let erpQuery = `
       SELECT
-        wu.UsuarioWeb as portalUserId,
-        wu.eMail as portalEmail,
-        wu.Nombre as portalNombre,
-        wu.Estatus as portalEstatus,
-        wu.Alta as portalFechaRegistro,
-        wu.Rol as portalRol,
-        wu.Telefono as portalTelefono,
-        wu.Proveedor as portalProveedorRef
-      FROM WebUsuario wu
-      WHERE wu.Rol = 'proveedor'
-    `;
-
-    const portalParams: any = {};
-
-    // Filtro por estatus portal
-    if (estatusPortal) {
-      portalQuery += ` AND wu.Estatus = @estatusPortal`;
-      portalParams.estatusPortal = estatusPortal;
+        p.Proveedor,
+        p.Nombre,
+        p.RFC,
+        p.eMail1,
+        p.eMail2,
+        p.Telefono,
+        p.Contacto1,
+        p.Direccion,
+        p.Colonia,
+        p.Poblacion,
+        p.Estado,
+        p.Pais,
+        p.CodigoPostal,
+        p.Condicion,
+        p.FormaPago,
+        p.Categoria,
+        p.Descuento,
+        p.ProvBancoSucursal,
+        p.ProvCuenta,
+        p.Estatus,
+        p.Situacion,
+        p.SituacionFecha,
+        p.SituacionNota,
+        p.SituacionUsuario,
+        p.Alta,
+        p.UltimoCambio,
+        p.TieneMovimientos,
+        p.Tipo,
+        p.DiaRevision1,
+        p.DiaRevision2,
+        p.DiaPago1,
+        p.DiaPago2,
+        p.Comprador,
+        p.Agente,
+        p.CentroCostos,
+        p.DefMoneda
+      FROM Prov p`;
+    
+    // Aplicar filtro de estatus (por defecto solo ALTA, excluir BLOQUEADO)
+    if (estatusERP) {
+      erpQuery += ` WHERE p.Estatus = '${estatusERP.toUpperCase()}'`;
+    } else {
+      erpQuery += ` WHERE p.Estatus = 'ALTA'`;
     }
+    
+    erpQuery += ` ORDER BY p.Nombre`;
+    
+    const erpResult = await hybridDB.queryERP('la-cantera', erpQuery);
 
-    // Filtro por búsqueda
-    if (busqueda) {
-      portalQuery += ` AND (
-        wu.Nombre LIKE @busqueda OR
-        wu.eMail LIKE @busqueda OR
-        wu.UsuarioWeb LIKE @busqueda
-      )`;
-      portalParams.busqueda = `%${busqueda}%`;
-    }
+    console.log(`[getProveedoresConDatosERP] Encontrados ${erpResult.recordset.length} proveedores en ERP`);
 
-    portalQuery += ` ORDER BY wu.Alta DESC`;
+    // 2. Obtener usuarios del portal para mapear
+    const portalResult = await hybridDB.queryPortal(`
+      SELECT
+        u.IDUsuario,
+        u.eMail,
+        u.Nombre,
+        u.Estatus,
+        u.FechaRegistro,
+        u.Telefono,
+        u.Usuario
+      FROM pNetUsuario u
+      WHERE u.IDUsuarioTipo = 4
+    `);
 
-    const portalResult = await hybridDB.queryPortal(portalQuery, portalParams);
+    // 3. Crear mapas de usuarios del portal por diferentes criterios
+    const portalMapByCodigo = new Map();
+    const portalMapByRFC = new Map();
+    const portalMapByNombre = new Map();
+    
+    portalResult.recordset.forEach(u => {
+      // Mapear por código de proveedor
+      if (u.Usuario) {
+        portalMapByCodigo.set(u.Usuario.trim().toUpperCase(), u);
+      }
+      // Mapear por nombre (normalizado)
+      if (u.Nombre) {
+        const nombreNorm = u.Nombre.trim().toUpperCase();
+        portalMapByNombre.set(nombreNorm, u);
+      }
+    });
 
-    if (portalResult.recordset.length === 0) {
-      return {
-        proveedores: [],
-        total: 0,
-        page,
-        limit,
-        totalPages: 0,
-      };
-    }
-
-    // 2. Para cada proveedor, obtener sus mapeos y datos ERP
+    // 4. Procesar TODOS los proveedores del ERP
     const proveedores: ProveedorCompleto[] = [];
-
-    for (const portalProv of portalResult.recordset) {
-      // Obtener mapeos del proveedor
-      const mapeoResult = await hybridDB.queryPortal(
-        `
-        SELECT
-          empresa_code,
-          erp_proveedor_code,
-          activo
-        FROM portal_proveedor_mapping
-        WHERE portal_user_id = @userId
-          AND activo = 1
-        `,
-        { userId: portalProv.portalUserId }
-      );
-
-      const empresasAsignadas = mapeoResult.recordset.map((m: any) => ({
-        empresaCode: m.empresa_code,
-        empresaName: getEmpresaName(m.empresa_code),
-        erpProveedorCode: m.erp_proveedor_code,
-        mappingActivo: m.activo === 1,
-      }));
-
-      // Filtrar por empresa si se especificó
-      if (empresaCode && !empresasAsignadas.some(e => e.empresaCode === empresaCode)) {
-        continue; // Saltar este proveedor
+    
+    for (const erpProv of erpResult.recordset) {
+      // Buscar usuario del portal por múltiples criterios
+      let portalUser = null;
+      
+      // 1. Intentar por código de proveedor
+      if (erpProv.Proveedor) {
+        portalUser = portalMapByCodigo.get(erpProv.Proveedor.trim().toUpperCase());
       }
-
-      // 3. Obtener datos del ERP (de la primera empresa asignada)
-      let erpDatos: ProveedorCompleto['erpDatos'] = undefined;
-
-      if (empresasAsignadas.length > 0) {
-        const primeraEmpresa = empresasAsignadas[0];
-        const tenantConfig = getTenantConfig(primeraEmpresa.empresaCode);
-
-        try {
-          const erpResult = await hybridDB.queryERP(
-            primeraEmpresa.empresaCode,
-            `
-            SELECT TOP 1
-              p.Proveedor,
-              p.Nombre,
-              p.RFC,
-              p.eMail1,
-              p.eMail2,
-              p.Telefono,
-              p.Contacto1,
-              p.Direccion,
-              p.Colonia,
-              p.Poblacion,
-              p.Estado,
-              p.Pais,
-              p.CodigoPostal,
-              p.Condicion,
-              p.FormaPago,
-              p.Categoria,
-              p.Descuento,
-              p.ProvBancoSucursal,
-              p.ProvCuenta,
-              p.Estatus,
-              p.Situacion,
-              p.SituacionFecha,
-              p.SituacionNota,
-              p.SituacionUsuario,
-              p.Alta,
-              p.UltimoCambio,
-              p.TieneMovimientos,
-              p.Tipo,
-              p.DiaRevision1,
-              p.DiaRevision2,
-              p.HorarioRevision,
-              p.DiaPago1,
-              p.DiaPago2,
-              p.HorarioPago,
-              p.Comprador,
-              p.Agente,
-              p.CentroCostos,
-              p.DefMoneda
-            FROM Prov p
-            WHERE p.Proveedor = @proveedorCode
-              AND p.Estatus = 'ALTA'
-            `,
-            { proveedorCode: primeraEmpresa.erpProveedorCode }
-          );
-
-          if (erpResult.recordset.length > 0) {
-            const erp = erpResult.recordset[0];
-
-            // Filtrar por estatus ERP si se especificó
-            if (estatusERP && erp.Estatus !== estatusERP) {
-              continue; // Saltar este proveedor
-            }
-
-            // Construir array de días de revisión
-            const diasRevision: string[] = [];
-            if (erp.DiaRevision1) diasRevision.push(erp.DiaRevision1);
-            if (erp.DiaRevision2) diasRevision.push(erp.DiaRevision2);
-
-            // Construir array de días de pago
-            const diasPago: string[] = [];
-            if (erp.DiaPago1) diasPago.push(erp.DiaPago1);
-            if (erp.DiaPago2) diasPago.push(erp.DiaPago2);
-
-            erpDatos = {
-              proveedor: erp.Proveedor,
-              nombre: erp.Nombre,
-              rfc: erp.RFC,
-              email1: erp.eMail1,
-              email2: erp.eMail2,
-              telefono: erp.Telefono,
-              contacto1: erp.Contacto1,
-              direccion: erp.Direccion,
-              colonia: erp.Colonia,
-              ciudad: erp.Poblacion,
-              estado: erp.Estado,
-              pais: erp.Pais,
-              codigoPostal: erp.CodigoPostal,
-              condicionPago: erp.Condicion,
-              formaPago: erp.FormaPago,
-              categoria: erp.Categoria,
-              descuento: erp.Descuento,
-              banco: erp.ProvBancoSucursal,
-              cuenta: erp.ProvCuenta,
-              estatus: erp.Estatus,
-              situacion: erp.Situacion,
-              situacionFecha: erp.SituacionFecha,
-              situacionNota: erp.SituacionNota,
-              situacionUsuario: erp.SituacionUsuario,
-              alta: erp.Alta,
-              ultimoCambio: erp.UltimoCambio,
-              tieneMovimientos: erp.TieneMovimientos === 1,
-              tipo: erp.Tipo,
-              diasRevision,
-              diasPago,
-              comprador: erp.Comprador,
-              agente: erp.Agente,
-              centroCostos: erp.CentroCostos,
-              moneda: erp.DefMoneda,
-            };
-          }
-        } catch (erpError: any) {
-          console.error(`Error obteniendo datos ERP para ${primeraEmpresa.erpProveedorCode}:`, erpError.message);
-          // Continuar sin datos ERP
-        }
+      
+      // 2. Si no se encontró, intentar por nombre
+      if (!portalUser && erpProv.Nombre) {
+        const nombreErpNorm = erpProv.Nombre.trim().toUpperCase();
+        portalUser = portalMapByNombre.get(nombreErpNorm);
       }
+      
+      // Construir días de revisión y pago
+      const diasRevision: string[] = [];
+      if (erpProv.DiaRevision1) diasRevision.push(erpProv.DiaRevision1);
+      if (erpProv.DiaRevision2) diasRevision.push(erpProv.DiaRevision2);
+
+      const diasPago: string[] = [];
+      if (erpProv.DiaPago1) diasPago.push(erpProv.DiaPago1);
+      if (erpProv.DiaPago2) diasPago.push(erpProv.DiaPago2);
+
+      const erpDatos = {
+        proveedor: erpProv.Proveedor,
+        nombre: erpProv.Nombre,
+        rfc: erpProv.RFC,
+        email1: erpProv.eMail1,
+        email2: erpProv.eMail2,
+        telefono: erpProv.Telefono,
+        contacto1: erpProv.Contacto1,
+        direccion: erpProv.Direccion,
+        colonia: erpProv.Colonia,
+        ciudad: erpProv.Poblacion,
+        estado: erpProv.Estado,
+        pais: erpProv.Pais,
+        codigoPostal: erpProv.CodigoPostal,
+        condicionPago: erpProv.Condicion,
+        formaPago: erpProv.FormaPago,
+        categoria: erpProv.Categoria,
+        descuento: erpProv.Descuento,
+        banco: erpProv.ProvBancoSucursal,
+        cuenta: erpProv.ProvCuenta,
+        estatus: erpProv.Estatus,
+        situacion: erpProv.Situacion,
+        situacionFecha: erpProv.SituacionFecha,
+        situacionNota: erpProv.SituacionNota,
+        situacionUsuario: erpProv.SituacionUsuario,
+        alta: erpProv.Alta,
+        ultimoCambio: erpProv.UltimoCambio,
+        tieneMovimientos: erpProv.TieneMovimientos === 1,
+        tipo: erpProv.Tipo,
+        diasRevision,
+        diasPago,
+        comprador: erpProv.Comprador,
+        agente: erpProv.Agente,
+        centroCostos: erpProv.CentroCostos,
+        moneda: erpProv.DefMoneda,
+      };
+
+      const empresasAsignadas = [{
+        empresaCode: 'la-cantera',
+        empresaName: 'La Cantera',
+        erpProveedorCode: erpProv.Proveedor,
+        mappingActivo: true,
+      }];
 
       proveedores.push({
-        portalUserId: portalProv.portalUserId,
-        portalEmail: portalProv.portalEmail,
-        portalNombre: portalProv.portalNombre,
-        portalEstatus: portalProv.portalEstatus,
-        portalFechaRegistro: portalProv.portalFechaRegistro,
-        portalRol: portalProv.portalRol,
-        portalTelefono: portalProv.portalTelefono,
+        portalUserId: portalUser?.IDUsuario || `erp_${erpProv.Proveedor}`,
+        portalEmail: portalUser?.eMail || erpProv.eMail1 || '',
+        portalNombre: portalUser?.Nombre || erpProv.Nombre,
+        portalEstatus: portalUser?.Estatus || 'INACTIVO',
+        portalFechaRegistro: portalUser?.FechaRegistro || null,
+        portalRol: 'proveedor',
+        portalTelefono: portalUser?.Telefono || erpProv.Telefono || '',
         empresasAsignadas,
         erpDatos,
       });
     }
 
-    // Paginación
-    const total = proveedores.length;
-    const paginados = proveedores.slice(offset, offset + limit);
+    // 5. Aplicar filtros si se especificaron
+    let proveedoresFiltrados = proveedores;
+    
+    if (busqueda) {
+      const term = busqueda.toLowerCase();
+      proveedoresFiltrados = proveedoresFiltrados.filter(p =>
+        p.portalNombre.toLowerCase().includes(term) ||
+        p.erpDatos?.rfc?.toLowerCase().includes(term) ||
+        p.portalEmail.toLowerCase().includes(term) ||
+        p.erpDatos?.proveedor?.toLowerCase().includes(term)
+      );
+    }
+
+    // 6. Paginación
+    const total = proveedoresFiltrados.length;
+    const paginados = proveedoresFiltrados.slice(offset, offset + limit);
+    console.log(`[getProveedoresConDatosERP] Total ERP: ${erpResult.recordset.length}, Total procesados: ${total}, devolviendo ${paginados.length}`);
 
     return {
       proveedores: paginados,
@@ -334,15 +311,163 @@ export async function getProveedoresConDatosERP(
  * Obtiene un proveedor específico con todos sus datos
  */
 export async function getProveedorCompleto(portalUserId: string) {
-  const result = await getProveedoresConDatosERP({ limit: 1 });
+  try {
+    // Buscar específicamente el proveedor solicitado
+    const portalResult = await hybridDB.queryPortal(
+      `
+      SELECT
+        u.IDUsuario as portalUserId,
+        u.eMail as portalEmail,
+        u.Nombre as portalNombre,
+        u.Estatus as portalEstatus,
+        u.FechaRegistro as portalFechaRegistro,
+        'proveedor' as portalRol,
+        u.Telefono as portalTelefono,
+        u.Usuario as portalProveedorRef
+      FROM pNetUsuario u
+      WHERE u.IDUsuario = @userId AND u.IDUsuarioTipo = 4
+      `,
+      { userId: parseInt(portalUserId) }
+    );
 
-  const proveedor = result.proveedores.find(p => p.portalUserId === portalUserId);
+    if (portalResult.recordset.length === 0) {
+      throw new Error('Proveedor no encontrado');
+    }
 
-  if (!proveedor) {
-    throw new Error('Proveedor no encontrado');
+    const portalProv = portalResult.recordset[0];
+
+    // Crear mapeo simple usando el código de proveedor
+    const empresasAsignadas = portalProv.portalProveedorRef ? [{
+      empresaCode: 'la-cantera',
+      empresaName: 'La Cantera',
+      erpProveedorCode: portalProv.portalProveedorRef,
+      mappingActivo: true,
+    }] : [];
+
+    // Obtener datos del ERP si hay mapeos
+    let erpDatos: ProveedorCompleto['erpDatos'] = undefined;
+
+    if (empresasAsignadas.length > 0) {
+      const primeraEmpresa = empresasAsignadas[0];
+
+      try {
+        const erpResult = await hybridDB.queryERP(
+          primeraEmpresa.empresaCode,
+          `
+          SELECT TOP 1
+            p.Proveedor,
+            p.Nombre,
+            p.RFC,
+            p.eMail1,
+            p.eMail2,
+            p.Telefono,
+            p.Contacto1,
+            p.Direccion,
+            p.Colonia,
+            p.Poblacion,
+            p.Estado,
+            p.Pais,
+            p.CodigoPostal,
+            p.Condicion,
+            p.FormaPago,
+            p.Categoria,
+            p.Descuento,
+            p.ProvBancoSucursal,
+            p.ProvCuenta,
+            p.Estatus,
+            p.Situacion,
+            p.SituacionFecha,
+            p.SituacionNota,
+            p.SituacionUsuario,
+            p.Alta,
+            p.UltimoCambio,
+            p.TieneMovimientos,
+            p.Tipo,
+            p.DiaRevision1,
+            p.DiaRevision2,
+            p.HorarioRevision,
+            p.DiaPago1,
+            p.DiaPago2,
+            p.HorarioPago,
+            p.Comprador,
+            p.Agente,
+            p.CentroCostos,
+            p.DefMoneda
+          FROM Prov p
+          WHERE p.Proveedor = @proveedorCode
+          `,
+          { proveedorCode: primeraEmpresa.erpProveedorCode }
+        );
+
+        if (erpResult.recordset.length > 0) {
+          const erp = erpResult.recordset[0];
+
+          const diasRevision: string[] = [];
+          if (erp.DiaRevision1) diasRevision.push(erp.DiaRevision1);
+          if (erp.DiaRevision2) diasRevision.push(erp.DiaRevision2);
+
+          const diasPago: string[] = [];
+          if (erp.DiaPago1) diasPago.push(erp.DiaPago1);
+          if (erp.DiaPago2) diasPago.push(erp.DiaPago2);
+
+          erpDatos = {
+            proveedor: erp.Proveedor,
+            nombre: erp.Nombre,
+            rfc: erp.RFC,
+            email1: erp.eMail1,
+            email2: erp.eMail2,
+            telefono: erp.Telefono,
+            contacto1: erp.Contacto1,
+            direccion: erp.Direccion,
+            colonia: erp.Colonia,
+            ciudad: erp.Poblacion,
+            estado: erp.Estado,
+            pais: erp.Pais,
+            codigoPostal: erp.CodigoPostal,
+            condicionPago: erp.Condicion,
+            formaPago: erp.FormaPago,
+            categoria: erp.Categoria,
+            descuento: erp.Descuento,
+            banco: erp.ProvBancoSucursal,
+            cuenta: erp.ProvCuenta,
+            estatus: erp.Estatus,
+            situacion: erp.Situacion,
+            situacionFecha: erp.SituacionFecha,
+            situacionNota: erp.SituacionNota,
+            situacionUsuario: erp.SituacionUsuario,
+            alta: erp.Alta,
+            ultimoCambio: erp.UltimoCambio,
+            tieneMovimientos: erp.TieneMovimientos === 1,
+            tipo: erp.Tipo,
+            diasRevision,
+            diasPago,
+            comprador: erp.Comprador,
+            agente: erp.Agente,
+            centroCostos: erp.CentroCostos,
+            moneda: erp.DefMoneda,
+          };
+        }
+      } catch (erpError: any) {
+        console.error(`Error obteniendo datos ERP para ${primeraEmpresa.erpProveedorCode}:`, erpError.message);
+      }
+    }
+
+    return {
+      portalUserId: portalProv.portalUserId,
+      portalEmail: portalProv.portalEmail,
+      portalNombre: portalProv.portalNombre,
+      portalEstatus: portalProv.portalEstatus,
+      portalFechaRegistro: portalProv.portalFechaRegistro,
+      portalRol: portalProv.portalRol,
+      portalTelefono: portalProv.portalTelefono,
+      empresasAsignadas,
+      erpDatos,
+    };
+
+  } catch (error: any) {
+    console.error('Error en getProveedorCompleto:', error);
+    throw error;
   }
-
-  return proveedor;
 }
 
 /**

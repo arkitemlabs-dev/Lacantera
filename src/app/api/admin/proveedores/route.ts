@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     const estatusERP = searchParams.get('estatusERP'); // ALTA/BAJA/BLOQUEADO
     const busqueda = searchParams.get('q'); // Búsqueda por nombre/email/RFC
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const limit = parseInt(searchParams.get('limit') || '10000');
 
     console.log(`[API PROVEEDORES] Admin ${session.user.id} solicitando proveedores`);
     console.log(`[API PROVEEDORES] Filtros: empresa=${empresaCode}, estatusPortal=${estatusPortal}, estatusERP=${estatusERP}, búsqueda=${busqueda}`);

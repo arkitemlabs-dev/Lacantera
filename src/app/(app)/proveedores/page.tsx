@@ -45,6 +45,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { ProveedorDetailsModal } from '@/components/proveedores/proveedor-details-modal';
 
 const statusStyles: Record<
   SupplierStatus,
@@ -79,6 +80,8 @@ export default function ProveedoresPage() {
   const [registroFilter, setRegistroFilter] = useState('all'); // Nuevo filtro para estado de registro
   const [proveedores, setProveedores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedProveedor, setSelectedProveedor] = useState<any>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   useEffect(() => {
     cargarProveedores();
@@ -252,6 +255,7 @@ export default function ProveedoresPage() {
                       <TableHead>Nombre del Proveedor</TableHead>
                       <TableHead>RFC</TableHead>
                       <TableHead>Contacto</TableHead>
+                      <TableHead>Dirección</TableHead>
                       <TableHead>Fecha de Registro</TableHead>
                       <TableHead>Estado ERP</TableHead>
                       <TableHead className="text-right">
@@ -290,21 +294,77 @@ export default function ProveedoresPage() {
                           </Tooltip>
                         </TableCell>
                         <TableCell className="font-medium">
-                          {supplier.registradoEnPortal ? (
-                            <Link href={`/proveedores/${supplier.uid}`} className="hover:underline">
-                              {supplier.razonSocial}
-                            </Link>
-                          ) : (
-                            <span className="text-muted-foreground">{supplier.razonSocial}</span>
-                          )}
-                          {supplier.codigoERP && (
-                            <span className="ml-2 text-xs text-muted-foreground">
-                              ({supplier.codigoERP})
-                            </span>
-                          )}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div>
+                                {supplier.registradoEnPortal ? (
+                                  <Link href={`/proveedores/${supplier.uid}`} className="hover:underline">
+                                    {supplier.razonSocial}
+                                  </Link>
+                                ) : (
+                                  <span className="text-muted-foreground">{supplier.razonSocial}</span>
+                                )}
+                                {supplier.codigoERP && (
+                                  <span className="ml-2 text-xs text-muted-foreground">
+                                    ({supplier.codigoERP})
+                                  </span>
+                                )}
+                                {supplier.empresasAsignadas && supplier.empresasAsignadas.length > 0 && (
+                                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                    {supplier.empresasAsignadas.map(e => e.empresaName).join(', ')}
+                                  </div>
+                                )}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-sm">
+                              <div className="space-y-1">
+                                <div><strong>Código ERP:</strong> {supplier.codigoERP || 'N/A'}</div>
+                                {supplier.erpDatos?.categoria && (
+                                  <div><strong>Categoría:</strong> {supplier.erpDatos.categoria}</div>
+                                )}
+                                {supplier.erpDatos?.condicionPago && (
+                                  <div><strong>Condición de Pago:</strong> {supplier.erpDatos.condicionPago}</div>
+                                )}
+                                {supplier.erpDatos?.formaPago && (
+                                  <div><strong>Forma de Pago:</strong> {supplier.erpDatos.formaPago}</div>
+                                )}
+                                {supplier.erpDatos?.situacion && (
+                                  <div><strong>Situación:</strong> {supplier.erpDatos.situacion}</div>
+                                )}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
                         </TableCell>
                         <TableCell className="font-mono text-sm">{supplier.rfc || "-"}</TableCell>
-                        <TableCell>{supplier.email || "-"}</TableCell>
+                        <TableCell>
+                          <div>
+                            {supplier.email || "-"}
+                            {supplier.erpDatos?.email2 && (
+                              <div className="text-xs text-muted-foreground">
+                                {supplier.erpDatos.email2}
+                              </div>
+                            )}
+                            {supplier.telefono && (
+                              <div className="text-xs text-muted-foreground">
+                                Tel: {supplier.telefono}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {supplier.erpDatos?.direccion ? (
+                            <div className="text-sm">
+                              <div>{supplier.erpDatos.direccion}</div>
+                              {supplier.erpDatos.ciudad && (
+                                <div className="text-xs text-muted-foreground">
+                                  {supplier.erpDatos.ciudad}, {supplier.erpDatos.estado} {supplier.erpDatos.codigoPostal}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           {supplier.registradoEnPortal && supplier.fechaRegistroPortal ? (
                             <span className="text-green-600 dark:text-green-400">
@@ -362,7 +422,14 @@ export default function ProveedoresPage() {
                                 ) : (
                                   <>
                                     <DropdownMenuItem>Invitar al portal</DropdownMenuItem>
-                                    <DropdownMenuItem>Ver datos ERP</DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => {
+                                        setSelectedProveedor(supplier);
+                                        setShowDetailsModal(true);
+                                      }}
+                                    >
+                                      Ver datos ERP
+                                    </DropdownMenuItem>
                                   </>
                                 )}
                               </DropdownMenuContent>
@@ -378,6 +445,12 @@ export default function ProveedoresPage() {
           </CardContent>
         </Card>
       </main>
+      
+      <ProveedorDetailsModal 
+        proveedor={selectedProveedor}
+        open={showDetailsModal}
+        onOpenChange={setShowDetailsModal}
+      />
     </>
   );
 }

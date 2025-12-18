@@ -200,11 +200,15 @@ export default function SupplierProfilePage() {
                             <div className="space-y-4">
                             <InfoRow label="Razón Social" value={proveedor.razonSocial} />
                             <InfoRow label="RFC" value={proveedor.rfc} />
+                            <InfoRow label="Código ERP" value={proveedor.codigoERP} />
                             <InfoRow
                                 label="Dirección Fiscal"
-                                value={proveedor.direccionFiscal}
+                                value={proveedor.direccion ?
+                                  `${proveedor.direccion.calle || ''} ${proveedor.direccion.ciudad ? ', ' + proveedor.direccion.ciudad : ''} ${proveedor.direccion.estado ? ', ' + proveedor.direccion.estado : ''} ${proveedor.direccion.cp ? 'C.P. ' + proveedor.direccion.cp : ''}`.trim() || '-'
+                                  : proveedor.direccionFiscal || '-'
+                                }
                             />
-                            <InfoRow label="Tipo de Proveedor" value={proveedor.tipoProveedor} />
+                            <InfoRow label="Categoría" value={proveedor.categoria} />
                             </div>
                         </div>
                         <Separator />
@@ -214,28 +218,34 @@ export default function SupplierProfilePage() {
                             <div className="space-y-4">
                             <InfoRow
                                 label="Contacto Principal"
-                                value={proveedor.nombreContacto}
+                                value={proveedor.contacto1 || proveedor.nombreContacto || proveedor.displayName}
                             />
                             <InfoRow
                                 label="Email"
                                 value={proveedor.email}
                             />
+                            {proveedor.email2 && (
+                              <InfoRow label="Email Secundario" value={proveedor.email2} />
+                            )}
                             <InfoRow label="Teléfono" value={proveedor.telefono} />
+                            {proveedor.contacto2 && (
+                              <InfoRow label="Contacto Secundario" value={proveedor.contacto2} />
+                            )}
                             </div>
                         </div>
                         <Separator />
-                        {/* Representante legal */}
+                        {/* Condiciones Comerciales */}
                         <div>
-                            <h3 className="text-lg font-semibold mb-4">Representante Legal</h3>
+                            <h3 className="text-lg font-semibold mb-4">Condiciones Comerciales</h3>
                             <div className="space-y-4">
-                            <InfoRow
-                                label="Nombre"
-                                value={proveedor.representanteLegal?.nombre}
-                            />
-                            <InfoRow
-                                label="Email"
-                                value={proveedor.representanteLegal?.email}
-                            />
+                            <InfoRow label="Condición de Pago" value={proveedor.condicionPago} />
+                            <InfoRow label="Forma de Pago" value={proveedor.formaPago} />
+                            {(proveedor.diasRevision?.length > 0) && (
+                              <InfoRow label="Días de Revisión" value={proveedor.diasRevision?.join(', ')} />
+                            )}
+                            {(proveedor.diasPago?.length > 0) && (
+                              <InfoRow label="Días de Pago" value={proveedor.diasPago?.join(', ')} />
+                            )}
                             </div>
                         </div>
                         <Separator />
@@ -243,9 +253,11 @@ export default function SupplierProfilePage() {
                         <div>
                             <h3 className="text-lg font-semibold mb-4">Información Bancaria</h3>
                             <div className="space-y-4">
-                            <InfoRow label="Banco" value={proveedor.informacionBancaria?.banco} />
-                            <InfoRow label="CLABE" value={proveedor.informacionBancaria?.clabe} />
-                            <InfoRow label="Número de Cuenta" value={proveedor.informacionBancaria?.numeroCuenta} />
+                            <InfoRow label="Banco" value={proveedor.banco || proveedor.informacionBancaria?.banco} />
+                            <InfoRow label="Cuenta Bancaria" value={proveedor.cuentaBancaria || proveedor.informacionBancaria?.numeroCuenta} />
+                            {proveedor.informacionBancaria?.clabe && (
+                              <InfoRow label="CLABE" value={proveedor.informacionBancaria?.clabe} />
+                            )}
                             </div>
                         </div>
                         <Separator />
@@ -253,18 +265,59 @@ export default function SupplierProfilePage() {
                         <div>
                             <h3 className="text-lg font-semibold mb-4">Estado de la Cuenta</h3>
                             <div className="space-y-4">
-                                <InfoRow 
-                                  label="Fecha de Registro" 
-                                  value={proveedor.createdAt 
+                                <InfoRow
+                                  label="Registrado en Portal"
+                                  value={
+                                    <Badge
+                                      variant={proveedor.registradoEnPortal ? 'default' : 'secondary'}
+                                      className={cn(
+                                        proveedor.registradoEnPortal
+                                          ? 'dark:bg-green-500/20 dark:text-green-200 bg-green-100 text-green-800'
+                                          : 'dark:bg-orange-500/20 dark:text-orange-200 bg-orange-100 text-orange-800',
+                                        'hover:bg-transparent'
+                                      )}
+                                    >
+                                      {proveedor.registradoEnPortal ? 'Sí' : 'No'}
+                                    </Badge>
+                                  }
+                                />
+                                {proveedor.registradoEnPortal && proveedor.fechaRegistroPortal && (
+                                  <InfoRow
+                                    label="Fecha de Registro Portal"
+                                    value={new Date(proveedor.fechaRegistroPortal).toLocaleDateString('es-MX')}
+                                  />
+                                )}
+                                <InfoRow
+                                  label="Fecha Alta ERP"
+                                  value={proveedor.createdAt
                                     ? new Date(proveedor.createdAt).toLocaleDateString('es-MX')
                                     : 'N/A'
-                                  } 
+                                  }
                                 />
-                                <InfoRow label="Estado Actual" value={
-                                <Badge variant={proveedor.status === 'active' ? 'default' : 'destructive'} className={cn(proveedor.status === 'active' ? 'dark:bg-green-500/20 dark:text-green-200 bg-green-100 text-green-800' : 'dark:bg-red-500/20 dark:text-red-200 bg-red-100 text-red-800', 'hover:bg-transparent')}>
-                                    {proveedor.status === 'active' ? 'Activo' : proveedor.status === 'review' ? 'En revisión' : 'Inactivo'}
+                                <InfoRow label="Estado en ERP" value={
+                                <Badge
+                                  variant={proveedor.status === 'activo' ? 'default' : 'destructive'}
+                                  className={cn(
+                                    proveedor.status === 'activo'
+                                      ? 'dark:bg-green-500/20 dark:text-green-200 bg-green-100 text-green-800'
+                                      : proveedor.status === 'pendiente_validacion'
+                                        ? 'dark:bg-yellow-500/20 dark:text-yellow-200 bg-yellow-100 text-yellow-800'
+                                        : 'dark:bg-red-500/20 dark:text-red-200 bg-red-100 text-red-800',
+                                    'hover:bg-transparent'
+                                  )}
+                                >
+                                    {proveedor.status === 'activo' ? 'Activo (Alta)'
+                                      : proveedor.status === 'pendiente_validacion' ? 'Pendiente Validación'
+                                      : proveedor.status === 'suspendido' ? 'Bloqueado'
+                                      : 'Baja'}
                                 </Badge>
                                 } />
+                                {proveedor.situacion && (
+                                  <InfoRow label="Situación" value={proveedor.situacion} />
+                                )}
+                                {proveedor.situacionNota && (
+                                  <InfoRow label="Nota de Situación" value={proveedor.situacionNota} />
+                                )}
                             </div>
                         </div>
                     </CardContent>

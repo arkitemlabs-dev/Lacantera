@@ -143,8 +143,9 @@ export class SqlServerPNetDatabase implements Database {
             estado: '',
             cp: '',
           },
-      status: proveedorData?.Estatus === 'ALTA' ? 'aprobado' : 'pendiente',
+      status: proveedorData?.Estatus === 'ALTA' ? 'activo' : 'pendiente_validacion',
       documentosValidados: false,
+      registradoEnPortal: true, // Si llegamos aquí, está registrado
       createdAt: new Date(), // TODO: Usar fecha real de FechaRegistro
     };
 
@@ -301,10 +302,15 @@ export class SqlServerPNetDatabase implements Database {
             p.Estatus as ProveedorEstatus,
             p.Situacion,
             p.SituacionNota,
+            p.SituacionFecha,
             p.Alta as FechaAltaERP,
             p.ProvBancoSucursal as Banco,
             p.ProvCuenta as CuentaBancaria,
-            p.FormaPago
+            p.FormaPago,
+            p.DiaRevision1,
+            p.DiaRevision2,
+            p.DiaPago1,
+            p.DiaPago2
           FROM Prov p
           WHERE p.Proveedor = @proveedor
         `);
@@ -365,10 +371,15 @@ export class SqlServerPNetDatabase implements Database {
           p.Estatus as ProveedorEstatus,
           p.Situacion,
           p.SituacionNota,
+          p.SituacionFecha,
           p.Alta as FechaAltaERP,
           p.ProvBancoSucursal as Banco,
           p.ProvCuenta as CuentaBancaria,
-          p.FormaPago
+          p.FormaPago,
+          p.DiaRevision1,
+          p.DiaRevision2,
+          p.DiaPago1,
+          p.DiaPago2
         FROM Prov p
         WHERE p.Proveedor = @proveedor
       `);
@@ -542,10 +553,8 @@ export class SqlServerPNetDatabase implements Database {
       const erpPool = await getERPConnection('la-cantera');
       const erpRequest = erpPool.request();
 
-      // Construir condiciones para el ERP
-      const erpConditions: string[] = [
-        "p.Tipo = 'Proveedor Nal'", // Solo proveedores nacionales, no estructuras
-      ];
+      // Filtro por defecto: solo proveedores ALTA (excluir BLOQUEADO)
+      const erpConditions: string[] = ["p.Estatus = 'ALTA'"];
 
       // Filtros de estatus del ERP
       if (filters?.status) {
@@ -616,54 +625,114 @@ export class SqlServerPNetDatabase implements Database {
       const erpResult = await erpRequest.query(erpQuery);
       console.log(`[ERP-QUERY] Encontrados ${erpResult.recordset.length} proveedores en ERP`);
 
-      // 2. Obtener usuarios registrados en el portal (tabla WebUsuario)
+      // 2. Obtener usuarios registrados en el portal con sus RFCs
+      // El cruce se hace por RFC porque los códigos de proveedor del portal (PROV001)
+      // no coinciden con los códigos del ERP (P01464)
       const portalPool = await getConnection();
-      const portalQuery = `
+
+      // Query: Obtener usuarios del portal con el RFC del proveedor asociado
+      // Unimos pNetUsuario con la tabla Prov del PORTAL para obtener el RFC
+      const portalProveedoresQuery = `
         SELECT
-          wu.UsuarioWeb,
-          wu.eMail,
-          wu.Nombre as UsuarioNombre,
-          wu.Estatus as UsuarioEstatus,
-          wu.Alta as FechaRegistro,
-          wu.Telefono as UsuarioTelefono,
-          wu.Proveedor,
-          wu.Rol
-        FROM WebUsuario wu
-        WHERE wu.Proveedor IS NOT NULL
-          AND wu.Proveedor != ''
+          u.IDUsuario,
+          u.eMail,
+          u.Nombre as UsuarioNombre,
+          u.Estatus as UsuarioEstatus,
+          u.FechaRegistro,
+          u.Telefono as UsuarioTelefono,
+          u.Usuario as CodigoProveedorPortal,
+          p.RFC as ProveedorRFC,
+          'pNetUsuario' as Fuente
+        FROM pNetUsuario u
+        LEFT JOIN Prov p ON u.Usuario = p.Proveedor
+        WHERE u.IDUsuarioTipo = 4
+          AND u.Usuario IS NOT NULL
+          AND u.Usuario != ''
       `;
 
-      console.log('[PORTAL-QUERY] Obteniendo usuarios del portal...');
-      const portalResult = await portalPool.request().query(portalQuery);
+      console.log('[PORTAL-QUERY] Obteniendo usuarios del portal con RFC...');
+      const portalResult = await portalPool.request().query(portalProveedoresQuery);
       console.log(`[PORTAL-QUERY] Encontrados ${portalResult.recordset.length} usuarios proveedores en portal`);
 
-      // Debug: mostrar los proveedores encontrados en el portal
+      // Debug: mostrar los proveedores encontrados en el portal con sus RFCs
       if (portalResult.recordset.length > 0) {
-        console.log('[PORTAL-QUERY] Proveedores registrados:', portalResult.recordset.map(u => u.Proveedor).join(', '));
+        console.log('[PORTAL-QUERY] Proveedores registrados:');
+        portalResult.recordset.forEach(u => {
+          console.log(`  - Código: "${u.CodigoProveedorPortal}", RFC: "${u.ProveedorRFC || 'SIN RFC'}", Email: ${u.eMail}`);
+        });
       }
 
-      // 3. Crear mapa de proveedores registrados en el portal (por código de proveedor)
-      const portalUsuariosMap = new Map<string, any>();
+      // 3. Crear mapas de proveedores registrados en el portal por múltiples criterios
+      const portalUsuariosPorRFC = new Map<string, any>();
+      const portalUsuariosPorCodigo = new Map<string, any>();
+      const portalUsuariosPorNombre = new Map<string, any>();
+      
       for (const usuario of portalResult.recordset) {
-        if (usuario.Proveedor) {
-          portalUsuariosMap.set(usuario.Proveedor.trim(), usuario);
+        // Mapear por RFC
+        if (usuario.ProveedorRFC) {
+          const rfcNormalizado = String(usuario.ProveedorRFC).trim().toUpperCase().replace(/[\s-]/g, '');
+          portalUsuariosPorRFC.set(rfcNormalizado, usuario);
+        }
+        
+        // Mapear por código de proveedor del portal
+        if (usuario.CodigoProveedorPortal) {
+          const codigoNorm = String(usuario.CodigoProveedorPortal).trim().toUpperCase();
+          portalUsuariosPorCodigo.set(codigoNorm, usuario);
+        }
+        
+        // Mapear por nombre
+        if (usuario.UsuarioNombre) {
+          const nombreNorm = String(usuario.UsuarioNombre).trim().toUpperCase();
+          portalUsuariosPorNombre.set(nombreNorm, usuario);
         }
       }
 
-      // 4. Combinar datos: ERP + Portal
+      console.log(`[PORTAL-MAP] Total RFCs mapeados: ${portalUsuariosPorRFC.size}`);
+
+      // Debug: mostrar algunos RFCs del ERP
+      if (erpResult.recordset.length > 0) {
+        const primeros5 = erpResult.recordset.slice(0, 5).map(p => `"${p.RFC || 'SIN RFC'}"`);
+        console.log('[ERP-QUERY] Primeros 5 RFCs del ERP:', primeros5.join(', '));
+      }
+
+      // 4. Combinar datos: ERP + Portal (cruce por múltiples criterios)
       let proveedores: ProveedorUser[] = erpResult.recordset.map(erpRow => {
-        const codigoERP = erpRow.Proveedor?.trim() || '';
-        const portalUsuario = portalUsuariosMap.get(codigoERP);
+        let portalUsuario = null;
+        
+        // 1. Intentar por RFC
+        if (erpRow.RFC) {
+          const rfcERP = String(erpRow.RFC).trim().toUpperCase().replace(/[\s-]/g, '');
+          portalUsuario = portalUsuariosPorRFC.get(rfcERP);
+        }
+        
+        // 2. Si no se encontró, intentar por código de proveedor
+        if (!portalUsuario && erpRow.Proveedor) {
+          const codigoERP = String(erpRow.Proveedor).trim().toUpperCase();
+          portalUsuario = portalUsuariosPorCodigo.get(codigoERP);
+        }
+        
+        // 3. Si no se encontró, intentar por nombre
+        if (!portalUsuario && erpRow.ProveedorNombre) {
+          const nombreERP = String(erpRow.ProveedorNombre).trim().toUpperCase();
+          portalUsuario = portalUsuariosPorNombre.get(nombreERP);
+        }
+
+        // Debug para primeros registros
+        if (erpResult.recordset.indexOf(erpRow) < 10) {
+          console.log(`[MATCH] Proveedor ERP: "${erpRow.Proveedor}" - "${erpRow.ProveedorNombre}", Match: ${portalUsuario ? 'SÍ (' + portalUsuario.eMail + ')' : 'NO'}`);
+        }
+
         return this.mapRowToProveedorUserFromERP({
           ...erpRow,
-          // Datos del portal si existe
-          IDUsuario: portalUsuario?.UsuarioWeb || null,
+          // Datos del portal si existe (cruzado por RFC)
+          IDUsuario: portalUsuario?.IDUsuario || null,
           eMail: portalUsuario?.eMail || null,
           UsuarioNombre: portalUsuario?.UsuarioNombre || null,
           UsuarioEstatus: portalUsuario?.UsuarioEstatus || null,
           FechaRegistro: portalUsuario?.FechaRegistro || null,
           UsuarioTelefono: portalUsuario?.UsuarioTelefono || null,
           RegistradoEnPortal: portalUsuario ? 1 : 0,
+          FuentePortal: portalUsuario?.Fuente || null,
         });
       });
 
@@ -845,7 +914,7 @@ export class SqlServerPNetDatabase implements Database {
         estado: row.Estado || '',
         cp: row.CodigoPostal || '',
       },
-      status: row.ProveedorEstatus === 'ALTA' ? 'aprobado' : 'pendiente',
+      status: row.ProveedorEstatus === 'ALTA' ? 'activo' : 'pendiente_validacion',
       documentosValidados: false,
       registradoEnPortal: true,
       fechaRegistroPortal: row.FechaRegistro || null,
@@ -875,6 +944,15 @@ export class SqlServerPNetDatabase implements Database {
     const direccionParts = [row.Direccion, row.DireccionNumero].filter(Boolean);
     const direccionCompleta = direccionParts.join(' ');
 
+    // Construir arrays de días de revisión y pago
+    const diasRevision: string[] = [];
+    if (row.DiaRevision1) diasRevision.push(row.DiaRevision1);
+    if (row.DiaRevision2) diasRevision.push(row.DiaRevision2);
+
+    const diasPago: string[] = [];
+    if (row.DiaPago1) diasPago.push(row.DiaPago1);
+    if (row.DiaPago2) diasPago.push(row.DiaPago2);
+
     return {
       // Si está registrado en portal, usar IDUsuario; si no, usar código del ERP como identificador
       uid: registradoEnPortal ? String(row.IDUsuario) : `erp_${row.Proveedor}`,
@@ -900,6 +978,21 @@ export class SqlServerPNetDatabase implements Database {
       fechaRegistroPortal: registradoEnPortal && row.FechaRegistro ? new Date(row.FechaRegistro) : null,
       codigoERP: row.Proveedor,
       createdAt: registradoEnPortal && row.FechaRegistro ? new Date(row.FechaRegistro) : (row.FechaAltaERP ? new Date(row.FechaAltaERP) : new Date()),
+
+      // Campos adicionales del ERP
+      contacto1: row.Contacto1 || undefined,
+      contacto2: row.Contacto2 || undefined,
+      email2: row.ProveedorEmail2 || undefined,
+      categoria: row.Categoria || undefined,
+      condicionPago: row.CondicionPago || undefined,
+      formaPago: row.FormaPago || undefined,
+      diasRevision: diasRevision.length > 0 ? diasRevision : undefined,
+      diasPago: diasPago.length > 0 ? diasPago : undefined,
+      banco: row.Banco || undefined,
+      cuentaBancaria: row.CuentaBancaria || undefined,
+      situacion: row.Situacion || undefined,
+      situacionNota: row.SituacionNota || undefined,
+      situacionFecha: row.SituacionFecha ? new Date(row.SituacionFecha) : undefined,
     };
   }
 

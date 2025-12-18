@@ -32,12 +32,34 @@ export interface ProveedorUser extends BaseUser {
   };
   status: 'activo' | 'pendiente_validacion' | 'rechazado' | 'suspendido';
   documentosValidados: boolean;
-  // Indica si el proveedor ya se registró en el portal (tiene usuario en pNetUsuario)
+  // Indica si el proveedor ya se registró en el portal (tiene usuario en pNetUsuario o WebUsuario)
   registradoEnPortal: boolean;
   // Fecha de registro en el portal (null si no se ha registrado)
   fechaRegistroPortal?: Date | null;
   // Código del proveedor en el ERP
   codigoERP?: string;
+
+  // === Campos adicionales del ERP ===
+  // Contactos
+  contacto1?: string;
+  contacto2?: string;
+  email2?: string;
+
+  // Categoría y condiciones comerciales
+  categoria?: string;
+  condicionPago?: string;
+  formaPago?: string;
+  diasRevision?: string[];
+  diasPago?: string[];
+
+  // Información bancaria del ERP
+  banco?: string;
+  cuentaBancaria?: string;
+
+  // Situación del proveedor en el ERP
+  situacion?: string;
+  situacionNota?: string;
+  situacionFecha?: Date;
 }
 
 export interface AdminUser extends BaseUser {

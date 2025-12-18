@@ -23,7 +23,25 @@ export async function getProveedor(uid: string) {
 
 export async function getProveedores(filters?: ProveedorFilters) {
   try {
+    console.log('[ACTION] getProveedores - iniciando con filtros:', filters);
     const proveedores = await database.getProveedores(filters);
+
+    // Log de resumen
+    const registrados = proveedores.filter(p => p.registradoEnPortal === true).length;
+    const noRegistrados = proveedores.filter(p => p.registradoEnPortal === false).length;
+    console.log(`[ACTION] getProveedores - Total: ${proveedores.length}, Registrados: ${registrados}, No registrados: ${noRegistrados}`);
+
+    // Log de algunos ejemplos
+    if (proveedores.length > 0) {
+      const ejemplos = proveedores.slice(0, 3).map(p => ({
+        codigo: p.codigoERP,
+        nombre: p.razonSocial?.substring(0, 30),
+        registrado: p.registradoEnPortal,
+        uid: p.uid
+      }));
+      console.log('[ACTION] Ejemplos de proveedores:', JSON.stringify(ejemplos, null, 2));
+    }
+
     return { success: true, data: proveedores };
   } catch (error: any) {
     console.error('Error obteniendo proveedores:', error);
