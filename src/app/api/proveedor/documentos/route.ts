@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     // 3. Conectar al ERP de la empresa
     const erpPool = await getERPConnection(empresaActual);
 
-    // 4. Obtener catálogo de documentos requeridos para proveedores (Rama = 'CXP')
+    // 4. Obtener catálogo de documentos requeridos para proveedores
     const documentosRequeridosResult = await erpPool.request()
       .query(`
         SELECT
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
           Orden,
           Requerido
         FROM DocRama
-        WHERE Rama = 'CXP'
+        WHERE Rama = 'CXP' AND Grupo = 'Check List de Proveedores'
         ORDER BY Orden
       `);
 

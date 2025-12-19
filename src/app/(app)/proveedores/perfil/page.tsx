@@ -181,13 +181,16 @@ export default function PerfilProveedorPage() {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const idFromQuery = urlParams.get('id');
-    setIsAdminView(!!idFromQuery);
+    const esVistaAdmin = !!idFromQuery;
+    
+    console.log('🔍 URL params:', { idFromQuery, esVistaAdmin });
+    setIsAdminView(esVistaAdmin);
     
     // Si es vista de admin, cargar datos inmediatamente
     if (idFromQuery) {
       setProveedorId(idFromQuery);
       cargarInfoProveedor(idFromQuery);
-      cargarDocumentos(idFromQuery);
+      cargarDocumentos(idFromQuery, true); // Forzar vista admin
     }
   }, []);
   const userAvatar = PlaceHolderImages.find(
@@ -213,6 +216,11 @@ export default function PerfilProveedorPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
+  // Estado para visualizar documento
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [documentoParaVer, setDocumentoParaVer] = useState<any>(null);
+  const [loadingDocumento, setLoadingDocumento] = useState(false);
+
   // Obtener ID del proveedor desde query params o usar el usuario logueado
   const [proveedorId, setProveedorId] = useState<string>('');
 
@@ -222,7 +230,7 @@ export default function PerfilProveedorPage() {
       const finalId = session.user.id;
       setProveedorId(finalId);
       cargarInfoProveedor(finalId);
-      cargarDocumentos(finalId);
+      cargarDocumentos(finalId, false); // Vista de proveedor normal
     }
   }, [session, isAdminView]);
 
@@ -333,14 +341,27 @@ export default function PerfilProveedorPage() {
     }
   };
 
-  const cargarDocumentos = async (id: string) => {
+  const cargarDocumentos = async (id: string, forceAdminView?: boolean) => {
     if (!id) return;
 
     setLoading(true);
     try {
       console.log("🔍 Cargando documentos desde ERP...");
-      // Si es un ID de admin, usar el endpoint de admin (por ahora usar el mismo)
-      const response = await fetch('/api/proveedor/documentos');
+
+      // Determinar si es vista de admin: usar el parámetro forzado o verificar la URL directamente
+      const urlParams = new URLSearchParams(window.location.search);
+      const idFromQuery = urlParams.get('id');
+      const esVistaAdmin = forceAdminView !== undefined ? forceAdminView : !!idFromQuery;
+
+      console.log("🔍 esVistaAdmin:", esVistaAdmin, "ID:", id, "idFromQuery:", idFromQuery);
+
+      // Determinar endpoint según si es vista de admin
+      const endpoint = esVistaAdmin
+        ? `/api/admin/proveedores/${id}/documentos`
+        : '/api/proveedor/documentos';
+
+      console.log("🔍 Usando endpoint:", endpoint);
+      const response = await fetch(endpoint);
       const result = await response.json();
 
       if (result.success) {
@@ -457,6 +478,110 @@ export default function PerfilProveedorPage() {
       d.documentoRequerido.toLowerCase() === documentoRequerido.toLowerCase()
     );
     return docERP;
+  };
+
+  // Función para visualizar documento
+  const handleVerDocumento = async (docERP: any) => {
+    if (!docERP.idr) {
+      alert('No se encontró el ID del documento');
+      return;
+    }
+
+    setDocumentoParaVer(docERP);
+    setViewDialogOpen(true);
+    setLoadingDocumento(true);
+
+    try {
+      // Obtener el archivo del servidor
+      const urlParams = new URLSearchParams(window.location.search);
+      const idFromQuery = urlParams.get('id');
+      const esVistaAdmin = !!idFromQuery;
+
+      const endpoint = esVistaAdmin
+        ? `/api/admin/proveedores/${idFromQuery}/documentos/${docERP.idr}/archivo`
+        : `/api/proveedor/documentos/${docERP.idr}/archivo`;
+
+      console.log('[handleVerDocumento] Llamando endpoint:', endpoint);
+      console.log('[handleVerDocumento] docERP:', docERP);
+
+      const response = await fetch(endpoint);
+      const result = await response.json();
+
+      console.log('[handleVerDocumento] Respuesta status:', response.status);
+      console.log('[handleVerDocumento] Respuesta:', result);
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || result.details || 'Error al obtener el documento');
+      }
+
+      if (result.data?.contenido) {
+        setDocumentoParaVer({
+          ...docERP,
+          contenidoBase64: result.data.contenido,
+          tipoMime: result.data.tipoMime || 'application/pdf',
+        });
+      } else {
+        throw new Error('No se pudo cargar el contenido del documento');
+      }
+    } catch (error: any) {
+      console.error('[handleVerDocumento] Error:', error);
+      alert(`Error al cargar el documento: ${error.message}`);
+      setViewDialogOpen(false);
+    } finally {
+      setLoadingDocumento(false);
+    }
+  };
+
+  // Función para descargar documento
+  const handleDescargarDocumento = async (docERP: any) => {
+    if (!docERP.idr) {
+      alert('No se encontró el ID del documento');
+      return;
+    }
+
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const idFromQuery = urlParams.get('id');
+      const esVistaAdmin = !!idFromQuery;
+
+      const endpoint = esVistaAdmin
+        ? `/api/admin/proveedores/${idFromQuery}/documentos/${docERP.idr}/archivo`
+        : `/api/proveedor/documentos/${docERP.idr}/archivo`;
+
+      const response = await fetch(endpoint);
+
+      if (!response.ok) {
+        throw new Error('Error al obtener el documento');
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.data?.contenido) {
+        // Crear blob y descargar
+        const byteCharacters = atob(result.data.contenido);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: result.data.tipoMime || 'application/pdf' });
+
+        // Crear enlace de descarga
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = docERP.nombreArchivo || `${docERP.documentoRequerido}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        throw new Error(result.error || 'No se pudo descargar el documento');
+      }
+    } catch (error: any) {
+      console.error('Error descargando documento:', error);
+      alert(`Error al descargar el documento: ${error.message}`);
+    }
   };
 
   const totalDocumentos = documentosERP.length || 14; // Usar documentos del ERP o default
@@ -764,13 +889,23 @@ export default function PerfilProveedorPage() {
                                     <Upload className="mr-2 h-4 w-4" />
                                     {docERP.tieneArchivo ? 'Reemplazar' : 'Subir'}
                                   </Button>
-                                  {docERP.tieneArchivo && docERP.rutaArchivo && (
+                                  {docERP.tieneArchivo && (
                                     <>
-                                      <Button variant="ghost" size="sm" title={`Archivo: ${docERP.rutaArchivo}`}>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        title="Ver documento"
+                                        onClick={() => handleVerDocumento(docERP)}
+                                      >
                                         <Eye className="mr-2 h-4 w-4" />
                                         Ver
                                       </Button>
-                                      <Button variant="ghost" size="sm" title="Descargar archivo">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        title="Descargar archivo"
+                                        onClick={() => handleDescargarDocumento(docERP)}
+                                      >
                                         <Download className="h-4 w-4" />
                                         <span className="sr-only">Descargar</span>
                                       </Button>
@@ -836,6 +971,67 @@ export default function PerfilProveedorPage() {
                   </>
                 )}
               </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog para visualizar documento */}
+        <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+          <DialogContent className="sm:max-w-[90vw] sm:max-h-[90vh] h-[90vh]">
+            <DialogHeader>
+              <DialogTitle>{documentoParaVer?.documentoRequerido || 'Documento'}</DialogTitle>
+              <DialogDescription>
+                {documentoParaVer?.nombreArchivo && (
+                  <span className="text-xs text-muted-foreground">
+                    Archivo: {documentoParaVer.nombreArchivo}
+                  </span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-hidden h-full min-h-[500px]">
+              {loadingDocumento ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <span className="ml-2">Cargando documento...</span>
+                </div>
+              ) : documentoParaVer?.contenidoBase64 ? (
+                documentoParaVer.tipoMime?.startsWith('image/') ? (
+                  <div className="flex items-center justify-center h-full">
+                    <img
+                      src={`data:${documentoParaVer.tipoMime};base64,${documentoParaVer.contenidoBase64}`}
+                      alt={documentoParaVer.nombreArchivo}
+                      className="max-w-full max-h-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <iframe
+                    src={`data:${documentoParaVer.tipoMime};base64,${documentoParaVer.contenidoBase64}`}
+                    className="w-full h-full min-h-[500px] border-0"
+                    title={documentoParaVer.nombreArchivo}
+                  />
+                )
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <AlertCircle className="h-8 w-8 mr-2" />
+                  No se pudo cargar el documento
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setViewDialogOpen(false)}
+              >
+                Cerrar
+              </Button>
+              {documentoParaVer && (
+                <Button
+                  onClick={() => handleDescargarDocumento(documentoParaVer)}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Descargar
+                </Button>
+              )}
             </div>
           </DialogContent>
         </Dialog>

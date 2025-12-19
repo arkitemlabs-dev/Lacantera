@@ -297,13 +297,15 @@ export default function ProveedoresPage() {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div>
-                                {supplier.registradoEnPortal ? (
-                                  <Link href={`/proveedores/perfil?id=${supplier.codigoERP || supplier.uid}`} className="hover:underline">
-                                    {supplier.razonSocial}
-                                  </Link>
-                                ) : (
-                                  <span className="text-muted-foreground">{supplier.razonSocial}</span>
-                                )}
+                                <Link
+                                  href={`/proveedores/perfil?id=${supplier.codigoERP || supplier.uid}`}
+                                  className={cn(
+                                    "hover:underline",
+                                    !supplier.registradoEnPortal && "text-muted-foreground"
+                                  )}
+                                >
+                                  {supplier.razonSocial}
+                                </Link>
                                 {supplier.codigoERP && (
                                   <span className="ml-2 text-xs text-muted-foreground">
                                     ({supplier.codigoERP})
@@ -390,14 +392,12 @@ export default function ProveedoresPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {supplier.registradoEnPortal && (
-                              <Button asChild variant="ghost" size="icon">
-                                <Link href={`/proveedores/perfil?id=${supplier.codigoERP || supplier.uid}`}>
-                                  <Eye className="h-4 w-4" />
-                                  <span className="sr-only">Ver Detalles</span>
-                                </Link>
-                              </Button>
-                            )}
+                            <Button asChild variant="ghost" size="icon">
+                              <Link href={`/proveedores/perfil?id=${supplier.codigoERP || supplier.uid}`}>
+                                <Eye className="h-4 w-4" />
+                                <span className="sr-only">Ver Detalles</span>
+                              </Link>
+                            </Button>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
@@ -411,13 +411,13 @@ export default function ProveedoresPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/proveedores/perfil?id=${supplier.codigoERP || supplier.uid}`}>
+                                    Ver perfil completo
+                                  </Link>
+                                </DropdownMenuItem>
                                 {supplier.registradoEnPortal ? (
                                   <>
-                                    <DropdownMenuItem asChild>
-                                      <Link href={`/proveedores/perfil?id=${supplier.codigoERP || supplier.uid}`}>
-                                        Ver perfil completo
-                                      </Link>
-                                    </DropdownMenuItem>
                                     <DropdownMenuItem>Editar</DropdownMenuItem>
                                     <DropdownMenuItem>
                                       {supplier.status === "activo" ? "Desactivar" : "Activar"}
@@ -426,14 +426,6 @@ export default function ProveedoresPage() {
                                 ) : (
                                   <>
                                     <DropdownMenuItem>Invitar al portal</DropdownMenuItem>
-                                    <DropdownMenuItem 
-                                      onClick={() => {
-                                        setSelectedProveedor(supplier);
-                                        setShowDetailsModal(true);
-                                      }}
-                                    >
-                                      Ver datos ERP
-                                    </DropdownMenuItem>
                                   </>
                                 )}
                               </DropdownMenuContent>
