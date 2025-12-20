@@ -1,19 +1,17 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import {
-  MoreHorizontal,
-  PlusCircle,
-  Search,
   Eye,
-  FileDown,
   ListFilter,
   Calendar as CalendarIcon,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
-import { purchaseOrders, suppliers } from '@/lib/data';
-import type { PurchaseOrder, PurchaseOrderStatus } from '@/lib/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { DateRange } from 'react-day-picker';
@@ -28,13 +26,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   Table,
   TableBody,
@@ -58,23 +49,33 @@ import {
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const statusStyles: Record<
-  PurchaseOrderStatus,
-  { variant: 'default' | 'destructive' | 'secondary' | 'outline'; className: string }
-> = {
-  Pendiente: {
+// Helper function to convert ERP currency names to ISO codes
+const getCurrencyCode = (erpCurrency: string): string => {
+  const currencyMap: Record<string, string> = {
+    'Pesos': 'MXN',
+    'Dolares': 'USD',
+    'Dólares': 'USD',
+    'Euros': 'EUR',
+    'MXN': 'MXN',
+    'USD': 'USD',
+    'EUR': 'EUR',
+  };
+  return currencyMap[erpCurrency] || 'MXN';
+};
+
+const statusStyles: Record<string, { variant: 'default' | 'destructive' | 'secondary' | 'outline'; className: string }> = {
+  'PENDIENTE': {
     variant: 'secondary',
     className:
       'dark:bg-yellow-500/20 dark:text-yellow-200 border-yellow-500/30 hover:bg-yellow-500/30 bg-yellow-100 text-yellow-800',
   },
-  Completa: {
+  'CONCLUIDO': {
     variant: 'default',
     className:
       'dark:bg-green-500/20 dark:text-green-200 border-green-500/30 hover:bg-green-500/30 bg-green-100 text-green-800',
   },
-  Cancelada: {
+  'CANCELADO': {
     variant: 'destructive',
     className:
       'dark:bg-red-500/20 dark:text-red-200 border-red-500/30 hover:bg-red-500/30 bg-red-100 text-red-800',
@@ -82,44 +83,138 @@ const statusStyles: Record<
 };
 
 export default function OrdenesDeCompraPage() {
+  const { data: session } = useSession();
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
-  const [status, setStatus] = useState('todas');
   const [supplier, setSupplier] = useState('todos');
+  const [empresa, setEmpresa] = useState('todas');
   const [orderNumber, setOrderNumber] = useState('');
+  const [ordenes, setOrdenes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [estadisticas, setEstadisticas] = useState<any>(null);
+  const [proveedoresUnicos, setProveedoresUnicos] = useState<string[]>([]);
+  const [empresasUnicas, setEmpresasUnicas] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (session) {
+      cargarOrdenes();
+    }
+  }, [session]);
+
+  const cargarOrdenes = async () => {
+    if (!session) return;
+
+    setLoading(true);
+    try {
+      console.log('Cargando órdenes de compra PENDIENTES desde ERP...');
+      const response = await fetch('/api/admin/ordenes');
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('Órdenes del ERP cargadas:', result.data);
+        setOrdenes(result.data.ordenes || []);
+        setEstadisticas(result.data.estadisticas || null);
+
+        // Extraer proveedores únicos para el filtro
+        const proveedores = [...new Set(result.data.ordenes.map((o: any) => o.nombreProveedor || o.proveedor))].filter(Boolean) as string[];
+        setProveedoresUnicos(proveedores);
+
+        // Extraer empresas únicas para el filtro
+        const empresas = [...new Set(result.data.ordenes.map((o: any) => o.empresa))].filter(Boolean) as string[];
+        setEmpresasUnicas(empresas);
+      } else {
+        console.error('Error cargando órdenes:', result.error);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredOrders = useMemo(() => {
-    return purchaseOrders.filter((order) => {
-      const orderDate = new Date(order.emissionDate);
-      
-      const dateFilter = !dateRange?.from || (orderDate >= dateRange.from && (!dateRange.to || orderDate <= dateRange.to));
-      const statusFilter = status === 'todas' || order.status.toLowerCase().replace(' ', '-') === status;
-      const supplierFilter = supplier === 'todos' || order.supplierName === suppliers.find(s => s.id === supplier)?.name;
-      const orderNumberFilter = order.id.toLowerCase().includes(orderNumber.toLowerCase());
+    return ordenes.filter((order) => {
+      const orderDate = order.fechaEmision ? new Date(order.fechaEmision) : null;
 
-      return dateFilter && statusFilter && supplierFilter && orderNumberFilter;
+      const dateFilter = !dateRange?.from || !orderDate || (orderDate >= dateRange.from && (!dateRange.to || orderDate <= dateRange.to));
+      const supplierFilter = supplier === 'todos' || order.nombreProveedor === supplier || order.proveedor === supplier;
+      const empresaFilter = empresa === 'todas' || order.empresa === empresa;
+      const orderNumberFilter = !orderNumber ||
+        order.movID?.toLowerCase().includes(orderNumber.toLowerCase()) ||
+        order.concepto?.toLowerCase().includes(orderNumber.toLowerCase()) ||
+        order.proveedor?.toLowerCase().includes(orderNumber.toLowerCase()) ||
+        order.nombreProveedor?.toLowerCase().includes(orderNumber.toLowerCase());
+
+      return dateFilter && supplierFilter && empresaFilter && orderNumberFilter;
     });
-  }, [dateRange, status, supplier, orderNumber]);
+  }, [ordenes, dateRange, supplier, empresa, orderNumber]);
 
   const clearFilters = () => {
     setDateRange(undefined);
-    setStatus('todas');
     setSupplier('todos');
+    setEmpresa('todas');
     setOrderNumber('');
   };
 
-
   return (
-    <>
-      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+    <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8" suppressHydrationWarning>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Órdenes de Compra</h1>
+            <h1 className="text-2xl font-bold">Órdenes de Compra Pendientes</h1>
             <p className="text-muted-foreground">
-              Consulte y gestione todas sus órdenes de compra.
+              Consulte todas las órdenes de compra pendientes de todas las empresas.
             </p>
           </div>
+          <Button variant="outline" onClick={cargarOrdenes} disabled={loading}>
+            <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
+            Actualizar
+          </Button>
         </div>
-        
+
+        {/* Estadísticas rápidas */}
+        {estadisticas && (
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Total Órdenes</CardDescription>
+                <CardTitle className="text-2xl">{estadisticas.totalOrdenes}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Importe Total</CardDescription>
+                <CardTitle className="text-2xl">
+                  {new Intl.NumberFormat('es-MX', {
+                    style: 'currency',
+                    currency: 'MXN',
+                  }).format(estadisticas.totalImporte || 0)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Impuestos</CardDescription>
+                <CardTitle className="text-2xl">
+                  {new Intl.NumberFormat('es-MX', {
+                    style: 'currency',
+                    currency: 'MXN',
+                  }).format(estadisticas.totalImpuestos || 0)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Total General</CardDescription>
+                <CardTitle className="text-2xl">
+                  {new Intl.NumberFormat('es-MX', {
+                    style: 'currency',
+                    currency: 'MXN',
+                  }).format(estadisticas.totalGeneral || 0)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+          </div>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle>Filtros de Búsqueda</CardTitle>
@@ -128,7 +223,7 @@ export default function OrdenesDeCompraPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="relative">
                 <Popover>
                   <PopoverTrigger asChild>
@@ -167,15 +262,17 @@ export default function OrdenesDeCompraPage() {
                   </PopoverContent>
                 </Popover>
               </div>
-              <Select value={status} onValueChange={setStatus}>
+              <Select value={empresa} onValueChange={setEmpresa}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Estado" />
+                  <SelectValue placeholder="Empresa" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todas">Todos los estados</SelectItem>
-                  <SelectItem value="pendiente">Pendiente</SelectItem>
-                  <SelectItem value="completa">Completa</SelectItem>
-                  <SelectItem value="cancelada">Cancelada</SelectItem>
+                  <SelectItem value="todas">Todas las empresas</SelectItem>
+                  {empresasUnicas.map((emp) => (
+                    <SelectItem key={emp} value={emp}>
+                      Empresa {emp}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Select value={supplier} onValueChange={setSupplier}>
@@ -183,98 +280,142 @@ export default function OrdenesDeCompraPage() {
                   <SelectValue placeholder="Seleccionar proveedor..." />
                 </SelectTrigger>
                 <SelectContent>
-                   <SelectItem value="todos">Todos los proveedores</SelectItem>
-                  {suppliers.map((supplier) => (
-                    <SelectItem key={supplier.id} value={supplier.id}>
-                      {supplier.name}
+                  <SelectItem value="todos">Todos los proveedores</SelectItem>
+                  {proveedoresUnicos.map((prov) => (
+                    <SelectItem key={prov} value={prov}>
+                      {prov}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <Input
-                placeholder="Número de Orden"
+                placeholder="Buscar por folio, concepto o proveedor..."
                 value={orderNumber}
                 onChange={(e) => setOrderNumber(e.target.value)}
               />
+              <Button variant="outline" onClick={clearFilters}>
+                <ListFilter className="mr-2 h-4 w-4" />
+                Limpiar Filtros
+              </Button>
             </div>
           </CardContent>
-          <CardFooter className="justify-end gap-2">
-            <Button variant="outline" onClick={clearFilters}>
-              <ListFilter className="mr-2 h-4 w-4" />
-              Limpiar Filtros
-            </Button>
-          </CardFooter>
         </Card>
 
         <Card>
           <CardContent className="pt-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Proveedor</TableHead>
-                  <TableHead>Empresa</TableHead>
-                  <TableHead>Fecha Emisión</TableHead>
-                  <TableHead>Estatus</TableHead>
-                  <TableHead className="text-right">Monto</TableHead>
-                  <TableHead>Fecha Entrega</TableHead>
-                  <TableHead>Área Compra</TableHead>
-                  <TableHead>Factura</TableHead>
-                  <TableHead className="text-right">
-                    <span className="sr-only">Acciones</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium">
-                      <Link
-                        href={`/ordenes-de-compra/${order.id}`}
-                        className="hover:underline"
-                      >
-                        {order.id}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{order.name}</TableCell>
-                    <TableCell>{order.supplierName}</TableCell>
-                    <TableCell>{order.company}</TableCell>
-                    <TableCell>{new Date(order.emissionDate).toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' })}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={statusStyles[order.status].variant}
-                        className={cn(statusStyles[order.status].className)}
-                      >
-                        {order.status}
-                      </Badge>
-                    </TableCell>
-                     <TableCell className="text-right">
-                        {new Intl.NumberFormat('es-MX', {
-                            style: 'currency',
-                            currency: 'MXN',
-                        }).format(order.amount)}
-                     </TableCell>
-                    <TableCell>{order.deliveryDate}</TableCell>
-                    <TableCell>{order.area}</TableCell>
-                    <TableCell>{order.invoice || 'N/A'}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button asChild variant="ghost" size="icon">
-                          <Link href={`/ordenes-de-compra/${order.id}`}>
-                            <Eye className="h-4 w-4" />
-                            <span className="sr-only">Ver Detalles</span>
-                          </Link>
-                        </Button>
-                      </div>
-                    </TableCell>
+            {loading ? (
+              <div className="flex items-center justify-center p-12">
+                <Loader2 className="h-8 w-8 animate-spin mr-2" />
+                <span>Cargando órdenes de compra...</span>
+              </div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-12 text-center">
+                <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No se encontraron órdenes de compra</h3>
+                <p className="text-sm text-muted-foreground">
+                  {ordenes.length === 0
+                    ? 'No hay órdenes de compra registradas con el estatus seleccionado.'
+                    : 'No hay órdenes que coincidan con los filtros aplicados.'}
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Folio</TableHead>
+                    <TableHead>Empresa</TableHead>
+                    <TableHead>Proveedor</TableHead>
+                    <TableHead>Concepto</TableHead>
+                    <TableHead>Fecha Emisión</TableHead>
+                    <TableHead>Situación</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead>Fecha Entrega</TableHead>
+                    <TableHead>Proyecto</TableHead>
+                    <TableHead className="text-right">
+                      Acciones
+                    </TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredOrders.map((order) => {
+                    return (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-medium">
+                          <Link
+                            href={`/ordenes-de-compra/${order.id}`}
+                            className="hover:underline"
+                          >
+                            {order.movID || order.id}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{order.empresa}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{order.nombreProveedor || 'N/A'}</div>
+                            <div className="text-xs text-muted-foreground">{order.proveedor}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{order.concepto || 'N/A'}</div>
+                            {order.referencia && (
+                              <div className="text-xs text-muted-foreground">Ref: {order.referencia}</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {order.fechaEmision
+                            ? new Date(order.fechaEmision).toLocaleDateString('es-MX', {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit',
+                              })
+                            : 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">{order.situacion || 'N/A'}</span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: getCurrencyCode(order.moneda),
+                          }).format(order.total || 0)}
+                        </TableCell>
+                        <TableCell>
+                          {order.fechaEntrega
+                            ? new Date(order.fechaEntrega).toLocaleDateString('es-MX', {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit',
+                              })
+                            : 'N/A'}
+                        </TableCell>
+                        <TableCell>{order.proyecto || 'N/A'}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button asChild variant="ghost" size="icon">
+                              <Link href={`/ordenes-de-compra/${order.id}`}>
+                                <Eye className="h-4 w-4" />
+                                <span className="sr-only">Ver Detalles</span>
+                              </Link>
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
+          {!loading && filteredOrders.length > 0 && (
+            <CardFooter className="text-sm text-muted-foreground">
+              Mostrando {filteredOrders.length} de {ordenes.length} órdenes
+            </CardFooter>
+          )}
         </Card>
-      </main>
-    </>
+    </main>
   );
 }

@@ -88,17 +88,21 @@ export async function GET(request: NextRequest) {
     const erpPool = await getERPConnection(empresaActual);
 
     // Determinar el código de empresa según el mapping
+    // El ERP usa códigos numéricos: '01', '02', etc.
     const empresaCodes: { [key: string]: string } = {
-      'la-cantera': 'e1',
-      'peralillo': 'e2',
-      'plaza-galerena': 'e3',
-      'inmobiliaria-galerena': 'e4',
-      'icrear': 'e5'
+      'la-cantera': '01',
+      'peralillo': '02',
+      'plaza-galerena': '03',
+      'inmobiliaria-galerena': '04',
+      'icrear': '05'
     };
 
-    const empresaCode = empresaCodes[empresaActual] || 'e1';
+    const empresaCode = empresaCodes[empresaActual] || '01';
 
-    // 5. Obtener órdenes de compra
+    console.log(`📍 Código empresa ERP: ${empresaCode}`);
+
+    // 5. Obtener órdenes de compra PENDIENTES
+    // Query basado en: SELECT * FROM Compra c JOIN MovTipo mt ON c.Mov=mt.Mov AND mt.Modulo='COMS' AND mt.Clave='COMS.0' AND mt.subClave is NULL JOIN prov p ON c.Proveedor=p.Proveedor WHERE c.Estatus='PENDIENTE' AND RFC='xxx' AND Empresa='01'
     const ordenesResult = await erpPool.request()
       .input('rfc', sql.VarChar(13), rfc)
       .input('empresaCode', sql.VarChar(5), empresaCode)
@@ -139,7 +143,7 @@ export async function GET(request: NextRequest) {
         FROM Compra c
         JOIN MovTipo mt ON c.Mov = mt.Mov
           AND mt.Modulo = 'COMS'
-          AND mt.Clave = 'COMS.O'
+          AND mt.Clave = 'COMS.0'
           AND mt.SubClave IS NULL
         JOIN Prov p ON c.Proveedor = p.Proveedor
         WHERE p.RFC = @rfc

@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,7 +32,7 @@ import {
 } from '@/components/ui/dialog';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
-import { Eye, Upload, Camera, FileCheck, FileClock, FileX, AlertCircle, Loader2, Download } from 'lucide-react';
+import { Eye, Upload, Camera, FileCheck, FileClock, FileX, AlertCircle, Loader2, Download, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -174,6 +175,7 @@ const docStatusConfig = {
 
 export default function PerfilProveedorPage() {
   const { data: session } = useSession();
+  const router = useRouter();
   
   // Verificar si es vista de admin
   const [isAdminView, setIsAdminView] = useState(false);
@@ -193,6 +195,7 @@ export default function PerfilProveedorPage() {
       cargarDocumentos(idFromQuery, true); // Forzar vista admin
     }
   }, []);
+
   const userAvatar = PlaceHolderImages.find(
     (img) => img.id === 'user-avatar-1'
   );
@@ -600,7 +603,18 @@ export default function PerfilProveedorPage() {
 
   return (
     <main className="flex-1 space-y-8 p-4 md:p-8">
-      <h1 className="text-3xl font-bold tracking-tight">Perfil del Proveedor</h1>
+      <div className="flex items-center gap-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.back()}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Volver
+        </Button>
+        <h1 className="text-3xl font-bold tracking-tight">Perfil del Proveedor</h1>
+      </div>
        <Tabs defaultValue="general">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="general">Información General</TabsTrigger>
@@ -615,7 +629,7 @@ export default function PerfilProveedorPage() {
                       Información del proveedor obtenida del ERP de la empresa seleccionada.
                     </CardDescription>
                   </div>
-                  {/* <div className="flex justify-end gap-2">
+                  <div className="flex justify-end gap-2">
                     {isEditing ? (
                       <>
                         <Button variant="outline" onClick={handleCancel}>Cancelar</Button>
@@ -624,7 +638,7 @@ export default function PerfilProveedorPage() {
                     ) : (
                       <Button onClick={handleEdit}>Editar</Button>
                     )}
-                  </div> */}
+                  </div>
               </CardHeader>
               <CardContent className="space-y-8">
                 {loadingInfo ? (

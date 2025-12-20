@@ -255,12 +255,9 @@ export default function ProveedoresPage() {
                       <TableHead>Nombre del Proveedor</TableHead>
                       <TableHead>RFC</TableHead>
                       <TableHead>Contacto</TableHead>
-                      <TableHead>Dirección</TableHead>
                       <TableHead>Fecha de Registro</TableHead>
                       <TableHead>Estado ERP</TableHead>
-                      <TableHead className="text-right">
-                        <span className="sr-only">Acciones</span>
-                      </TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -354,20 +351,6 @@ export default function ProveedoresPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {supplier.erpDatos?.direccion ? (
-                            <div className="text-sm">
-                              <div>{supplier.erpDatos.direccion}</div>
-                              {supplier.erpDatos.ciudad && (
-                                <div className="text-xs text-muted-foreground">
-                                  {supplier.erpDatos.ciudad}, {supplier.erpDatos.estado} {supplier.erpDatos.codigoPostal}
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
                           {supplier.registradoEnPortal && supplier.fechaRegistroPortal ? (
                             <span className="text-green-600 dark:text-green-400">
                               {new Date(supplier.fechaRegistroPortal).toLocaleDateString("es-MX")}
@@ -418,7 +401,6 @@ export default function ProveedoresPage() {
                                 </DropdownMenuItem>
                                 {supplier.registradoEnPortal ? (
                                   <>
-                                    <DropdownMenuItem>Editar</DropdownMenuItem>
                                     <DropdownMenuItem>
                                       {supplier.status === "activo" ? "Desactivar" : "Activar"}
                                     </DropdownMenuItem>
