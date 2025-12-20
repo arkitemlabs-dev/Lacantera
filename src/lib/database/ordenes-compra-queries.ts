@@ -98,6 +98,7 @@ export async function getOrdenesCompraPendientes(
         c.Descuento
       FROM Compra c
       WHERE c.Estatus = 'PENDIENTE'
+        AND YEAR(c.FechaEmision) = YEAR(GETDATE())
     `;
 
     const params: any = {};
@@ -135,6 +136,7 @@ export async function getOrdenesCompraPendientes(
       SELECT COUNT(*) as total
       FROM Compra c
       WHERE c.Estatus = 'PENDIENTE'
+        AND YEAR(c.FechaEmision) = YEAR(GETDATE())
     `;
 
     const countParams: any = {};

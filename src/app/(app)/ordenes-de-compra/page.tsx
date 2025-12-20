@@ -11,6 +11,8 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -93,6 +95,9 @@ export default function OrdenesDeCompraPage() {
   const [estadisticas, setEstadisticas] = useState<any>(null);
   const [proveedoresUnicos, setProveedoresUnicos] = useState<string[]>([]);
   const [empresasUnicas, setEmpresasUnicas] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalOrders, setTotalOrders] = useState(0);
 
   useEffect(() => {
     if (session) {
@@ -100,22 +105,32 @@ export default function OrdenesDeCompraPage() {
     }
   }, [session]);
 
-  const cargarOrdenes = async () => {
+  const cargarOrdenes = async (page = 1) => {
     if (!session) return;
 
     setLoading(true);
     try {
       console.log('Cargando órdenes de compra PENDIENTES desde ERP...');
-      const response = await fetch('/api/admin/ordenes');
+      const response = await fetch(`/api/admin/ordenes?page=${page}&limit=50`);
       const result = await response.json();
 
       if (result.success) {
         console.log('Órdenes del ERP cargadas:', result.data);
         setOrdenes(result.data.ordenes || []);
         setEstadisticas(result.data.estadisticas || null);
+        setCurrentPage(result.data.pagination.page);
+        setTotalPages(result.data.pagination.totalPages);
+        setTotalOrders(result.data.pagination.total);
 
-        // Extraer proveedores únicos para el filtro
-        const proveedores = [...new Set(result.data.ordenes.map((o: any) => o.nombreProveedor || o.proveedor))].filter(Boolean) as string[];
+        // Extraer proveedores únicos para el filtro y ordenar por código
+        const proveedores = [...new Set(result.data.ordenes.map((o: any) => o.proveedor))]
+          .filter(Boolean)
+          .sort((a, b) => {
+            // Extraer números de los códigos P00XXX
+            const numA = parseInt(a.replace(/\D/g, '')) || 0;
+            const numB = parseInt(b.replace(/\D/g, '')) || 0;
+            return numA - numB;
+          }) as string[];
         setProveedoresUnicos(proveedores);
 
         // Extraer empresas únicas para el filtro
@@ -164,7 +179,7 @@ export default function OrdenesDeCompraPage() {
               Consulte todas las órdenes de compra pendientes de todas las empresas.
             </p>
           </div>
-          <Button variant="outline" onClick={cargarOrdenes} disabled={loading}>
+          <Button variant="outline" onClick={() => cargarOrdenes(currentPage)} disabled={loading}>
             <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
             Actualizar
           </Button>
@@ -410,11 +425,44 @@ export default function OrdenesDeCompraPage() {
               </Table>
             )}
           </CardContent>
-          {!loading && filteredOrders.length > 0 && (
-            <CardFooter className="text-sm text-muted-foreground">
-              Mostrando {filteredOrders.length} de {ordenes.length} órdenes
-            </CardFooter>
-          )}
+            {!loading && filteredOrders.length > 0 && (
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Mostrando {((currentPage - 1) * 50) + 1} a {Math.min(currentPage * 50, totalOrders)} de {totalOrders} órdenes
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const newPage = currentPage - 1;
+                      setCurrentPage(newPage);
+                      cargarOrdenes(newPage);
+                    }}
+                    disabled={currentPage <= 1 || loading}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Anterior
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const newPage = currentPage + 1;
+                      setCurrentPage(newPage);
+                      cargarOrdenes(newPage);
+                    }}
+                    disabled={currentPage >= totalPages || loading}
+                  >
+                    Siguiente
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
         </Card>
     </main>
   );
