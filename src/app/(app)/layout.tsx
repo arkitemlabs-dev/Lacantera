@@ -38,8 +38,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                            pathname.startsWith('/proveedores/mensajeria') ||
                            pathname.startsWith('/proveedores/notificaciones') ||
                            pathname.startsWith('/proveedores/seguridad') ||
-                           pathname.startsWith('/proveedores/mensajes') ||
-                           pathname.startsWith('/facturas'); // Facturas compartida
+                           pathname.startsWith('/proveedores/mensajes');
     
     const isSupplierRole = userRole.name === 'Proveedor';
     
