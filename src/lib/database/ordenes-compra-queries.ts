@@ -95,10 +95,12 @@ export async function getOrdenesCompraPendientes(
         c.Observaciones,
         c.Prioridad,
         c.Agente,
-        c.Descuento
+        c.Descuento,
+        p.Nombre as ProveedorNombre
       FROM Compra c
+      JOIN MovTipo mt ON c.Mov = mt.Mov AND mt.Modulo = 'COMS' AND mt.Clave = 'COMS.O' AND mt.subClave IS NULL
+      JOIN Prov p ON c.Proveedor = p.Proveedor
       WHERE c.Estatus = 'PENDIENTE'
-        AND YEAR(c.FechaEmision) = YEAR(GETDATE())
     `;
 
     const params: any = {};
@@ -135,8 +137,9 @@ export async function getOrdenesCompraPendientes(
     let countQuery = `
       SELECT COUNT(*) as total
       FROM Compra c
+      JOIN MovTipo mt ON c.Mov = mt.Mov AND mt.Modulo = 'COMS' AND mt.Clave = 'COMS.O' AND mt.subClave IS NULL
+      JOIN Prov p ON c.Proveedor = p.Proveedor
       WHERE c.Estatus = 'PENDIENTE'
-        AND YEAR(c.FechaEmision) = YEAR(GETDATE())
     `;
 
     const countParams: any = {};
@@ -304,6 +307,8 @@ export async function getOrdenesCompraStats() {
     const pendientesResult = await hybridDB.queryERP('la-cantera', `
       SELECT COUNT(*) as total
       FROM Compra c
+      JOIN MovTipo mt ON c.Mov = mt.Mov AND mt.Modulo = 'COMS' AND mt.Clave = 'COMS.O' AND mt.subClave IS NULL
+      JOIN Prov p ON c.Proveedor = p.Proveedor
       WHERE c.Estatus = 'PENDIENTE'
     `);
 
@@ -311,11 +316,14 @@ export async function getOrdenesCompraStats() {
     const porProveedorResult = await hybridDB.queryERP('la-cantera', `
       SELECT TOP 10
         c.Proveedor,
+        p.Nombre as ProveedorNombre,
         COUNT(*) as cantidad,
         SUM(c.Importe) as importeTotal
       FROM Compra c
+      JOIN MovTipo mt ON c.Mov = mt.Mov AND mt.Modulo = 'COMS' AND mt.Clave = 'COMS.O' AND mt.subClave IS NULL
+      JOIN Prov p ON c.Proveedor = p.Proveedor
       WHERE c.Estatus = 'PENDIENTE'
-      GROUP BY c.Proveedor
+      GROUP BY c.Proveedor, p.Nombre
       ORDER BY COUNT(*) DESC
     `);
 
@@ -327,6 +335,8 @@ export async function getOrdenesCompraStats() {
         COUNT(*) as cantidad,
         SUM(c.Importe) as importeTotal
       FROM Compra c
+      JOIN MovTipo mt ON c.Mov = mt.Mov AND mt.Modulo = 'COMS' AND mt.Clave = 'COMS.O' AND mt.subClave IS NULL
+      JOIN Prov p ON c.Proveedor = p.Proveedor
       WHERE c.Estatus = 'PENDIENTE'
         AND c.FechaEmision >= DATEADD(MONTH, -6, GETDATE())
       GROUP BY YEAR(c.FechaEmision), MONTH(c.FechaEmision)
@@ -337,6 +347,8 @@ export async function getOrdenesCompraStats() {
     const importeTotalResult = await hybridDB.queryERP('la-cantera', `
       SELECT SUM(c.Importe) as importeTotal
       FROM Compra c
+      JOIN MovTipo mt ON c.Mov = mt.Mov AND mt.Modulo = 'COMS' AND mt.Clave = 'COMS.O' AND mt.subClave IS NULL
+      JOIN Prov p ON c.Proveedor = p.Proveedor
       WHERE c.Estatus = 'PENDIENTE'
     `);
 

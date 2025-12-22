@@ -163,11 +163,6 @@ export const authOptions: NextAuthOptions = {
             throw new Error('Credenciales inválidas');
           }
 
-          // Verificar tipo de usuario si se especifica
-          if (credentials.userType && user.TipoUsuario !== credentials.userType) {
-            throw new Error('Tipo de usuario inválido');
-          }
-
           // Determinar rol basado en el tipo de usuario
           let role = 'user';
           if (user.IDUsuarioTipo === 1) {
