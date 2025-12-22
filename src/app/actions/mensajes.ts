@@ -386,13 +386,37 @@ export async function getEstadisticasMensajeria(usuarioId: string, empresaId?: s
 
 export async function getUsuariosParaConversacion(usuarioId: string, empresaId: string, rol?: string) {
   try {
-    // Si es proveedor, solo puede contactar admins de su empresa
-    // Si es admin, puede contactar proveedores y otros admins
+    console.log('🔍 getUsuariosParaConversacion ejecutándose con:', { usuarioId, empresaId, rol });
+
+    // Si es Super Admin o Admin, obtener proveedores reales
+    if (rol === 'Super Admin' || rol === 'Admin') {
+      console.log('✅ Es Admin, obteniendo todos los proveedores ordenados alfabéticamente');
+
+      const { hybridDB } = await import('@/lib/database/multi-tenant-connection');
+      const result = await hybridDB.queryERP('la-cantera', `
+        SELECT
+          p.Proveedor as id,
+          p.Nombre as nombre,
+          COALESCE(p.eMail1, 'sin-email@proveedor.com') as email,
+          'Proveedor' as rol
+        FROM Prov p
+        WHERE UPPER(p.Estatus) = 'ALTA'
+          AND p.Nombre IS NOT NULL
+          AND p.Nombre != ''
+        ORDER BY p.Nombre ASC
+      `);
+
+      console.log('📦 Proveedores encontrados:', result.recordset.length);
+      return { success: true, data: result.recordset };
+    }
+
+    console.log('❌ No es Admin, usando implementación original');
+    // Para otros roles, usar la implementación original
     const usuarios = await database.getUsuariosParaConversacion(usuarioId, empresaId, rol);
-    
+
     return { success: true, data: usuarios };
   } catch (error: any) {
-    console.error('Error obteniendo usuarios:', error);
+    console.error('💥 Error obteniendo usuarios:', error);
     return { success: false, error: error.message };
   }
 }

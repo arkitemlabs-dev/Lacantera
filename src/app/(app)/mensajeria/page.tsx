@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 
 export default function MensajeriaPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, userRole, loading: authLoading } = useAuth();
   const { empresaSeleccionada, loading: empresaLoading } = useEmpresa();
 
   // Mostrar loader mientras se carga la autenticación o empresa
@@ -37,8 +37,11 @@ export default function MensajeriaPage() {
     );
   }
 
-  // Validar que hay empresa seleccionada
-  if (!empresaSeleccionada) {
+  // Para administradores, permitir acceso sin empresa seleccionada
+  const esAdmin = userRole.name !== 'Proveedor';
+  
+  // Validar que hay empresa seleccionada (solo para proveedores)
+  if (!esAdmin && !empresaSeleccionada) {
     return (
       <div className="flex flex-1 items-center justify-center min-h-[calc(100vh-8rem)]">
         <Card className="w-full max-w-md">
@@ -64,8 +67,8 @@ export default function MensajeriaPage() {
       <MensajeriaInterface
         usuarioId={user.id}
         usuarioNombre={user.name || user.email}
-        usuarioRol={user.role || 'admin'}
-        empresaId={empresaSeleccionada.codigo}
+        usuarioRol={userRole.name}
+        empresaId={empresaSeleccionada?.codigo || 'admin-global'}
       />
     </div>
   );

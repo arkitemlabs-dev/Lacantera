@@ -40,13 +40,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 
 import { useMensajeria } from '@/hooks/useMensajeria';
@@ -551,29 +544,72 @@ function NuevaConversacionDialog({
   crearNuevaConversacion: any;
 }) {
   const [destinatario, setDestinatario] = useState('');
+  const [destinatarioNombre, setDestinatarioNombre] = useState('');
+  const [busquedaDestinatario, setBusquedaDestinatario] = useState('');
+  const [mostrarListaDestinatarios, setMostrarListaDestinatarios] = useState(false);
   const [asunto, setAsunto] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [archivos, setArchivos] = useState<File[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [cargando, setCargando] = useState(false);
+  const [cargandoUsuarios, setCargandoUsuarios] = useState(true);
+  const inputDestinatarioRef = useRef<HTMLInputElement>(null);
+  const listaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Cargar usuarios disponibles para nueva conversación
     const cargarUsuarios = async () => {
+      setCargandoUsuarios(true);
       try {
         const { getUsuariosParaConversacion } = await import('@/app/actions/mensajes');
         const response = await getUsuariosParaConversacion(usuarioId, empresaId, usuarioRol);
-        
+
         if (response.success) {
-          setUsuarios(response.data);
+          // Ordenar alfabéticamente por nombre
+          const usuariosOrdenados = (response.data || []).sort((a: any, b: any) =>
+            (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })
+          );
+          setUsuarios(usuariosOrdenados);
         }
       } catch (error) {
         console.error('Error cargando usuarios:', error);
+      } finally {
+        setCargandoUsuarios(false);
       }
     };
 
     cargarUsuarios();
   }, [usuarioId, empresaId, usuarioRol]);
+
+  // Cerrar lista al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        listaRef.current &&
+        !listaRef.current.contains(event.target as Node) &&
+        inputDestinatarioRef.current &&
+        !inputDestinatarioRef.current.contains(event.target as Node)
+      ) {
+        setMostrarListaDestinatarios(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filtrar usuarios por búsqueda
+  const usuariosFiltrados = usuarios.filter(usuario =>
+    (usuario.nombre || '').toLowerCase().includes(busquedaDestinatario.toLowerCase()) ||
+    (usuario.id || '').toLowerCase().includes(busquedaDestinatario.toLowerCase())
+  );
+
+  const handleSeleccionarDestinatario = (usuario: any) => {
+    setDestinatario(usuario.id);
+    setDestinatarioNombre(usuario.nombre);
+    setBusquedaDestinatario(usuario.nombre);
+    setMostrarListaDestinatarios(false);
+  };
 
   const handleCrear = async () => {
     if (!destinatario || !asunto || !mensaje) return;
@@ -581,7 +617,7 @@ function NuevaConversacionDialog({
     setCargando(true);
     try {
       const usuarioDestino = usuarios.find(u => u.id === destinatario);
-      
+
       const conversacionId = await crearNuevaConversacion({
         destinatarioId: destinatario,
         destinatarioNombre: usuarioDestino?.nombre || 'Usuario',
@@ -592,9 +628,11 @@ function NuevaConversacionDialog({
 
       if (conversacionId) {
         onConversacionCreada(conversacionId);
-        
+
         // Limpiar formulario
         setDestinatario('');
+        setDestinatarioNombre('');
+        setBusquedaDestinatario('');
         setAsunto('');
         setMensaje('');
         setArchivos([]);
@@ -609,29 +647,93 @@ function NuevaConversacionDialog({
       <DialogHeader>
         <DialogTitle>Nueva Conversación</DialogTitle>
         <DialogDescription>
-          Inicia una nueva conversación con un usuario.
+          Inicia una nueva conversación con un proveedor.
         </DialogDescription>
       </DialogHeader>
 
       <div className="space-y-4">
-        <div>
+        <div className="relative">
           <label className="text-sm font-medium">Destinatario</label>
-          <Select value={destinatario} onValueChange={setDestinatario}>
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccionar usuario..." />
-            </SelectTrigger>
-            <SelectContent>
-              {usuarios.map((usuario) => (
-                <SelectItem key={usuario.id} value={usuario.id}>
-                  <div className="flex items-center space-x-2">
-                    <User className="h-4 w-4" />
-                    <span>{usuario.nombre}</span>
-                    <Badge variant="outline">{usuario.rol}</Badge>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              ref={inputDestinatarioRef}
+              placeholder={cargandoUsuarios ? "Cargando proveedores..." : "Buscar proveedor por nombre..."}
+              value={busquedaDestinatario}
+              onChange={(e) => {
+                setBusquedaDestinatario(e.target.value);
+                setMostrarListaDestinatarios(true);
+                // Si cambia el texto, limpiar selección
+                if (e.target.value !== destinatarioNombre) {
+                  setDestinatario('');
+                  setDestinatarioNombre('');
+                }
+              }}
+              onFocus={() => setMostrarListaDestinatarios(true)}
+              className="pl-9"
+              disabled={cargandoUsuarios}
+            />
+            {destinatario && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                onClick={() => {
+                  setDestinatario('');
+                  setDestinatarioNombre('');
+                  setBusquedaDestinatario('');
+                  inputDestinatarioRef.current?.focus();
+                }}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+
+          {/* Lista desplegable de proveedores */}
+          {mostrarListaDestinatarios && !cargandoUsuarios && (
+            <div
+              ref={listaRef}
+              className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-hidden"
+            >
+              <ScrollArea className="h-full max-h-60">
+                {usuariosFiltrados.length === 0 ? (
+                  <div className="p-3 text-sm text-muted-foreground text-center">
+                    {busquedaDestinatario
+                      ? 'No se encontraron proveedores'
+                      : 'Escribe para buscar proveedores'}
                   </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                ) : (
+                  <div className="p-1">
+                    {usuariosFiltrados.map((usuario) => (
+                      <div
+                        key={usuario.id}
+                        className={`flex items-center space-x-2 p-2 rounded cursor-pointer transition-colors ${
+                          destinatario === usuario.id
+                            ? 'bg-accent'
+                            : 'hover:bg-accent/50'
+                        }`}
+                        onClick={() => handleSeleccionarDestinatario(usuario)}
+                      >
+                        <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{usuario.nombre}</p>
+                          <p className="text-xs text-muted-foreground">ID: {usuario.id}</p>
+                        </div>
+                        <Badge variant="outline" className="flex-shrink-0">{usuario.rol}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+              {usuariosFiltrados.length > 0 && (
+                <div className="p-2 border-t text-xs text-muted-foreground text-center">
+                  {usuariosFiltrados.length} proveedor{usuariosFiltrados.length !== 1 ? 'es' : ''} encontrado{usuariosFiltrados.length !== 1 ? 's' : ''}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div>
@@ -658,6 +760,8 @@ function NuevaConversacionDialog({
             variant="outline"
             onClick={() => {
               setDestinatario('');
+              setDestinatarioNombre('');
+              setBusquedaDestinatario('');
               setAsunto('');
               setMensaje('');
               setArchivos([]);
