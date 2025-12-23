@@ -59,9 +59,13 @@ export function useMensajeria(
     try {
       setCargando(true);
       setError(null);
-      
+
+      console.log('🔄 useMensajeria - Cargando conversaciones para usuario:', usuarioId);
+
       const response = await getConversacionesByUsuario(usuarioId);
-      
+
+      console.log('🔄 useMensajeria - Respuesta:', response.success ? `${response.data?.length || 0} conversaciones` : response.error);
+
       if (response.success) {
         setConversaciones(response.data);
       } else {

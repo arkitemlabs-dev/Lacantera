@@ -1219,14 +1219,25 @@ export class SqlServerPNetDatabase implements Database {
     await this.ensureMensajeriaTables();
     const pool = await getConnection();
 
+    // Buscar con múltiples patrones para asegurar que encontramos el ID
+    // El ID puede estar como: "123" o "123", o 123 en el JSON
     const result = await pool.request()
       .input('usuarioId', sql.NVarChar(100), usuarioId)
+      .input('pattern1', sql.NVarChar(150), `%"${usuarioId}"%`)  // "123"
+      .input('pattern2', sql.NVarChar(150), `%"${usuarioId}",%`) // "123",
+      .input('pattern3', sql.NVarChar(150), `%,"${usuarioId}"%`) // ,"123"
       .query(`
         SELECT * FROM WebConversacion
-        WHERE Participantes LIKE '%' + @usuarioId + '%'
-          AND Activa = 1
+        WHERE (
+          Participantes LIKE @pattern1
+          OR Participantes LIKE @pattern2
+          OR Participantes LIKE @pattern3
+        )
+        AND Activa = 1
         ORDER BY UltimoMensajeFecha DESC
       `);
+
+    console.log(`[DB] getConversacionesByUsuario(${usuarioId}) - Encontradas: ${result.recordset.length} conversaciones`);
 
     return result.recordset.map(row => ({
       id: String(row.ID),

@@ -10,7 +10,7 @@ export default function MensajeriaProveedorPage() {
   const { user, loading: authLoading } = useAuth();
   const { empresaSeleccionada, loading: empresaLoading } = useEmpresa();
 
-  // Mostrar loader mientras se carga la autenticación o empresa
+  // Mostrar loader mientras se carga la autenticación
   if (authLoading || empresaLoading) {
     return (
       <div className="flex flex-1 items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -37,20 +37,12 @@ export default function MensajeriaProveedorPage() {
     );
   }
 
-  // Validar que hay empresa seleccionada
-  if (!empresaSeleccionada) {
-    return (
-      <div className="flex flex-1 items-center justify-center min-h-[calc(100vh-8rem)]">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground">
-              Selecciona una empresa para acceder a la mensajería.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // Para proveedores: usar empresa del contexto, o la empresa del usuario, o 'la-cantera' por defecto
+  // Los proveedores generalmente trabajan con una sola empresa
+  const empresaId = empresaSeleccionada?.codigo || user.empresaActual || user.empresa || 'la-cantera';
+
+  // Debug: mostrar ID del usuario logueado
+  console.log('🔐 Proveedor logueado - user.id:', user.id, '| user.email:', user.email, '| user.role:', user.role);
 
   return (
     <div className="flex flex-col h-full p-4 md:p-6">
@@ -65,7 +57,7 @@ export default function MensajeriaProveedorPage() {
         usuarioId={user.id}
         usuarioNombre={user.name || user.email}
         usuarioRol={user.role || 'proveedor'}
-        empresaId={empresaSeleccionada.codigo}
+        empresaId={empresaId}
       />
     </div>
   );
