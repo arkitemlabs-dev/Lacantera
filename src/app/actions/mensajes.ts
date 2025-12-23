@@ -94,7 +94,8 @@ export async function crearConversacion(data: {
     });
 
     // Actualizar conversación con último mensaje
-    await database.updateConversacion(conversacion.id, {
+    const conversacionActualizada = {
+      ...conversacion,
       ultimoMensaje: data.mensajeInicial,
       ultimoMensajeFecha: new Date(),
       ultimoMensajeRemitente: data.remitenteNombre,
@@ -103,6 +104,14 @@ export async function crearConversacion(data: {
         [data.destinatarioId]: (conversacion.noLeidos[data.destinatarioId] || 0) + 1
       },
       updatedAt: new Date()
+    };
+
+    await database.updateConversacion(conversacion.id, {
+      ultimoMensaje: data.mensajeInicial,
+      ultimoMensajeFecha: conversacionActualizada.ultimoMensajeFecha,
+      ultimoMensajeRemitente: data.remitenteNombre,
+      noLeidos: conversacionActualizada.noLeidos,
+      updatedAt: conversacionActualizada.updatedAt
     });
 
     // Crear notificación para el destinatario
@@ -119,14 +128,14 @@ export async function crearConversacion(data: {
 
     revalidatePath('/mensajeria');
     revalidatePath('/proveedores/mensajeria');
-    
-    return { 
-      success: true, 
-      data: { 
-        conversacion, 
+
+    return {
+      success: true,
+      data: {
+        conversacion: conversacionActualizada,
         mensaje,
-        conversacionId: conversacion.id 
-      } 
+        conversacionId: conversacion.id
+      }
     };
   } catch (error: any) {
     console.error('Error creando conversación:', error);
@@ -388,12 +397,37 @@ export async function getUsuariosParaConversacion(usuarioId: string, empresaId: 
   try {
     console.log('🔍 getUsuariosParaConversacion ejecutándose con:', { usuarioId, empresaId, rol });
 
-    // Si es Super Admin o Admin, obtener proveedores reales
+    // Si es Super Admin o Admin, obtener proveedores que tienen cuenta en el portal
     if (rol === 'Super Admin' || rol === 'Admin') {
-      console.log('✅ Es Admin, obteniendo todos los proveedores ordenados alfabéticamente');
+      console.log('✅ Es Admin, obteniendo proveedores con cuenta en el portal');
 
       const { hybridDB } = await import('@/lib/database/multi-tenant-connection');
-      const result = await hybridDB.queryERP('la-cantera', `
+
+      // Primero obtener usuarios del portal que son proveedores (IDUsuarioTipo = 4)
+      const portalResult = await hybridDB.queryPortal(`
+        SELECT
+          u.IDUsuario as id,
+          u.Nombre as nombre,
+          u.eMail as email,
+          u.Usuario as codigoProveedor,
+          'Proveedor' as rol
+        FROM pNetUsuario u
+        WHERE u.IDUsuarioTipo = 4
+          AND u.Estatus = 'ALTA'
+          AND u.Nombre IS NOT NULL
+          AND u.Nombre != ''
+        ORDER BY u.Nombre ASC
+      `);
+
+      // Si hay proveedores en el portal, usarlos
+      if (portalResult.recordset && portalResult.recordset.length > 0) {
+        console.log('📦 Proveedores del portal encontrados:', portalResult.recordset.length);
+        return { success: true, data: portalResult.recordset };
+      }
+
+      // Si no hay proveedores en el portal, obtener del ERP como fallback
+      console.log('⚠️ No hay proveedores en portal, usando ERP como fallback');
+      const erpResult = await hybridDB.queryERP('la-cantera', `
         SELECT
           p.Proveedor as id,
           p.Nombre as nombre,
@@ -406,8 +440,8 @@ export async function getUsuariosParaConversacion(usuarioId: string, empresaId: 
         ORDER BY p.Nombre ASC
       `);
 
-      console.log('📦 Proveedores encontrados:', result.recordset.length);
-      return { success: true, data: result.recordset };
+      console.log('📦 Proveedores del ERP encontrados:', erpResult.recordset.length);
+      return { success: true, data: erpResult.recordset };
     }
 
     console.log('❌ No es Admin, usando implementación original');

@@ -601,11 +601,12 @@ function NuevaConversacionDialog({
   // Filtrar usuarios por búsqueda
   const usuariosFiltrados = usuarios.filter(usuario =>
     (usuario.nombre || '').toLowerCase().includes(busquedaDestinatario.toLowerCase()) ||
-    (usuario.id || '').toLowerCase().includes(busquedaDestinatario.toLowerCase())
+    String(usuario.id || '').toLowerCase().includes(busquedaDestinatario.toLowerCase())
   );
 
   const handleSeleccionarDestinatario = (usuario: any) => {
-    setDestinatario(usuario.id);
+    // Asegurar que el ID sea string para coincidir con user.id de sesión
+    setDestinatario(String(usuario.id));
     setDestinatarioNombre(usuario.nombre);
     setBusquedaDestinatario(usuario.nombre);
     setMostrarListaDestinatarios(false);
@@ -616,7 +617,7 @@ function NuevaConversacionDialog({
 
     setCargando(true);
     try {
-      const usuarioDestino = usuarios.find(u => u.id === destinatario);
+      const usuarioDestino = usuarios.find(u => String(u.id) === destinatario);
 
       const conversacionId = await crearNuevaConversacion({
         destinatarioId: destinatario,
@@ -627,6 +628,12 @@ function NuevaConversacionDialog({
       });
 
       if (conversacionId) {
+        // Mostrar mensaje de confirmación
+        toast({
+          title: 'Mensaje enviado',
+          description: `Tu mensaje ha sido enviado a ${usuarioDestino?.nombre || 'el proveedor'}.`,
+        });
+
         onConversacionCreada(conversacionId);
 
         // Limpiar formulario
@@ -636,7 +643,20 @@ function NuevaConversacionDialog({
         setAsunto('');
         setMensaje('');
         setArchivos([]);
+      } else {
+        toast({
+          title: 'Error',
+          description: 'No se pudo crear la conversación. Intenta de nuevo.',
+          variant: 'destructive',
+        });
       }
+    } catch (error) {
+      console.error('Error creando conversación:', error);
+      toast({
+        title: 'Error',
+        description: 'Ocurrió un error al enviar el mensaje. Intenta de nuevo.',
+        variant: 'destructive',
+      });
     } finally {
       setCargando(false);
     }

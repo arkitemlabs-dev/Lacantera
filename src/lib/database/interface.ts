@@ -96,17 +96,26 @@ export interface Database {
   updateComprobantePago(id: string, data: Partial<ComprobantePago>): Promise<void>;
   
   // ==================== MENSAJERÍA ====================
-  createConversacion(data: Omit<Conversacion, 'id'>): Promise<string>;
+  createConversacion(data: Omit<Conversacion, 'id' | 'conversacionId' | 'createdAt' | 'updatedAt'>): Promise<Conversacion>;
   getConversacion(id: string): Promise<Conversacion | null>;
+  getConversacionEntreUsuarios(usuario1Id: string, usuario2Id: string): Promise<Conversacion | null>;
   getConversacionesByUsuario(usuarioId: string): Promise<Conversacion[]>;
   updateConversacion(id: string, data: Partial<Conversacion>): Promise<void>;
-  
-  createMensaje(data: Omit<Mensaje, 'id'>): Promise<string>;
-  getMensajesByConversacion(conversacionId: string, limit?: number): Promise<Mensaje[]>;
+
+  createMensaje(data: Omit<Mensaje, 'id' | 'mensajeId' | 'createdAt'>): Promise<Mensaje>;
+  getMensajesByConversacion(conversacionId: string, limit?: number, offset?: number): Promise<Mensaje[]>;
   marcarMensajeComoLeido(id: string): Promise<void>;
-  
+  marcarMensajesComoLeidos(conversacionId: string, usuarioId: string): Promise<void>;
+  getMensajesNoLeidosCount(usuarioId: string): Promise<number>;
+
+  uploadArchivoMensaje(archivo: File, conversacionId: string): Promise<string>;
+  getDownloadUrl(archivoUrl: string): Promise<string>;
+  getUsuariosParaConversacion(usuarioId: string, empresaId: string, rol?: string): Promise<any[]>;
+  buscarMensajes(usuarioId: string, query: string, conversacionId?: string): Promise<Mensaje[]>;
+  getEstadisticasMensajeria(usuarioId: string, empresaId?: string): Promise<any>;
+
   // ==================== NOTIFICACIONES ====================
-  createNotificacion(data: Omit<Notificacion, 'id'>): Promise<string>;
+  createNotificacion(data: { usuarioId: string; tipo: string; titulo: string; mensaje: string; link?: string; leida?: boolean; emailEnviado?: boolean; empresaId?: string }): Promise<string>;
   getNotificacionesByUsuario(usuarioId: string, limit?: number): Promise<Notificacion[]>;
   marcarNotificacionComoLeida(id: string): Promise<void>;
   marcarTodasNotificacionesComoLeidas(usuarioId: string): Promise<void>;

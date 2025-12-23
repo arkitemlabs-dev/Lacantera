@@ -1045,34 +1045,524 @@ export class SqlServerPNetDatabase implements Database {
   }
   async updateComprobantePago(): Promise<void> {}
 
-  async createConversacion(): Promise<string> {
-    throw new Error('Not implemented yet');
-  }
-  async getConversacion(): Promise<Conversacion | null> {
-    return null;
-  }
-  async getConversacionesByUsuario(): Promise<Conversacion[]> {
-    return [];
-  }
-  async updateConversacion(): Promise<void> {}
+  // ==================== MENSAJERÍA ====================
 
-  async createMensaje(): Promise<string> {
-    throw new Error('Not implemented yet');
-  }
-  async getMensajesByConversacion(): Promise<Mensaje[]> {
-    return [];
-  }
-  async marcarMensajeComoLeido(): Promise<void> {}
+  /**
+   * Asegura que las tablas de mensajería existan
+   */
+  private async ensureMensajeriaTables(): Promise<void> {
+    const pool = await getConnection();
 
-  async createNotificacion(): Promise<string> {
-    throw new Error('Not implemented yet');
+    // Crear tabla de conversaciones si no existe
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='WebConversacion' AND xtype='U')
+      CREATE TABLE WebConversacion (
+        ID INT IDENTITY(1,1) PRIMARY KEY,
+        Participantes NVARCHAR(MAX) NOT NULL,
+        ParticipantesInfo NVARCHAR(MAX) NOT NULL,
+        Asunto NVARCHAR(500) NOT NULL,
+        UltimoMensaje NVARCHAR(MAX),
+        UltimoMensajeFecha DATETIME,
+        UltimoMensajeRemitente NVARCHAR(200),
+        Activa BIT DEFAULT 1,
+        NoLeidos NVARCHAR(MAX),
+        EmpresaId NVARCHAR(50),
+        CreatedAt DATETIME DEFAULT GETDATE(),
+        UpdatedAt DATETIME DEFAULT GETDATE()
+      )
+    `);
+
+    // Crear tabla de mensajes si no existe
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='WebMensaje' AND xtype='U')
+      CREATE TABLE WebMensaje (
+        ID INT IDENTITY(1,1) PRIMARY KEY,
+        ConversacionId INT NOT NULL,
+        RemitenteId NVARCHAR(100) NOT NULL,
+        RemitenteNombre NVARCHAR(200) NOT NULL,
+        RemitenteRol NVARCHAR(100),
+        DestinatarioId NVARCHAR(100) NOT NULL,
+        DestinatarioNombre NVARCHAR(200),
+        Mensaje NVARCHAR(MAX) NOT NULL,
+        Asunto NVARCHAR(500),
+        Archivos NVARCHAR(MAX),
+        Leido BIT DEFAULT 0,
+        FechaLectura DATETIME,
+        CreatedAt DATETIME DEFAULT GETDATE()
+      )
+    `);
+
+    // Crear tabla de notificaciones si no existe
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='WebNotificacion' AND xtype='U')
+      CREATE TABLE WebNotificacion (
+        ID INT IDENTITY(1,1) PRIMARY KEY,
+        UsuarioId NVARCHAR(100) NOT NULL,
+        Tipo NVARCHAR(50) NOT NULL,
+        Titulo NVARCHAR(200) NOT NULL,
+        Mensaje NVARCHAR(MAX),
+        Link NVARCHAR(500),
+        Leida BIT DEFAULT 0,
+        EmailEnviado BIT DEFAULT 0,
+        EmpresaId NVARCHAR(50),
+        CreatedAt DATETIME DEFAULT GETDATE()
+      )
+    `);
   }
-  async getNotificacionesByUsuario(): Promise<Notificacion[]> {
+
+  async createConversacion(data: Omit<Conversacion, 'id' | 'conversacionId' | 'createdAt' | 'updatedAt'>): Promise<Conversacion> {
+    await this.ensureMensajeriaTables();
+    const pool = await getConnection();
+
+    const result = await pool.request()
+      .input('participantes', sql.NVarChar(sql.MAX), JSON.stringify(data.participantes))
+      .input('participantesInfo', sql.NVarChar(sql.MAX), JSON.stringify(data.participantesInfo))
+      .input('asunto', sql.NVarChar(500), data.asunto)
+      .input('ultimoMensaje', sql.NVarChar(sql.MAX), data.ultimoMensaje || '')
+      .input('ultimoMensajeFecha', sql.DateTime, data.ultimoMensajeFecha || new Date())
+      .input('ultimoMensajeRemitente', sql.NVarChar(200), data.ultimoMensajeRemitente || '')
+      .input('activa', sql.Bit, data.activa ? 1 : 0)
+      .input('noLeidos', sql.NVarChar(sql.MAX), JSON.stringify(data.noLeidos || {}))
+      .input('empresaId', sql.NVarChar(50), data.empresaId || '')
+      .query(`
+        INSERT INTO WebConversacion
+          (Participantes, ParticipantesInfo, Asunto, UltimoMensaje, UltimoMensajeFecha,
+           UltimoMensajeRemitente, Activa, NoLeidos, EmpresaId, CreatedAt, UpdatedAt)
+        OUTPUT INSERTED.ID, INSERTED.CreatedAt, INSERTED.UpdatedAt
+        VALUES
+          (@participantes, @participantesInfo, @asunto, @ultimoMensaje, @ultimoMensajeFecha,
+           @ultimoMensajeRemitente, @activa, @noLeidos, @empresaId, GETDATE(), GETDATE())
+      `);
+
+    const conversacionId = String(result.recordset[0].ID);
+
+    return {
+      id: conversacionId,
+      conversacionId: conversacionId,
+      participantes: data.participantes,
+      participantesInfo: data.participantesInfo,
+      asunto: data.asunto,
+      ultimoMensaje: data.ultimoMensaje || '',
+      ultimoMensajeFecha: data.ultimoMensajeFecha || new Date(),
+      ultimoMensajeRemitente: data.ultimoMensajeRemitente || '',
+      activa: data.activa,
+      noLeidos: data.noLeidos || {},
+      createdAt: result.recordset[0].CreatedAt,
+      updatedAt: result.recordset[0].UpdatedAt
+    };
+  }
+
+  async getConversacion(id: string): Promise<Conversacion | null> {
+    await this.ensureMensajeriaTables();
+    const pool = await getConnection();
+
+    const result = await pool.request()
+      .input('id', sql.Int, parseInt(id))
+      .query(`
+        SELECT * FROM WebConversacion WHERE ID = @id
+      `);
+
+    if (result.recordset.length === 0) return null;
+
+    const row = result.recordset[0];
+    return {
+      id: String(row.ID),
+      conversacionId: String(row.ID),
+      participantes: JSON.parse(row.Participantes || '[]'),
+      participantesInfo: JSON.parse(row.ParticipantesInfo || '[]'),
+      asunto: row.Asunto,
+      ultimoMensaje: row.UltimoMensaje || '',
+      ultimoMensajeFecha: row.UltimoMensajeFecha,
+      ultimoMensajeRemitente: row.UltimoMensajeRemitente || '',
+      activa: row.Activa,
+      noLeidos: JSON.parse(row.NoLeidos || '{}'),
+      createdAt: row.CreatedAt,
+      updatedAt: row.UpdatedAt
+    };
+  }
+
+  async getConversacionEntreUsuarios(usuario1Id: string, usuario2Id: string): Promise<Conversacion | null> {
+    await this.ensureMensajeriaTables();
+    const pool = await getConnection();
+
+    const result = await pool.request()
+      .input('usuario1', sql.NVarChar(100), usuario1Id)
+      .input('usuario2', sql.NVarChar(100), usuario2Id)
+      .query(`
+        SELECT * FROM WebConversacion
+        WHERE Participantes LIKE '%' + @usuario1 + '%'
+          AND Participantes LIKE '%' + @usuario2 + '%'
+          AND Activa = 1
+        ORDER BY UpdatedAt DESC
+      `);
+
+    if (result.recordset.length === 0) return null;
+
+    const row = result.recordset[0];
+    return {
+      id: String(row.ID),
+      conversacionId: String(row.ID),
+      participantes: JSON.parse(row.Participantes || '[]'),
+      participantesInfo: JSON.parse(row.ParticipantesInfo || '[]'),
+      asunto: row.Asunto,
+      ultimoMensaje: row.UltimoMensaje || '',
+      ultimoMensajeFecha: row.UltimoMensajeFecha,
+      ultimoMensajeRemitente: row.UltimoMensajeRemitente || '',
+      activa: row.Activa,
+      noLeidos: JSON.parse(row.NoLeidos || '{}'),
+      createdAt: row.CreatedAt,
+      updatedAt: row.UpdatedAt
+    };
+  }
+
+  async getConversacionesByUsuario(usuarioId: string): Promise<Conversacion[]> {
+    await this.ensureMensajeriaTables();
+    const pool = await getConnection();
+
+    const result = await pool.request()
+      .input('usuarioId', sql.NVarChar(100), usuarioId)
+      .query(`
+        SELECT * FROM WebConversacion
+        WHERE Participantes LIKE '%' + @usuarioId + '%'
+          AND Activa = 1
+        ORDER BY UltimoMensajeFecha DESC
+      `);
+
+    return result.recordset.map(row => ({
+      id: String(row.ID),
+      conversacionId: String(row.ID),
+      participantes: JSON.parse(row.Participantes || '[]'),
+      participantesInfo: JSON.parse(row.ParticipantesInfo || '[]'),
+      asunto: row.Asunto,
+      ultimoMensaje: row.UltimoMensaje || '',
+      ultimoMensajeFecha: row.UltimoMensajeFecha,
+      ultimoMensajeRemitente: row.UltimoMensajeRemitente || '',
+      activa: row.Activa,
+      noLeidos: JSON.parse(row.NoLeidos || '{}'),
+      createdAt: row.CreatedAt,
+      updatedAt: row.UpdatedAt
+    }));
+  }
+
+  async updateConversacion(id: string, data: Partial<Conversacion>): Promise<void> {
+    const pool = await getConnection();
+
+    const updates: string[] = [];
+    const request = pool.request().input('id', sql.Int, parseInt(id));
+
+    if (data.ultimoMensaje !== undefined) {
+      updates.push('UltimoMensaje = @ultimoMensaje');
+      request.input('ultimoMensaje', sql.NVarChar(sql.MAX), data.ultimoMensaje);
+    }
+    if (data.ultimoMensajeFecha !== undefined) {
+      updates.push('UltimoMensajeFecha = @ultimoMensajeFecha');
+      request.input('ultimoMensajeFecha', sql.DateTime, data.ultimoMensajeFecha);
+    }
+    if (data.ultimoMensajeRemitente !== undefined) {
+      updates.push('UltimoMensajeRemitente = @ultimoMensajeRemitente');
+      request.input('ultimoMensajeRemitente', sql.NVarChar(200), data.ultimoMensajeRemitente);
+    }
+    if (data.activa !== undefined) {
+      updates.push('Activa = @activa');
+      request.input('activa', sql.Bit, data.activa ? 1 : 0);
+    }
+    if (data.noLeidos !== undefined) {
+      updates.push('NoLeidos = @noLeidos');
+      request.input('noLeidos', sql.NVarChar(sql.MAX), JSON.stringify(data.noLeidos));
+    }
+
+    updates.push('UpdatedAt = GETDATE()');
+
+    if (updates.length > 0) {
+      await request.query(`
+        UPDATE WebConversacion SET ${updates.join(', ')} WHERE ID = @id
+      `);
+    }
+  }
+
+  async createMensaje(data: Omit<Mensaje, 'id' | 'mensajeId' | 'createdAt'>): Promise<Mensaje> {
+    await this.ensureMensajeriaTables();
+    const pool = await getConnection();
+
+    const result = await pool.request()
+      .input('conversacionId', sql.Int, parseInt(data.conversacionId))
+      .input('remitenteId', sql.NVarChar(100), data.remitenteId)
+      .input('remitenteNombre', sql.NVarChar(200), data.remitenteNombre)
+      .input('remitenteRol', sql.NVarChar(100), data.remitenteRol || '')
+      .input('destinatarioId', sql.NVarChar(100), data.destinatarioId)
+      .input('destinatarioNombre', sql.NVarChar(200), data.destinatarioNombre || '')
+      .input('mensaje', sql.NVarChar(sql.MAX), data.mensaje)
+      .input('asunto', sql.NVarChar(500), data.asunto || '')
+      .input('archivos', sql.NVarChar(sql.MAX), JSON.stringify(data.archivos || []))
+      .input('leido', sql.Bit, data.leido ? 1 : 0)
+      .query(`
+        INSERT INTO WebMensaje
+          (ConversacionId, RemitenteId, RemitenteNombre, RemitenteRol, DestinatarioId,
+           DestinatarioNombre, Mensaje, Asunto, Archivos, Leido, CreatedAt)
+        OUTPUT INSERTED.ID, INSERTED.CreatedAt
+        VALUES
+          (@conversacionId, @remitenteId, @remitenteNombre, @remitenteRol, @destinatarioId,
+           @destinatarioNombre, @mensaje, @asunto, @archivos, @leido, GETDATE())
+      `);
+
+    const mensajeId = String(result.recordset[0].ID);
+
+    return {
+      id: mensajeId,
+      mensajeId: mensajeId,
+      conversacionId: data.conversacionId,
+      remitenteId: data.remitenteId,
+      remitenteNombre: data.remitenteNombre,
+      remitenteRol: data.remitenteRol,
+      destinatarioId: data.destinatarioId,
+      destinatarioNombre: data.destinatarioNombre,
+      mensaje: data.mensaje,
+      asunto: data.asunto,
+      archivos: data.archivos,
+      leido: data.leido,
+      createdAt: result.recordset[0].CreatedAt
+    };
+  }
+
+  async getMensajesByConversacion(conversacionId: string, limit: number = 50, offset: number = 0): Promise<Mensaje[]> {
+    await this.ensureMensajeriaTables();
+    const pool = await getConnection();
+
+    const result = await pool.request()
+      .input('conversacionId', sql.Int, parseInt(conversacionId))
+      .input('limit', sql.Int, limit)
+      .input('offset', sql.Int, offset)
+      .query(`
+        SELECT * FROM WebMensaje
+        WHERE ConversacionId = @conversacionId
+        ORDER BY CreatedAt ASC
+        OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
+      `);
+
+    return result.recordset.map(row => ({
+      id: String(row.ID),
+      mensajeId: String(row.ID),
+      conversacionId: String(row.ConversacionId),
+      remitenteId: row.RemitenteId,
+      remitenteNombre: row.RemitenteNombre,
+      remitenteRol: row.RemitenteRol || '',
+      destinatarioId: row.DestinatarioId,
+      destinatarioNombre: row.DestinatarioNombre || '',
+      mensaje: row.Mensaje,
+      asunto: row.Asunto || '',
+      archivos: JSON.parse(row.Archivos || '[]'),
+      leido: row.Leido,
+      fechaLectura: row.FechaLectura,
+      createdAt: row.CreatedAt
+    }));
+  }
+
+  async marcarMensajesComoLeidos(conversacionId: string, usuarioId: string): Promise<void> {
+    const pool = await getConnection();
+
+    await pool.request()
+      .input('conversacionId', sql.Int, parseInt(conversacionId))
+      .input('usuarioId', sql.NVarChar(100), usuarioId)
+      .query(`
+        UPDATE WebMensaje
+        SET Leido = 1, FechaLectura = GETDATE()
+        WHERE ConversacionId = @conversacionId
+          AND DestinatarioId = @usuarioId
+          AND Leido = 0
+      `);
+  }
+
+  async marcarMensajeComoLeido(id: string): Promise<void> {
+    const pool = await getConnection();
+
+    await pool.request()
+      .input('id', sql.Int, parseInt(id))
+      .query(`
+        UPDATE WebMensaje SET Leido = 1, FechaLectura = GETDATE() WHERE ID = @id
+      `);
+  }
+
+  // ==================== NOTIFICACIONES ====================
+
+  async createNotificacion(data: {
+    usuarioId: string;
+    tipo: string;
+    titulo: string;
+    mensaje: string;
+    link?: string;
+    leida?: boolean;
+    emailEnviado?: boolean;
+    empresaId?: string;
+  }): Promise<string> {
+    await this.ensureMensajeriaTables();
+    const pool = await getConnection();
+
+    const result = await pool.request()
+      .input('usuarioId', sql.NVarChar(100), data.usuarioId)
+      .input('tipo', sql.NVarChar(50), data.tipo)
+      .input('titulo', sql.NVarChar(200), data.titulo)
+      .input('mensaje', sql.NVarChar(sql.MAX), data.mensaje)
+      .input('link', sql.NVarChar(500), data.link || '')
+      .input('leida', sql.Bit, data.leida ? 1 : 0)
+      .input('emailEnviado', sql.Bit, data.emailEnviado ? 1 : 0)
+      .input('empresaId', sql.NVarChar(50), data.empresaId || '')
+      .query(`
+        INSERT INTO WebNotificacion
+          (UsuarioId, Tipo, Titulo, Mensaje, Link, Leida, EmailEnviado, EmpresaId, CreatedAt)
+        OUTPUT INSERTED.ID
+        VALUES
+          (@usuarioId, @tipo, @titulo, @mensaje, @link, @leida, @emailEnviado, @empresaId, GETDATE())
+      `);
+
+    return String(result.recordset[0].ID);
+  }
+
+  async getNotificacionesByUsuario(usuarioId: string, limit: number = 20): Promise<Notificacion[]> {
+    await this.ensureMensajeriaTables();
+    const pool = await getConnection();
+
+    const result = await pool.request()
+      .input('usuarioId', sql.NVarChar(100), usuarioId)
+      .input('limit', sql.Int, limit)
+      .query(`
+        SELECT TOP (@limit) * FROM WebNotificacion
+        WHERE UsuarioId = @usuarioId
+        ORDER BY CreatedAt DESC
+      `);
+
+    return result.recordset.map(row => ({
+      id: String(row.ID),
+      notificacionId: String(row.ID),
+      usuarioId: row.UsuarioId,
+      tipo: row.Tipo,
+      titulo: row.Titulo,
+      mensaje: row.Mensaje,
+      link: row.Link,
+      leida: row.Leida,
+      emailEnviado: row.EmailEnviado,
+      empresaId: row.EmpresaId,
+      createdAt: row.CreatedAt
+    }));
+  }
+
+  async marcarNotificacionComoLeida(id: string): Promise<void> {
+    const pool = await getConnection();
+
+    await pool.request()
+      .input('id', sql.Int, parseInt(id))
+      .query(`UPDATE WebNotificacion SET Leida = 1 WHERE ID = @id`);
+  }
+
+  async marcarTodasNotificacionesComoLeidas(usuarioId: string): Promise<void> {
+    const pool = await getConnection();
+
+    await pool.request()
+      .input('usuarioId', sql.NVarChar(100), usuarioId)
+      .query(`UPDATE WebNotificacion SET Leida = 1 WHERE UsuarioId = @usuarioId`);
+  }
+
+  async getNotificacionesNoLeidas(usuarioId: string): Promise<number> {
+    await this.ensureMensajeriaTables();
+    const pool = await getConnection();
+
+    const result = await pool.request()
+      .input('usuarioId', sql.NVarChar(100), usuarioId)
+      .query(`
+        SELECT COUNT(*) as count FROM WebNotificacion
+        WHERE UsuarioId = @usuarioId AND Leida = 0
+      `);
+
+    return result.recordset[0].count;
+  }
+
+  async getMensajesNoLeidosCount(usuarioId: string): Promise<number> {
+    await this.ensureMensajeriaTables();
+    const pool = await getConnection();
+
+    const result = await pool.request()
+      .input('usuarioId', sql.NVarChar(100), usuarioId)
+      .query(`
+        SELECT COUNT(*) as count FROM WebMensaje
+        WHERE DestinatarioId = @usuarioId AND Leido = 0
+      `);
+
+    return result.recordset[0].count;
+  }
+
+  async uploadArchivoMensaje(archivo: File, conversacionId: string): Promise<string> {
+    // Por ahora retornar una URL placeholder
+    // TODO: Implementar subida real a almacenamiento
+    return `mensajes/${conversacionId}/${archivo.name}`;
+  }
+
+  async getDownloadUrl(archivoUrl: string): Promise<string> {
+    // Por ahora retornar la misma URL
+    // TODO: Implementar URL de descarga real
+    return archivoUrl;
+  }
+
+  async getUsuariosParaConversacion(usuarioId: string, empresaId: string, rol?: string): Promise<any[]> {
+    // Esta función ya se maneja directamente en mensajes.ts
     return [];
   }
-  async marcarNotificacionComoLeida(): Promise<void> {}
-  async marcarTodasNotificacionesComoLeidas(): Promise<void> {}
-  async getNotificacionesNoLeidas(): Promise<number> {
-    return 0;
+
+  async buscarMensajes(usuarioId: string, query: string, conversacionId?: string): Promise<Mensaje[]> {
+    await this.ensureMensajeriaTables();
+    const pool = await getConnection();
+
+    let sqlQuery = `
+      SELECT m.* FROM WebMensaje m
+      INNER JOIN WebConversacion c ON m.ConversacionId = c.ID
+      WHERE c.Participantes LIKE '%' + @usuarioId + '%'
+        AND m.Mensaje LIKE '%' + @query + '%'
+    `;
+
+    const request = pool.request()
+      .input('usuarioId', sql.NVarChar(100), usuarioId)
+      .input('query', sql.NVarChar(200), query);
+
+    if (conversacionId) {
+      sqlQuery += ' AND m.ConversacionId = @conversacionId';
+      request.input('conversacionId', sql.Int, parseInt(conversacionId));
+    }
+
+    sqlQuery += ' ORDER BY m.CreatedAt DESC';
+
+    const result = await request.query(sqlQuery);
+
+    return result.recordset.map(row => ({
+      id: String(row.ID),
+      mensajeId: String(row.ID),
+      conversacionId: String(row.ConversacionId),
+      remitenteId: row.RemitenteId,
+      remitenteNombre: row.RemitenteNombre,
+      remitenteRol: row.RemitenteRol || '',
+      destinatarioId: row.DestinatarioId,
+      destinatarioNombre: row.DestinatarioNombre || '',
+      mensaje: row.Mensaje,
+      asunto: row.Asunto || '',
+      archivos: JSON.parse(row.Archivos || '[]'),
+      leido: row.Leido,
+      fechaLectura: row.FechaLectura,
+      createdAt: row.CreatedAt
+    }));
+  }
+
+  async getEstadisticasMensajeria(usuarioId: string, empresaId?: string): Promise<any> {
+    await this.ensureMensajeriaTables();
+    const pool = await getConnection();
+
+    const result = await pool.request()
+      .input('usuarioId', sql.NVarChar(100), usuarioId)
+      .query(`
+        SELECT
+          (SELECT COUNT(*) FROM WebConversacion WHERE Participantes LIKE '%' + @usuarioId + '%' AND Activa = 1) as totalConversaciones,
+          (SELECT COUNT(*) FROM WebMensaje WHERE DestinatarioId = @usuarioId AND Leido = 0) as mensajesNoLeidos
+      `);
+
+    return {
+      totalConversaciones: result.recordset[0].totalConversaciones,
+      mensajesNoLeidos: result.recordset[0].mensajesNoLeidos
+    };
   }
 }
