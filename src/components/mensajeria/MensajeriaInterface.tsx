@@ -667,7 +667,9 @@ function NuevaConversacionDialog({
       <DialogHeader>
         <DialogTitle>Nueva Conversación</DialogTitle>
         <DialogDescription>
-          Inicia una nueva conversación con un proveedor.
+          {usuarioRol === 'proveedor'
+            ? 'Envía un mensaje al equipo de La Cantera.'
+            : 'Inicia una nueva conversación con un proveedor.'}
         </DialogDescription>
       </DialogHeader>
 
@@ -678,7 +680,9 @@ function NuevaConversacionDialog({
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               ref={inputDestinatarioRef}
-              placeholder={cargandoUsuarios ? "Cargando proveedores..." : "Buscar proveedor por nombre..."}
+              placeholder={cargandoUsuarios
+                ? (usuarioRol === 'proveedor' ? "Cargando contactos..." : "Cargando proveedores...")
+                : (usuarioRol === 'proveedor' ? "Buscar por nombre o área..." : "Buscar proveedor por nombre...")}
               value={busquedaDestinatario}
               onChange={(e) => {
                 setBusquedaDestinatario(e.target.value);
@@ -721,8 +725,8 @@ function NuevaConversacionDialog({
                 {usuariosFiltrados.length === 0 ? (
                   <div className="p-3 text-sm text-muted-foreground text-center">
                     {busquedaDestinatario
-                      ? 'No se encontraron proveedores'
-                      : 'Escribe para buscar proveedores'}
+                      ? (usuarioRol === 'proveedor' ? 'No se encontraron contactos' : 'No se encontraron proveedores')
+                      : (usuarioRol === 'proveedor' ? 'Escribe para buscar contactos' : 'Escribe para buscar proveedores')}
                   </div>
                 ) : (
                   <div className="p-1">
@@ -730,7 +734,7 @@ function NuevaConversacionDialog({
                       <div
                         key={usuario.id}
                         className={`flex items-center space-x-2 p-2 rounded cursor-pointer transition-colors ${
-                          destinatario === usuario.id
+                          destinatario === String(usuario.id)
                             ? 'bg-accent'
                             : 'hover:bg-accent/50'
                         }`}
@@ -739,7 +743,7 @@ function NuevaConversacionDialog({
                         <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{usuario.nombre}</p>
-                          <p className="text-xs text-muted-foreground">ID: {usuario.id}</p>
+                          <p className="text-xs text-muted-foreground">{usuario.email}</p>
                         </div>
                         <Badge variant="outline" className="flex-shrink-0">{usuario.rol}</Badge>
                       </div>
@@ -749,7 +753,7 @@ function NuevaConversacionDialog({
               </ScrollArea>
               {usuariosFiltrados.length > 0 && (
                 <div className="p-2 border-t text-xs text-muted-foreground text-center">
-                  {usuariosFiltrados.length} proveedor{usuariosFiltrados.length !== 1 ? 'es' : ''} encontrado{usuariosFiltrados.length !== 1 ? 's' : ''}
+                  {usuariosFiltrados.length} {usuarioRol === 'proveedor' ? 'contacto' : 'proveedor'}{usuariosFiltrados.length !== 1 ? (usuarioRol === 'proveedor' ? 's' : 'es') : ''} encontrado{usuariosFiltrados.length !== 1 ? 's' : ''}
                 </div>
               )}
             </div>

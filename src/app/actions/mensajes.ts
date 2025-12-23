@@ -492,33 +492,53 @@ export async function getUsuariosParaConversacion(usuarioId: string, empresaId: 
       return { success: true, data: erpResult.recordset };
     }
 
-    // Si es proveedor, obtener administradores para que pueda escribirles
+    // Si es proveedor, obtener todos los usuarios internos de la empresa (admin, finanzas, etc.)
     if (rol === 'proveedor') {
-      console.log('🔍 Es Proveedor, obteniendo administradores...');
+      console.log('🔍 Es Proveedor, obteniendo usuarios internos de la empresa...');
 
       const { hybridDB } = await import('@/lib/database/multi-tenant-connection');
 
-      // Buscar administradores en WebUsuario
-      const adminsResult = await hybridDB.queryPortal(`
+      // Buscar todos los usuarios internos en WebUsuario (no proveedores, no clientes)
+      const usuariosResult = await hybridDB.queryPortal(`
         SELECT
           UsuarioWeb as id,
           Nombre as nombre,
           eMail as email,
-          'Admin' as rol
+          Rol as rolOriginal,
+          CASE
+            WHEN Rol = 'super-admin' THEN 'Super Admin'
+            WHEN Rol = 'admin' THEN 'Administrador'
+            WHEN Rol = 'finanzas' THEN 'Finanzas'
+            WHEN Rol = 'compras' THEN 'Compras'
+            WHEN Rol = 'almacen' THEN 'Almacén'
+            WHEN Rol = 'contabilidad' THEN 'Contabilidad'
+            ELSE UPPER(LEFT(Rol, 1)) + LOWER(SUBSTRING(Rol, 2, LEN(Rol)))
+          END as rol
         FROM WebUsuario
-        WHERE (Rol = 'super-admin' OR Rol = 'admin')
-          AND Estatus = 'ACTIVO'
+        WHERE Estatus = 'ACTIVO'
           AND Nombre IS NOT NULL
           AND Nombre != ''
-        ORDER BY Nombre ASC
+          AND (Proveedor IS NULL OR Proveedor = '')
+          AND (Cliente IS NULL OR Cliente = '')
+        ORDER BY
+          CASE Rol
+            WHEN 'super-admin' THEN 1
+            WHEN 'admin' THEN 2
+            WHEN 'finanzas' THEN 3
+            WHEN 'compras' THEN 4
+            WHEN 'almacen' THEN 5
+            WHEN 'contabilidad' THEN 6
+            ELSE 7
+          END,
+          Nombre ASC
       `);
 
-      if (adminsResult.recordset && adminsResult.recordset.length > 0) {
-        console.log('📦 Administradores encontrados:', adminsResult.recordset.length);
-        return { success: true, data: adminsResult.recordset };
+      if (usuariosResult.recordset && usuariosResult.recordset.length > 0) {
+        console.log('📦 Usuarios internos encontrados:', usuariosResult.recordset.length);
+        return { success: true, data: usuariosResult.recordset };
       }
 
-      console.log('⚠️ No se encontraron administradores');
+      console.log('⚠️ No se encontraron usuarios internos');
       return { success: true, data: [] };
     }
 
