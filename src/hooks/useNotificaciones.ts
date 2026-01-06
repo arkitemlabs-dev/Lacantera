@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { NotificacionPortal } from '@/lib/types';
 
 export function useNotificaciones(empresa: string, autoRefresh = true) {
@@ -6,6 +6,7 @@ export function useNotificaciones(empresa: string, autoRefresh = true) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [noLeidasCount, setNoLeidasCount] = useState(0);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   const fetchNotificaciones = useCallback(async (soloNoLeidas = false) => {
     try {
@@ -82,18 +83,79 @@ export function useNotificaciones(empresa: string, autoRefresh = true) {
     }
   }, []);
 
-  // Cargar notificaciones al montar
+  // Configurar Server-Sent Events para notificaciones en tiempo real
   useEffect(() => {
-    fetchNotificaciones();
-  }, [fetchNotificaciones]);
+    if (!empresa) return;
 
-  // Auto-refresh cada 30 segundos
+    // Cargar notificaciones iniciales
+    fetchNotificaciones();
+
+    // Configurar SSE
+    const eventSource = new EventSource(`/api/notificaciones/sse?empresa=${empresa}`);
+    eventSourceRef.current = eventSource;
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        switch (data.type) {
+          case 'connected':
+            console.log('🔔 Conectado a notificaciones en tiempo real');
+            break;
+            
+          case 'initial_notifications':
+            setNoLeidasCount(data.count);
+            break;
+            
+          case 'new_notification':
+            // Agregar nueva notificación al inicio
+            setNotificaciones(prev => [data.notification, ...prev]);
+            setNoLeidasCount(prev => prev + 1);
+            
+            // Mostrar notificación del navegador si está permitido
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification(data.notification.titulo, {
+                body: data.notification.mensaje,
+                icon: '/favicon.ico'
+              });
+            }
+            break;
+            
+          case 'count_update':
+            setNoLeidasCount(data.count);
+            break;
+        }
+      } catch (err) {
+        console.error('Error procesando evento SSE:', err);
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error('Error en SSE:', error);
+      setError('Error en conexión de notificaciones');
+    };
+
+    // Solicitar permisos de notificación del navegador
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
+    return () => {
+      eventSource.close();
+      eventSourceRef.current = null;
+    };
+  }, [empresa, fetchNotificaciones]);
+
+  // Fallback: Auto-refresh cada 60 segundos si SSE falla
   useEffect(() => {
     if (!autoRefresh) return;
 
     const interval = setInterval(() => {
-      fetchNotificaciones();
-    }, 30000); // 30 segundos
+      // Solo hacer polling si SSE no está conectado
+      if (!eventSourceRef.current || eventSourceRef.current.readyState !== EventSource.OPEN) {
+        fetchNotificaciones();
+      }
+    }, 60000); // 60 segundos
 
     return () => clearInterval(interval);
   }, [autoRefresh, fetchNotificaciones]);

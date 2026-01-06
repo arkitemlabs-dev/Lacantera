@@ -111,6 +111,7 @@ export default function LoginPage() {
         password,
         userType: tipoUsuario,
         empresaId: empresaSeleccionada,
+        userAgent: navigator.userAgent,
       });
 
       if (result?.error) {

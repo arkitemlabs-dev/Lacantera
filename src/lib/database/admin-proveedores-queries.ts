@@ -551,9 +551,9 @@ export async function getProveedorPorCodigoERP(codigoERP: string): Promise<Prove
   if (erp.DiaRevision1) diasRevision.push(erp.DiaRevision1);
   if (erp.DiaRevision2) diasRevision.push(erp.DiaRevision2);
 
-  const diasPago: string[] = ];
+  const diasPago: string[] = [];
   if (erp.DiaPago1) diasPago.push(erp.DiaPago1);
-  if (erp.DiaPago2) diasPago.p[ush(erp.DiaPago2);
+  if (erp.DiaPago2) diasPago.push(erp.DiaPago2);
 
   return {
     portalUserId: `erp_${codigoERP}`,

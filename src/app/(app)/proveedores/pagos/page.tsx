@@ -231,7 +231,6 @@ export default function PagosProveedorPage() {
                 <TableHead>ID Pago</TableHead>
                 <TableHead>Factura</TableHead>
                 <TableHead className="text-right">Monto</TableHead>
-                <TableHead>Fecha de Pago</TableHead>
                 <TableHead>Método</TableHead>
                 <TableHead className="text-center">Comprobante de pago</TableHead>
                 <TableHead>Estado</TableHead>
@@ -256,7 +255,6 @@ export default function PagosProveedorPage() {
                       currency: 'MXN',
                     }).format(payment.amount)}
                   </TableCell>
-                  <TableCell>{payment.date}</TableCell>
                   <TableCell>{payment.method}</TableCell>
                   <TableCell className="text-center space-x-1">
                      <Button variant="ghost" size="icon" className="h-8 w-8">

@@ -40,6 +40,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
         userType: { label: 'User Type', type: 'text' },
         empresaId: { label: 'Empresa ID', type: 'text' },
+        userAgent: { label: 'User Agent', type: 'text' },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
@@ -88,6 +89,16 @@ export const authOptions: NextAuthOptions = {
             }
 
             console.log(`[AUTH] Usuario web autenticado: ${webUser.eMail} (Rol: ${webUser.Rol})`);
+
+            // Registrar inicio de sesión exitoso (importación dinámica para evitar problemas de dependencia)
+            import('@/app/actions/seguridad').then(({ registrarInicioSesion }) => {
+              registrarInicioSesion({
+                usuarioId: String(webUser.UsuarioWeb),
+                ip: 'Desde servidor',
+                userAgent: credentials.userAgent || '',
+                exitoso: true,
+              }).catch(err => console.error('[AUTH] Error registrando sesión:', err));
+            }).catch(err => console.error('[AUTH] Error importando módulo de seguridad:', err));
 
             // Determinar userType basado en el rol
             let userType = 'Usuario';
