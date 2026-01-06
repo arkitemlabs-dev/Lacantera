@@ -9,6 +9,7 @@ import type {
   ParticipanteConversacion 
 } from '@/types/backend';
 import { revalidatePath } from 'next/cache';
+import { NotificationService } from '@/lib/services/notification-service';
 
 // ==================== CREAR CONVERSACIÓN ====================
 
@@ -129,16 +130,13 @@ export async function crearConversacion(data: {
       updatedAt: conversacionActualizada.updatedAt
     });
 
-    // Crear notificación para el destinatario
-    await database.createNotificacion({
-      usuarioId: data.destinatarioId,
-      tipo: 'nuevo_mensaje',
-      titulo: 'Nuevo mensaje',
-      mensaje: `Mensaje de ${data.remitenteNombre}: ${data.asunto}`,
-      link: `/mensajeria?conversacion=${conversacion.id}`,
-      leida: false,
-      emailEnviado: false,
-      empresaId: data.empresaId
+    // Crear notificación para el destinatario usando el servicio de notificaciones
+    await NotificationService.enviarNotificacionMensaje({
+      destinatarioId: parseInt(data.destinatarioId),
+      remitenteNombre: data.remitenteNombre,
+      asunto: data.asunto,
+      empresaId: data.empresaId,
+      conversacionId: conversacion.id
     });
 
     revalidatePath('/mensajeria');
@@ -236,16 +234,13 @@ export async function enviarMensaje(data: {
       updatedAt: new Date()
     });
 
-    // Crear notificación para el destinatario
-    await database.createNotificacion({
-      usuarioId: destinatarioId,
-      tipo: 'nuevo_mensaje',
-      titulo: 'Nuevo mensaje',
-      mensaje: `Mensaje de ${data.remitenteNombre}`,
-      link: `/mensajeria?conversacion=${data.conversacionId}`,
-      leida: false,
-      emailEnviado: false,
-      empresaId: conversacion.empresaId || ''
+    // Crear notificación para el destinatario usando el servicio de notificaciones
+    await NotificationService.enviarNotificacionMensaje({
+      destinatarioId: parseInt(destinatarioId),
+      remitenteNombre: data.remitenteNombre,
+      asunto: 'Nuevo mensaje',
+      empresaId: conversacion.empresaId || '',
+      conversacionId: data.conversacionId
     });
 
     revalidatePath('/mensajeria');
@@ -425,7 +420,7 @@ export async function getUsuariosParaConversacion(usuarioId: string, empresaId: 
     if (rol === 'super-admin' || rol === 'admin' || rol === 'Super Admin' || rol === 'Admin') {
       console.log('✅ Es Admin, obteniendo proveedores con cuenta en el portal');
 
-      const { hybridDB } = await import('@/lib/database/multi-tenant-connection');
+      const { hybridDB } = await import('@/lib/database/hybrid-queries');
 
       // 🔥 PRIMERO: Buscar en WebUsuario (sistema nuevo) - proveedores con campo Proveedor no vacío
       console.log('🔍 Buscando en WebUsuario (sistema nuevo)...');
@@ -496,7 +491,7 @@ export async function getUsuariosParaConversacion(usuarioId: string, empresaId: 
     if (rol === 'proveedor') {
       console.log('🔍 Es Proveedor, obteniendo usuarios internos de la empresa...');
 
-      const { hybridDB } = await import('@/lib/database/multi-tenant-connection');
+      const { hybridDB } = await import('@/lib/database/hybrid-queries');
 
       // Buscar todos los usuarios internos en WebUsuario (no proveedores, no clientes)
       const usuariosResult = await hybridDB.queryPortal(`
