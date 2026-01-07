@@ -48,8 +48,7 @@ export async function GET(request: NextRequest) {
         Nombre as nombre,
         eMail as email,
         Rol as rol,
-        Estatus as estatus,
-        FechaRegistro as fechaCreacion
+        Estatus as estatus
       FROM WebUsuario
       WHERE Proveedor IS NULL
         AND (Rol IS NULL OR Rol NOT IN ('proveedor'))
@@ -62,7 +61,6 @@ export async function GET(request: NextRequest) {
       email: u.email,
       rol: u.rol || 'super-admin',
       estatus: u.estatus === 'ACTIVO' ? 'Activo' : 'Inactivo',
-      fechaCreacion: u.fechaCreacion,
     }));
 
     await pool.close();
@@ -139,9 +137,9 @@ export async function POST(request: NextRequest) {
       .input('rol', sql.VarChar(50), rol)
       .input('contrasena', sql.NVarChar(255), passwordHash)
       .query(`
-        INSERT INTO WebUsuario (Nombre, eMail, Rol, Contrasena, Estatus, FechaRegistro)
+        INSERT INTO WebUsuario (Nombre, eMail, Rol, Contrasena, Estatus)
         OUTPUT INSERTED.UsuarioWeb
-        VALUES (@nombre, @email, @rol, @contrasena, 'ACTIVO', GETDATE())
+        VALUES (@nombre, @email, @rol, @contrasena, 'ACTIVO')
       `);
 
     const newUserId = insertResult.recordset[0].UsuarioWeb;

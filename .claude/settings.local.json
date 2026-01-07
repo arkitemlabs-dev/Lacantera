@@ -26,7 +26,8 @@
       "Bash(tasklist:*)",
       "Bash(del:*)",
       "Bash(ren:*)",
-      "Bash(move:*)"
+      "Bash(move:*)",
+      "Bash(npm --version:*)"
     ],
     "deny": [],
     "ask": []

@@ -68,7 +68,7 @@ import { navItems } from '../nav';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/app/providers';
 import { initialRoles, type Role, type Permission } from '@/lib/roles';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 
 type User = {
   id: string;
@@ -148,11 +148,11 @@ export default function ConfiguracionPage() {
       if (result.success) {
         setUsers(result.data);
       } else {
-        toast.error('Error cargando usuarios: ' + result.error);
+        toast({ title: 'Error', description: 'Error cargando usuarios: ' + result.error, variant: 'destructive' });
       }
     } catch (error) {
       console.error('Error:', error);
-      toast.error('Error al cargar usuarios');
+      toast({ title: 'Error', description: 'Error al cargar usuarios', variant: 'destructive' });
     } finally {
       setLoadingUsers(false);
     }
@@ -177,7 +177,7 @@ export default function ConfiguracionPage() {
 
   const handleCreateUser = async () => {
     if (!newUserForm.nombre || !newUserForm.email || !newUserForm.rol || !newUserForm.contrasena) {
-      toast.error('Todos los campos son requeridos');
+      toast({ title: 'Error', description: 'Todos los campos son requeridos', variant: 'destructive' });
       return;
     }
 
@@ -192,16 +192,16 @@ export default function ConfiguracionPage() {
       const result = await response.json();
 
       if (result.success) {
-        toast.success('Usuario creado correctamente');
+        toast({ title: 'Éxito', description: 'Usuario creado correctamente' });
         setIsNewUserDialogOpen(false);
         setNewUserForm({ nombre: '', email: '', rol: '', contrasena: '' });
         cargarUsuarios();
       } else {
-        toast.error(result.error || 'Error al crear usuario');
+        toast({ title: 'Error', description: result.error || 'Error al crear usuario', variant: 'destructive' });
       }
     } catch (error) {
       console.error('Error:', error);
-      toast.error('Error al crear usuario');
+      toast({ title: 'Error', description: 'Error al crear usuario', variant: 'destructive' });
     } finally {
       setSavingUser(false);
     }
@@ -221,15 +221,15 @@ export default function ConfiguracionPage() {
       const result = await response.json();
 
       if (result.success) {
-        toast.success('Usuario actualizado correctamente');
+        toast({ title: 'Éxito', description: 'Usuario actualizado correctamente' });
         setIsEditUserDialogOpen(false);
         cargarUsuarios();
       } else {
-        toast.error(result.error || 'Error al actualizar usuario');
+        toast({ title: 'Error', description: result.error || 'Error al actualizar usuario', variant: 'destructive' });
       }
     } catch (error) {
       console.error('Error:', error);
-      toast.error('Error al actualizar usuario');
+      toast({ title: 'Error', description: 'Error al actualizar usuario', variant: 'destructive' });
     } finally {
       setSavingUser(false);
     }
@@ -249,15 +249,15 @@ export default function ConfiguracionPage() {
       const result = await response.json();
 
       if (result.success) {
-        toast.success('Rol actualizado correctamente');
+        toast({ title: 'Éxito', description: 'Rol actualizado correctamente' });
         setIsChangeRoleDialogOpen(false);
         cargarUsuarios();
       } else {
-        toast.error(result.error || 'Error al cambiar rol');
+        toast({ title: 'Error', description: result.error || 'Error al cambiar rol', variant: 'destructive' });
       }
     } catch (error) {
       console.error('Error:', error);
-      toast.error('Error al cambiar rol');
+      toast({ title: 'Error', description: 'Error al cambiar rol', variant: 'destructive' });
     } finally {
       setSavingUser(false);
     }
@@ -278,15 +278,15 @@ export default function ConfiguracionPage() {
       const result = await response.json();
 
       if (result.success) {
-        toast.success(`Usuario ${newStatus === 'Activo' ? 'activado' : 'desactivado'} correctamente`);
+        toast({ title: 'Éxito', description: `Usuario ${newStatus === 'Activo' ? 'activado' : 'desactivado'} correctamente` });
         setIsToggleStatusAlertOpen(false);
         cargarUsuarios();
       } else {
-        toast.error(result.error || 'Error al cambiar estado');
+        toast({ title: 'Error', description: result.error || 'Error al cambiar estado', variant: 'destructive' });
       }
     } catch (error) {
       console.error('Error:', error);
-      toast.error('Error al cambiar estado');
+      toast({ title: 'Error', description: 'Error al cambiar estado', variant: 'destructive' });
     } finally {
       setSavingUser(false);
     }
@@ -337,7 +337,7 @@ export default function ConfiguracionPage() {
     }
     setIsCreateRoleDialogOpen(false);
     setIsEditRoleDialogOpen(false);
-    toast.success('Rol guardado correctamente');
+    toast({ title: 'Éxito', description: 'Rol guardado correctamente' });
   };
 
   const getRolDisplayName = (rol: string) => {
