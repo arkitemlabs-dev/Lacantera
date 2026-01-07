@@ -54,11 +54,30 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
 
       let mappedRole: Role | undefined;
 
+      // Mapear roles del backend a roles del frontend
+      // Roles de administrador:
+      // - super-admin / admin → Super Admin (acceso total)
+      // - compras → Compras (proveedores, órdenes)
+      // - contabilidad → Contabilidad (facturas, pagos)
+      // - solo-lectura → Solo lectura (solo ver)
+
       if (role === 'proveedor') {
         mappedRole = initialRoles.find((r) => r.name === 'Proveedor');
+      } else if (role === 'super-admin') {
+        mappedRole = initialRoles.find((r) => r.name === 'Super Admin');
+      } else if (role === 'admin') {
+        mappedRole = initialRoles.find((r) => r.name === 'Super Admin');
+      } else if (role === 'compras') {
+        mappedRole = initialRoles.find((r) => r.name === 'Compras');
+      } else if (role === 'contabilidad') {
+        mappedRole = initialRoles.find((r) => r.name === 'Contabilidad');
+      } else if (role === 'solo-lectura') {
+        mappedRole = initialRoles.find((r) => r.name === 'Solo lectura');
       } else if (role === 'admin_super') {
+        // Compatibilidad con formato antiguo
         mappedRole = initialRoles.find((r) => r.name === 'Super Admin');
       } else if (role === 'admin_compras') {
+        // Compatibilidad con formato antiguo
         mappedRole = initialRoles.find((r) => r.name === 'Compras');
       }
 
