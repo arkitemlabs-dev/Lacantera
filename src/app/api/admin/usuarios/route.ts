@@ -34,8 +34,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    // Solo super-admin puede ver usuarios
-    if (session.user.role !== 'super-admin') {
+    // Solo super-admin o admin puede ver usuarios
+    if (session.user.role !== 'super-admin' && session.user.role !== 'admin') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    if (session.user.role !== 'super-admin') {
+    if (session.user.role !== 'super-admin' && session.user.role !== 'admin') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 

@@ -37,7 +37,7 @@ export async function GET(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    if (session.user.role !== 'super-admin') {
+    if (session.user.role !== 'super-admin' && session.user.role !== 'admin') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
@@ -52,8 +52,7 @@ export async function GET(
           Nombre as nombre,
           eMail as email,
           Rol as rol,
-          Estatus as estatus,
-          FechaRegistro as fechaCreacion
+          Estatus as estatus
         FROM WebUsuario
         WHERE UsuarioWeb = @id
       `);
@@ -76,7 +75,6 @@ export async function GET(
         email: u.email,
         rol: u.rol || 'super-admin',
         estatus: u.estatus === 'ACTIVO' ? 'Activo' : 'Inactivo',
-        fechaCreacion: u.fechaCreacion,
       },
     });
   } catch (error: any) {
@@ -103,7 +101,7 @@ export async function PUT(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    if (session.user.role !== 'super-admin') {
+    if (session.user.role !== 'super-admin' && session.user.role !== 'admin') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
@@ -238,7 +236,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    if (session.user.role !== 'super-admin') {
+    if (session.user.role !== 'super-admin' && session.user.role !== 'admin') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
