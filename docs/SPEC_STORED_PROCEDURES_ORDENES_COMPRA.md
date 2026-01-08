@@ -245,13 +245,15 @@ Obtiene estadisticas de ordenes de compra para el dashboard. Puede filtrar por e
 | Cantidad | INT | Cantidad | Numero de ordenes |
 | ImporteTotal | DECIMAL(18,2) | ImporteTotal | Suma de importes |
 
-#### Result Set 3 - Ordenes por Mes (ultimos 6 meses)
+#### Result Set 3 - Ordenes por Mes (ultimos 6 meses incluyendo el actual)
 | Campo | Tipo SQL | Alias Requerido | Descripcion |
 |-------|----------|-----------------|-------------|
 | Anio | INT | Anio | Ano |
 | Mes | INT | Mes | Mes (1-12) |
 | Cantidad | INT | Cantidad | Numero de ordenes |
 | ImporteTotal | DECIMAL(18,2) | ImporteTotal | Suma de importes |
+
+**Nota:** Incluir el mes actual + 5 meses anteriores = 6 registros total. Ordenar de mas antiguo a mas reciente.
 
 #### Result Set 4 - Por Estatus
 | Campo | Tipo SQL | Alias Requerido | Descripcion |
@@ -287,8 +289,8 @@ Obtiene ordenes de compra para un proveedor especifico (vista del proveedor). In
 | @Estatus | VARCHAR(20) | NO | NULL | Estatus a filtrar. Si es NULL, trae todos |
 | @FechaDesde | DATE | NO | NULL | Fecha minima de emision |
 | @FechaHasta | DATE | NO | NULL | Fecha maxima de emision |
+| @Page | INT | NO | 1 | Numero de pagina (1-based) |
 | @Limit | INT | NO | 50 | Registros por pagina |
-| @Offset | INT | NO | 0 | Offset para paginacion |
 
 ### Campos de Salida Requeridos (Result Set 1 - Ordenes)
 
@@ -358,8 +360,8 @@ EXEC sp_GetOrdenesCompraProveedor
     @Estatus = NULL,  -- Trae todas
     @FechaDesde = '2024-01-01',
     @FechaHasta = NULL,
-    @Limit = 50,
-    @Offset = 0
+    @Page = 1,
+    @Limit = 50
 ```
 
 ### Ejemplo de Llamada - Solo Pendientes
@@ -368,8 +370,8 @@ EXEC sp_GetOrdenesCompraProveedor
     @RFC = 'XAXX010101000',
     @Empresa = '01',
     @Estatus = 'PENDIENTE',
-    @Limit = 50,
-    @Offset = 0
+    @Page = 1,
+    @Limit = 50
 ```
 
 ---
@@ -518,7 +520,7 @@ Cuando el parametro @Estatus es NULL o 'todas', el SP debe retornar ordenes de T
 
 ### 3. Paginacion
 - `@Page` es 1-based (la primera pagina es 1, no 0)
-- `@Offset` es 0-based (se calcula como: `(Page - 1) * Limit`)
+- El SP internamente calcula el offset como: `(@Page - 1) * @Limit`
 - Siempre retornar el conteo total en un result set separado
 
 ### 4. Valores NULL

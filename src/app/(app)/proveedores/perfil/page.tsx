@@ -43,25 +43,35 @@ import { getDocumentosByProveedor } from '@/app/actions/proveedores';
 const InfoField = ({
   label,
   value,
+  editValue,
   isEditing,
+  onChange,
 }: {
   label: string;
   value?: string;
+  editValue?: string;
   isEditing: boolean;
-}) => (
-  <div className="grid grid-cols-3 gap-2 text-sm items-center">
-    <dt className="text-muted-foreground">{label}</dt>
-    <dd className="col-span-2">
-       <Input
-        id={label.toLowerCase()}
-        value={value || ''}
-        className="bg-background/40 border-border/60 h-8"
-        disabled={!isEditing}
-        readOnly
-      />
-    </dd>
-  </div>
-);
+  onChange?: (value: string) => void;
+}) => {
+  // Usar editValue cuando está en modo edición, sino usar value
+  const displayValue = isEditing ? (editValue ?? value ?? '') : (value ?? '');
+
+  return (
+    <div className="grid grid-cols-3 gap-2 text-sm items-center">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="col-span-2">
+        <Input
+          id={label.toLowerCase()}
+          value={displayValue}
+          className="bg-background/40 border-border/60 h-8"
+          disabled={!isEditing}
+          readOnly={!isEditing}
+          onChange={(e) => onChange?.(e.target.value)}
+        />
+      </dd>
+    </div>
+  );
+};
 
 type DocStatus = 'aprobado' | 'pendiente' | 'rechazado';
 
@@ -207,6 +217,7 @@ export default function PerfilProveedorPage() {
 
   // Estados para datos del proveedor
   const [proveedorInfo, setProveedorInfo] = useState<any>(null);
+  const [editedInfo, setEditedInfo] = useState<any>(null); // Datos editados temporalmente
   const [loadingInfo, setLoadingInfo] = useState(true);
 
   // Estados para documentos
@@ -418,15 +429,31 @@ export default function PerfilProveedorPage() {
   };
 
   const handleSave = () => {
+    // Guardar los cambios editados en proveedorInfo
+    if (editedInfo) {
+      setProveedorInfo(editedInfo);
+    }
     setIsEditing(false);
   };
 
   const handleEdit = () => {
+    // Copiar los datos actuales para edición
+    setEditedInfo({ ...proveedorInfo });
     setIsEditing(true);
   };
 
   const handleCancel = () => {
+    // Descartar cambios
+    setEditedInfo(null);
     setIsEditing(false);
+  };
+
+  // Función para actualizar un campo específico
+  const updateField = (field: string, value: string) => {
+    setEditedInfo((prev: any) => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
   const openUploadDialog = (tipo: TipoDocumento) => {
@@ -685,12 +712,12 @@ export default function PerfilProveedorPage() {
                         </div>
                          <div className="flex-1 space-y-4">
                              <h3 className="text-lg font-semibold">Datos Fiscales</h3>
-                             <InfoField label="Razón Social" value={proveedorInfo.razonSocial} isEditing={isEditing} />
-                             <InfoField label="Nombre Corto" value={proveedorInfo.nombreCorto} isEditing={isEditing} />
-                             <InfoField label="RFC" value={proveedorInfo.rfc} isEditing={isEditing} />
-                             <InfoField label="CURP" value={proveedorInfo.curp} isEditing={isEditing} />
-                             <InfoField label="Código Proveedor" value={proveedorInfo.codigo} isEditing={isEditing} />
-                             <InfoField label="Régimen Fiscal" value={proveedorInfo.fiscalRegimen} isEditing={isEditing} />
+                             <InfoField label="Razón Social" value={proveedorInfo.razonSocial} editValue={editedInfo?.razonSocial} isEditing={isEditing} onChange={(v) => updateField('razonSocial', v)} />
+                             <InfoField label="Nombre Corto" value={proveedorInfo.nombreCorto} editValue={editedInfo?.nombreCorto} isEditing={isEditing} onChange={(v) => updateField('nombreCorto', v)} />
+                             <InfoField label="RFC" value={proveedorInfo.rfc} editValue={editedInfo?.rfc} isEditing={isEditing} onChange={(v) => updateField('rfc', v)} />
+                             <InfoField label="CURP" value={proveedorInfo.curp} editValue={editedInfo?.curp} isEditing={isEditing} onChange={(v) => updateField('curp', v)} />
+                             <InfoField label="Código Proveedor" value={proveedorInfo.codigo} editValue={editedInfo?.codigo} isEditing={isEditing} onChange={(v) => updateField('codigo', v)} />
+                             <InfoField label="Régimen Fiscal" value={proveedorInfo.fiscalRegimen} editValue={editedInfo?.fiscalRegimen} isEditing={isEditing} onChange={(v) => updateField('fiscalRegimen', v)} />
                         </div>
                     </div>
 
@@ -699,15 +726,15 @@ export default function PerfilProveedorPage() {
                     <div>
                       <h3 className="text-lg font-semibold mb-4">Dirección Completa</h3>
                       <div className="space-y-4">
-                        <InfoField label="Dirección" value={proveedorInfo.direccionFiscal} isEditing={isEditing} />
-                        <InfoField label="Número Exterior" value={proveedorInfo.direccionNumero} isEditing={isEditing} />
-                        <InfoField label="Número Interior" value={proveedorInfo.direccionNumeroInt} isEditing={isEditing} />
-                        <InfoField label="Entre Calles" value={proveedorInfo.entreCalles} isEditing={isEditing} />
-                        <InfoField label="Colonia" value={proveedorInfo.colonia} isEditing={isEditing} />
-                        <InfoField label="Ciudad/Población" value={proveedorInfo.poblacion} isEditing={isEditing} />
-                        <InfoField label="Estado" value={proveedorInfo.estado} isEditing={isEditing} />
-                        <InfoField label="País" value={proveedorInfo.pais} isEditing={isEditing} />
-                        <InfoField label="Código Postal" value={proveedorInfo.codigoPostal} isEditing={isEditing} />
+                        <InfoField label="Dirección" value={proveedorInfo.direccionFiscal} editValue={editedInfo?.direccionFiscal} isEditing={isEditing} onChange={(v) => updateField('direccionFiscal', v)} />
+                        <InfoField label="Número Exterior" value={proveedorInfo.direccionNumero} editValue={editedInfo?.direccionNumero} isEditing={isEditing} onChange={(v) => updateField('direccionNumero', v)} />
+                        <InfoField label="Número Interior" value={proveedorInfo.direccionNumeroInt} editValue={editedInfo?.direccionNumeroInt} isEditing={isEditing} onChange={(v) => updateField('direccionNumeroInt', v)} />
+                        <InfoField label="Entre Calles" value={proveedorInfo.entreCalles} editValue={editedInfo?.entreCalles} isEditing={isEditing} onChange={(v) => updateField('entreCalles', v)} />
+                        <InfoField label="Colonia" value={proveedorInfo.colonia} editValue={editedInfo?.colonia} isEditing={isEditing} onChange={(v) => updateField('colonia', v)} />
+                        <InfoField label="Ciudad/Población" value={proveedorInfo.poblacion} editValue={editedInfo?.poblacion} isEditing={isEditing} onChange={(v) => updateField('poblacion', v)} />
+                        <InfoField label="Estado" value={proveedorInfo.estado} editValue={editedInfo?.estado} isEditing={isEditing} onChange={(v) => updateField('estado', v)} />
+                        <InfoField label="País" value={proveedorInfo.pais} editValue={editedInfo?.pais} isEditing={isEditing} onChange={(v) => updateField('pais', v)} />
+                        <InfoField label="Código Postal" value={proveedorInfo.codigoPostal} editValue={editedInfo?.codigoPostal} isEditing={isEditing} onChange={(v) => updateField('codigoPostal', v)} />
                       </div>
                     </div>
 
@@ -716,14 +743,14 @@ export default function PerfilProveedorPage() {
                     <div>
                       <h3 className="text-lg font-semibold mb-4">Datos de Contacto</h3>
                       <div className="space-y-4">
-                        <InfoField label="Contacto Principal" value={proveedorInfo.nombreContacto} isEditing={isEditing} />
-                        <InfoField label="Contacto Secundario" value={proveedorInfo.contacto2} isEditing={isEditing} />
-                        <InfoField label="Email Principal" value={proveedorInfo.email} isEditing={isEditing} />
-                        <InfoField label="Email Secundario" value={proveedorInfo.email2} isEditing={isEditing} />
-                        <InfoField label="Teléfono" value={proveedorInfo.telefono} isEditing={isEditing} />
-                        <InfoField label="Fax" value={proveedorInfo.fax} isEditing={isEditing} />
-                        <InfoField label="Extensión 1" value={proveedorInfo.extension1} isEditing={isEditing} />
-                        <InfoField label="Extensión 2" value={proveedorInfo.extension2} isEditing={isEditing} />
+                        <InfoField label="Contacto Principal" value={proveedorInfo.nombreContacto} editValue={editedInfo?.nombreContacto} isEditing={isEditing} onChange={(v) => updateField('nombreContacto', v)} />
+                        <InfoField label="Contacto Secundario" value={proveedorInfo.contacto2} editValue={editedInfo?.contacto2} isEditing={isEditing} onChange={(v) => updateField('contacto2', v)} />
+                        <InfoField label="Email Principal" value={proveedorInfo.email} editValue={editedInfo?.email} isEditing={isEditing} onChange={(v) => updateField('email', v)} />
+                        <InfoField label="Email Secundario" value={proveedorInfo.email2} editValue={editedInfo?.email2} isEditing={isEditing} onChange={(v) => updateField('email2', v)} />
+                        <InfoField label="Teléfono" value={proveedorInfo.telefono} editValue={editedInfo?.telefono} isEditing={isEditing} onChange={(v) => updateField('telefono', v)} />
+                        <InfoField label="Fax" value={proveedorInfo.fax} editValue={editedInfo?.fax} isEditing={isEditing} onChange={(v) => updateField('fax', v)} />
+                        <InfoField label="Extensión 1" value={proveedorInfo.extension1} editValue={editedInfo?.extension1} isEditing={isEditing} onChange={(v) => updateField('extension1', v)} />
+                        <InfoField label="Extensión 2" value={proveedorInfo.extension2} editValue={editedInfo?.extension2} isEditing={isEditing} onChange={(v) => updateField('extension2', v)} />
                       </div>
                     </div>
 
@@ -732,11 +759,11 @@ export default function PerfilProveedorPage() {
                     <div>
                       <h3 className="text-lg font-semibold mb-4">Información Bancaria</h3>
                        <div className="space-y-4">
-                         <InfoField label="Banco/Sucursal" value={proveedorInfo.banco} isEditing={isEditing} />
-                         <InfoField label="Número de Cuenta" value={proveedorInfo.numeroCuenta} isEditing={isEditing} />
-                         <InfoField label="Beneficiario" value={proveedorInfo.beneficiario} isEditing={isEditing} />
-                         <InfoField label="Nombre del Beneficiario" value={proveedorInfo.beneficiarioNombre} isEditing={isEditing} />
-                         <InfoField label="Leyenda del Cheque" value={proveedorInfo.leyendaCheque} isEditing={isEditing} />
+                         <InfoField label="Banco/Sucursal" value={proveedorInfo.banco} editValue={editedInfo?.banco} isEditing={isEditing} onChange={(v) => updateField('banco', v)} />
+                         <InfoField label="Número de Cuenta" value={proveedorInfo.numeroCuenta} editValue={editedInfo?.numeroCuenta} isEditing={isEditing} onChange={(v) => updateField('numeroCuenta', v)} />
+                         <InfoField label="Beneficiario" value={proveedorInfo.beneficiario} editValue={editedInfo?.beneficiario} isEditing={isEditing} onChange={(v) => updateField('beneficiario', v)} />
+                         <InfoField label="Nombre del Beneficiario" value={proveedorInfo.beneficiarioNombre} editValue={editedInfo?.beneficiarioNombre} isEditing={isEditing} onChange={(v) => updateField('beneficiarioNombre', v)} />
+                         <InfoField label="Leyenda del Cheque" value={proveedorInfo.leyendaCheque} editValue={editedInfo?.leyendaCheque} isEditing={isEditing} onChange={(v) => updateField('leyendaCheque', v)} />
                       </div>
                     </div>
 
@@ -745,13 +772,13 @@ export default function PerfilProveedorPage() {
                     <div>
                       <h3 className="text-lg font-semibold mb-4">Condiciones Comerciales</h3>
                       <div className="space-y-4">
-                        <InfoField label="Condición de Pago" value={proveedorInfo.condicionPago} isEditing={isEditing} />
-                        <InfoField label="Forma de Pago" value={proveedorInfo.formaPago} isEditing={isEditing} />
-                        <InfoField label="Categoría" value={proveedorInfo.categoria} isEditing={isEditing} />
-                        <InfoField label="Familia" value={proveedorInfo.familia} isEditing={isEditing} />
-                        <InfoField label="Descuento" value={proveedorInfo.descuento?.toString()} isEditing={isEditing} />
-                        <InfoField label="Comisión" value={proveedorInfo.comision?.toString()} isEditing={isEditing} />
-                        <InfoField label="Moneda" value={proveedorInfo.moneda} isEditing={isEditing} />
+                        <InfoField label="Condición de Pago" value={proveedorInfo.condicionPago} editValue={editedInfo?.condicionPago} isEditing={isEditing} onChange={(v) => updateField('condicionPago', v)} />
+                        <InfoField label="Forma de Pago" value={proveedorInfo.formaPago} editValue={editedInfo?.formaPago} isEditing={isEditing} onChange={(v) => updateField('formaPago', v)} />
+                        <InfoField label="Categoría" value={proveedorInfo.categoria} editValue={editedInfo?.categoria} isEditing={isEditing} onChange={(v) => updateField('categoria', v)} />
+                        <InfoField label="Familia" value={proveedorInfo.familia} editValue={editedInfo?.familia} isEditing={isEditing} onChange={(v) => updateField('familia', v)} />
+                        <InfoField label="Descuento" value={proveedorInfo.descuento?.toString()} editValue={editedInfo?.descuento?.toString()} isEditing={isEditing} onChange={(v) => updateField('descuento', v)} />
+                        <InfoField label="Comisión" value={proveedorInfo.comision?.toString()} editValue={editedInfo?.comision?.toString()} isEditing={isEditing} onChange={(v) => updateField('comision', v)} />
+                        <InfoField label="Moneda" value={proveedorInfo.moneda} editValue={editedInfo?.moneda} isEditing={isEditing} onChange={(v) => updateField('moneda', v)} />
                       </div>
                     </div>
 
@@ -760,11 +787,11 @@ export default function PerfilProveedorPage() {
                     <div>
                       <h3 className="text-lg font-semibold mb-4">Información Operativa</h3>
                       <div className="space-y-4">
-                        <InfoField label="Días de Revisión" value={proveedorInfo.diasRevision} isEditing={isEditing} />
-                        <InfoField label="Días de Pago" value={proveedorInfo.diasPago} isEditing={isEditing} />
-                        <InfoField label="Comprador" value={proveedorInfo.comprador} isEditing={isEditing} />
-                        <InfoField label="Agente" value={proveedorInfo.agente} isEditing={isEditing} />
-                        <InfoField label="Centro de Costos" value={proveedorInfo.centroCostos} isEditing={isEditing} />
+                        <InfoField label="Días de Revisión" value={proveedorInfo.diasRevision} editValue={editedInfo?.diasRevision} isEditing={isEditing} onChange={(v) => updateField('diasRevision', v)} />
+                        <InfoField label="Días de Pago" value={proveedorInfo.diasPago} editValue={editedInfo?.diasPago} isEditing={isEditing} onChange={(v) => updateField('diasPago', v)} />
+                        <InfoField label="Comprador" value={proveedorInfo.comprador} editValue={editedInfo?.comprador} isEditing={isEditing} onChange={(v) => updateField('comprador', v)} />
+                        <InfoField label="Agente" value={proveedorInfo.agente} editValue={editedInfo?.agente} isEditing={isEditing} onChange={(v) => updateField('agente', v)} />
+                        <InfoField label="Centro de Costos" value={proveedorInfo.centroCostos} editValue={editedInfo?.centroCostos} isEditing={isEditing} onChange={(v) => updateField('centroCostos', v)} />
                       </div>
                     </div>
 
@@ -773,10 +800,10 @@ export default function PerfilProveedorPage() {
                     <div>
                       <h3 className="text-lg font-semibold mb-4">Información Contable</h3>
                       <div className="space-y-4">
-                        <InfoField label="Cuenta Contable" value={proveedorInfo.cuentaContable} isEditing={isEditing} />
-                        <InfoField label="Cuenta de Retención" value={proveedorInfo.cuentaRetencion} isEditing={isEditing} />
-                        <InfoField label="Importe 1" value={proveedorInfo.importe1?.toString()} isEditing={isEditing} />
-                        <InfoField label="Importe 2" value={proveedorInfo.importe2?.toString()} isEditing={isEditing} />
+                        <InfoField label="Cuenta Contable" value={proveedorInfo.cuentaContable} editValue={editedInfo?.cuentaContable} isEditing={isEditing} onChange={(v) => updateField('cuentaContable', v)} />
+                        <InfoField label="Cuenta de Retención" value={proveedorInfo.cuentaRetencion} editValue={editedInfo?.cuentaRetencion} isEditing={isEditing} onChange={(v) => updateField('cuentaRetencion', v)} />
+                        <InfoField label="Importe 1" value={proveedorInfo.importe1?.toString()} editValue={editedInfo?.importe1?.toString()} isEditing={isEditing} onChange={(v) => updateField('importe1', v)} />
+                        <InfoField label="Importe 2" value={proveedorInfo.importe2?.toString()} editValue={editedInfo?.importe2?.toString()} isEditing={isEditing} onChange={(v) => updateField('importe2', v)} />
                       </div>
                     </div>
 
