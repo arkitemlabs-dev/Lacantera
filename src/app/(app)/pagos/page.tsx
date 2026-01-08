@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import type { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
@@ -30,6 +30,8 @@ import {
   ThumbsUp,
   ThumbsDown,
   Check,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,6 +69,8 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
+
+const ITEMS_PER_PAGE = 10;
 
 const getStatusVariant = (status: PaymentStatus) => {
   switch (status) {
@@ -114,6 +118,7 @@ export default function PagosPage() {
   const [status, setStatus] = useState('todas');
   const [supplier, setSupplier] = useState('todos');
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const filteredPayments = useMemo(() => {
     return payments.filter((payment) => {
@@ -131,6 +136,18 @@ export default function PagosPage() {
 
         return dateFilter && statusFilter && supplierFilter && searchFilter;
     });
+  }, [dateRange, status, supplier, searchTerm]);
+
+  // Paginación del lado del cliente
+  const totalPages = Math.ceil(filteredPayments.length / ITEMS_PER_PAGE);
+  const displayedPayments = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredPayments.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredPayments, currentPage]);
+
+  // Resetear página cuando cambian los filtros
+  useEffect(() => {
+    setCurrentPage(1);
   }, [dateRange, status, supplier, searchTerm]);
 
 
@@ -297,7 +314,7 @@ export default function PagosPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredPayments.map((payment) => (
+                  {displayedPayments.map((payment) => (
                     <TableRow key={payment.id}>
                       <TableCell className="font-medium">
                         <Button variant="link" className="p-0 h-auto" onClick={() => handleOpenDetailDialog(payment)}>
@@ -446,9 +463,36 @@ export default function PagosPage() {
                 onChange={handleFileSelect}
               />
             </CardContent>
-            <CardFooter className="flex justify-center border-t pt-4">
-              <Button variant="outline">Cargar más</Button>
-            </CardFooter>
+            {filteredPayments.length > 0 && (
+              <CardFooter className="flex items-center justify-between border-t pt-4">
+                <div className="text-sm text-muted-foreground">
+                  Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, filteredPayments.length)} de {filteredPayments.length} pagos
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                    disabled={currentPage <= 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Anterior
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    disabled={currentPage >= totalPages}
+                  >
+                    Siguiente
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardFooter>
+            )}
           </Card>
           
             <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>

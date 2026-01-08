@@ -1,9 +1,9 @@
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { Calendar as CalendarIcon, ListFilter, Search, Eye, FileDown } from 'lucide-react';
+import { Calendar as CalendarIcon, ListFilter, Search, Eye, FileDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { DateRange } from 'react-day-picker';
@@ -52,6 +52,8 @@ import { cn } from '@/lib/utils';
 import type { Invoice } from '@/lib/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
+const ITEMS_PER_PAGE = 10;
+
 const getBadgeVariant = (status: Invoice['status']) => {
   switch (status) {
     case 'Pendiente pago':
@@ -76,6 +78,7 @@ export default function FacturasPage() {
   const [status, setStatus] = useState('todas');
   const [supplier, setSupplier] = useState('todos');
   const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter((invoice) => {
@@ -88,6 +91,18 @@ export default function FacturasPage() {
 
       return dateFilter && statusFilter && supplierFilter && invoiceNumberFilter;
     });
+  }, [dateRange, status, supplier, invoiceNumber]);
+
+  // Paginación del lado del cliente
+  const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
+  const displayedInvoices = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredInvoices, currentPage]);
+
+  // Resetear página cuando cambian los filtros
+  useEffect(() => {
+    setCurrentPage(1);
   }, [dateRange, status, supplier, invoiceNumber]);
 
   const handleReviewClick = (invoice: Invoice) => {
@@ -216,7 +231,7 @@ export default function FacturasPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredInvoices.map((invoice) => (
+              {displayedInvoices.map((invoice) => (
                 <TableRow key={invoice.id}>
                   <TableCell>{invoice.invoiceNumber}</TableCell>
                   <TableCell className="font-medium">
@@ -289,6 +304,36 @@ export default function FacturasPage() {
             </TableBody>
           </Table>
           </TooltipProvider>
+          {filteredInvoices.length > 0 && (
+            <div className="flex items-center justify-between p-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, filteredInvoices.length)} de {filteredInvoices.length} facturas
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => prev - 1)}
+                  disabled={currentPage <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  disabled={currentPage >= totalPages}
+                >
+                  Siguiente
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
           {selectedInvoice && (
             <DialogContent className="max-w-4xl grid-rows-[auto_1fr_auto]">
               <DialogHeader>

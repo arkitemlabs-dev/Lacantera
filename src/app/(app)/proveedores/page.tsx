@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { MoreHorizontal, PlusCircle, Eye, ListFilter, Loader2, UserCheck, UserX } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Eye, ListFilter, Loader2, UserCheck, UserX, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { SupplierStatus, SupplierType } from '@/lib/types';
 import { getProveedores } from '@/app/actions/proveedores';
 
@@ -12,6 +12,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -46,6 +47,8 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { ProveedorDetailsModal } from '@/components/proveedores/proveedor-details-modal';
+
+const ITEMS_PER_PAGE = 10;
 
 const statusStyles: Record<
   SupplierStatus,
@@ -82,6 +85,7 @@ export default function ProveedoresPage() {
   const [loading, setLoading] = useState(true);
   const [selectedProveedor, setSelectedProveedor] = useState<any>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     cargarProveedores();
@@ -103,7 +107,8 @@ export default function ProveedoresPage() {
     setLoading(false);
   };
   
-  const displayedSuppliers = useMemo(() => {
+  // Proveedores filtrados (sin paginación)
+  const filteredSuppliers = useMemo(() => {
     return proveedores
       .filter((supplier) => {
         const searchFilter =
@@ -120,6 +125,21 @@ export default function ProveedoresPage() {
       });
   }, [proveedores, searchTerm, statusFilter, typeFilter, registroFilter]);
 
+  // Calcular total de páginas
+  const totalPages = Math.ceil(filteredSuppliers.length / ITEMS_PER_PAGE);
+
+  // Proveedores de la página actual
+  const displayedSuppliers = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return filteredSuppliers.slice(startIndex, endIndex);
+  }, [filteredSuppliers, currentPage]);
+
+  // Resetear página cuando cambian los filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, typeFilter, registroFilter]);
+
   // Calcular estadísticas
   const stats = useMemo(() => {
     const total = proveedores.length;
@@ -133,6 +153,13 @@ export default function ProveedoresPage() {
     setStatusFilter('all');
     setTypeFilter('all');
     setRegistroFilter('all');
+    setCurrentPage(1);
+  };
+
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
   };
 
   return (
@@ -419,6 +446,64 @@ export default function ProveedoresPage() {
                   </TableBody>
                 </Table>
               </TooltipProvider>
+            )}
+
+            {/* Paginación */}
+            {!loading && filteredSuppliers.length > 0 && (
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, filteredSuppliers.length)} de {filteredSuppliers.length} proveedores
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Anterior
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {/* Mostrar números de página */}
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(page => {
+                        // Mostrar primera, última, actual y adyacentes
+                        if (page === 1 || page === totalPages) return true;
+                        if (Math.abs(page - currentPage) <= 1) return true;
+                        return false;
+                      })
+                      .map((page, index, array) => {
+                        // Agregar puntos suspensivos si hay salto
+                        const showEllipsis = index > 0 && page - array[index - 1] > 1;
+                        return (
+                          <div key={page} className="flex items-center">
+                            {showEllipsis && (
+                              <span className="px-2 text-muted-foreground">...</span>
+                            )}
+                            <Button
+                              variant={currentPage === page ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => goToPage(page)}
+                              className="w-8 h-8 p-0"
+                            >
+                              {page}
+                            </Button>
+                          </div>
+                        );
+                      })}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Siguiente
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>

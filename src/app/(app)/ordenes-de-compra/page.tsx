@@ -52,6 +52,8 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 
+const ITEMS_PER_PAGE = 10;
+
 // Helper function to convert ERP currency names to ISO codes
 const getCurrencyCode = (erpCurrency: string): string => {
   const currencyMap: Record<string, string> = {
@@ -162,6 +164,18 @@ export default function OrdenesDeCompraPage() {
       return dateFilter && supplierFilter && empresaFilter && orderNumberFilter;
     });
   }, [ordenes, dateRange, supplier, empresa, orderNumber]);
+
+  // Paginación del lado del cliente
+  const totalFilteredPages = Math.ceil(filteredOrders.length / ITEMS_PER_PAGE);
+  const displayedOrders = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredOrders.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredOrders, currentPage]);
+
+  // Resetear página cuando cambian los filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [dateRange, supplier, empresa, orderNumber]);
 
   const clearFilters = () => {
     setDateRange(undefined);
@@ -323,7 +337,7 @@ export default function OrdenesDeCompraPage() {
                 <Loader2 className="h-8 w-8 animate-spin mr-2" />
                 <span>Cargando órdenes de compra...</span>
               </div>
-            ) : filteredOrders.length === 0 ? (
+            ) : displayedOrders.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-12 text-center">
                 <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No se encontraron órdenes de compra</h3>
@@ -352,7 +366,7 @@ export default function OrdenesDeCompraPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredOrders.map((order) => {
+                  {displayedOrders.map((order) => {
                     return (
                       <TableRow key={order.id}>
                         <TableCell className="font-medium">
@@ -426,36 +440,28 @@ export default function OrdenesDeCompraPage() {
             )}
           </CardContent>
             {!loading && filteredOrders.length > 0 && (
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between p-4 border-t">
                 <div className="text-sm text-muted-foreground">
-                  Mostrando {((currentPage - 1) * 50) + 1} a {Math.min(currentPage * 50, totalOrders)} de {totalOrders} órdenes
+                  Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, filteredOrders.length)} de {filteredOrders.length} órdenes
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      const newPage = currentPage - 1;
-                      setCurrentPage(newPage);
-                      cargarOrdenes(newPage);
-                    }}
-                    disabled={currentPage <= 1 || loading}
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                    disabled={currentPage <= 1}
                   >
                     <ChevronLeft className="h-4 w-4" />
                     Anterior
                   </Button>
                   <span className="text-sm text-muted-foreground">
-                    Página {currentPage} de {totalPages}
+                    Página {currentPage} de {totalFilteredPages}
                   </span>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      const newPage = currentPage + 1;
-                      setCurrentPage(newPage);
-                      cargarOrdenes(newPage);
-                    }}
-                    disabled={currentPage >= totalPages || loading}
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    disabled={currentPage >= totalFilteredPages}
                   >
                     Siguiente
                     <ChevronRight className="h-4 w-4" />
