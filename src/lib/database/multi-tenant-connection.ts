@@ -17,7 +17,7 @@ const TENANT_CONFIGS: Record<string, TenantERPConfig> = {
   'la-cantera': {
     id: 'la-cantera',
     nombre: 'La Cantera Desarrollos Mineros',
-    erpDatabase: 'Cantera_ajustes', // Base real
+    erpDatabase: 'Cantera', // Base de datos donde están los SPs
     codigoEmpresa: 'LCDM',
   },
   'peralillo': {
