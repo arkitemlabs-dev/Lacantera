@@ -178,10 +178,13 @@ export class StoredProcedures {
   /**
    * SP 1: sp_GetOrdenesCompra
    * Lista órdenes de compra con paginación y filtros (Vista Admin)
+   *
+   * Parámetros reales del SP:
+   * @RfcProv VARCHAR(20), @Empresa VARCHAR(5), @Estatus VARCHAR(15),
+   * @FechaDesde DATE, @FechaHasta DATE, @Page INT, @Limit INT, @CuantasPaginas INT
    */
   async getOrdenesCompra(params: GetOrdenesCompraParams = {}): Promise<GetOrdenesCompraResult> {
     const {
-      proveedor = null,
       rfc = null,
       empresa = '01',
       estatus = null,
@@ -193,15 +196,18 @@ export class StoredProcedures {
 
     const pool = await this.getPool(empresa || '01');
 
+    // Calcular cantidad de páginas (puede ser 0 si no se necesita)
+    const cuantasPaginas = 0;
+
     const result = await pool.request()
-      .input('Proveedor', sql.VarChar(20), proveedor)
-      .input('RFC', sql.VarChar(13), rfc)
-      .input('Empresa', sql.VarChar(10), empresa)
-      .input('Estatus', sql.VarChar(20), estatus)
+      .input('RfcProv', sql.VarChar(20), rfc)
+      .input('Empresa', sql.VarChar(5), empresa)
+      .input('Estatus', sql.VarChar(15), estatus)
       .input('FechaDesde', sql.Date, this.toDate(fechaDesde))
       .input('FechaHasta', sql.Date, this.toDate(fechaHasta))
       .input('Page', sql.Int, page)
       .input('Limit', sql.Int, limit)
+      .input('CuantasPaginas', sql.Int, cuantasPaginas)
       .execute('sp_GetOrdenesCompra');
 
     const ordenes = getRecordset<OrdenCompra>(result, 0);
