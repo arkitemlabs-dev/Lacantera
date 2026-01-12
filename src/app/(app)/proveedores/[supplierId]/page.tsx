@@ -87,6 +87,8 @@ export default function SupplierProfilePage() {
   const [loading, setLoading] = useState(true);
   const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<any | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [processingAction, setProcessingAction] = useState(false);
 
   useEffect(() => {
     if (params.supplierId) {
@@ -119,7 +121,83 @@ export default function SupplierProfilePage() {
 
   const handleOpenDocumentDialog = (doc: any) => {
     setSelectedDocument(doc);
+    setRejectionReason('');
     setIsDocumentDialogOpen(true);
+  };
+
+  const handleApproveDocument = async () => {
+    if (!selectedDocument) return;
+    
+    setProcessingAction(true);
+    try {
+      const response = await fetch(`/api/admin/proveedores/${params.supplierId}/documentos/${selectedDocument.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'aprobar',
+          motivo: 'Documento aprobado por administrador'
+        })
+      });
+      
+      if (response.ok) {
+        await cargarDatos(); // Recargar datos
+        setIsDocumentDialogOpen(false);
+      }
+    } catch (error) {
+      console.error('Error aprobando documento:', error);
+    } finally {
+      setProcessingAction(false);
+    }
+  };
+
+  const handleRejectDocument = async () => {
+    if (!selectedDocument || !rejectionReason.trim()) return;
+    
+    setProcessingAction(true);
+    try {
+      const response = await fetch(`/api/admin/proveedores/${params.supplierId}/documentos/${selectedDocument.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'rechazar',
+          motivo: rejectionReason.trim()
+        })
+      });
+      
+      if (response.ok) {
+        await cargarDatos(); // Recargar datos
+        setIsDocumentDialogOpen(false);
+      }
+    } catch (error) {
+      console.error('Error rechazando documento:', error);
+    } finally {
+      setProcessingAction(false);
+    }
+  };
+
+  const handleRequestUpdate = async () => {
+    if (!selectedDocument || !rejectionReason.trim()) return;
+    
+    setProcessingAction(true);
+    try {
+      const response = await fetch(`/api/admin/proveedores/${params.supplierId}/documentos/${selectedDocument.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'solicitar_actualizacion',
+          motivo: rejectionReason.trim()
+        })
+      });
+      
+      if (response.ok) {
+        await cargarDatos(); // Recargar datos
+        setIsDocumentDialogOpen(false);
+      }
+    } catch (error) {
+      console.error('Error solicitando actualización:', error);
+    } finally {
+      setProcessingAction(false);
+    }
   };
 
   if (loading) {
@@ -472,16 +550,39 @@ export default function SupplierProfilePage() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="rejectionReason">
-                      Motivo de Rechazo (si aplica)
+                      Motivo / Observaciones
                     </Label>
                     <Textarea
                       id="rejectionReason"
-                      placeholder="Describe el motivo del rechazo..."
+                      placeholder="Describe el motivo del rechazo o solicitud de actualización..."
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
                     />
                   </div>
                   <div className="flex justify-end gap-2">
-                    <Button variant="destructive" onClick={() => setIsDocumentDialogOpen(false)}>Rechazar</Button>
-                    <Button onClick={() => setIsDocumentDialogOpen(false)}>Aprobar Documento</Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleRequestUpdate}
+                      disabled={processingAction || !rejectionReason.trim()}
+                    >
+                      {processingAction ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Solicitar Actualización
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      onClick={handleRejectDocument}
+                      disabled={processingAction || !rejectionReason.trim()}
+                    >
+                      {processingAction ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Rechazar
+                    </Button>
+                    <Button 
+                      onClick={handleApproveDocument}
+                      disabled={processingAction}
+                    >
+                      {processingAction ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Aprobar Documento
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

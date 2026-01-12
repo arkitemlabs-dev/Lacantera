@@ -2,47 +2,54 @@
  * API Route: Detalle de Orden de Compra usando Stored Procedures
  *
  * GET /api/admin/ordenes-sp/[id]
- *
- * Query params:
- * - empresa: código de empresa (01, 02, etc.)
+ * 
+ * Solo obtiene las partidas adicionales, ya que los datos principales
+ * vienen de la lista principal de órdenes
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth.config';
 import { storedProcedures } from '@/lib/database/stored-procedures';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
-    const ordenId = parseInt(id);
+    // Verificar autenticación
+    const session = await getServerSession(authOptions);
 
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { error: 'No autenticado' },
+        { status: 401 }
+      );
+    }
+
+    // Verificar que sea administrador
+    if (session.user.role !== 'super-admin' && session.user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'No autorizado. Se requiere rol de administrador.' },
+        { status: 403 }
+      );
+    }
+
+    const ordenId = parseInt(params.id);
     if (isNaN(ordenId)) {
       return NextResponse.json(
-        { success: false, error: 'ID de orden inválido' },
+        { error: 'ID de orden inválido' },
         { status: 400 }
       );
     }
 
-    const { searchParams } = new URL(request.url);
-    const empresa = searchParams.get('empresa') || '01';
-
-    // Llamar al Stored Procedure
-    const result = await storedProcedures.getOrdenCompraConDetalle(ordenId, empresa);
-
-    if (!result.encabezado) {
-      return NextResponse.json(
-        { success: false, error: 'Orden de compra no encontrada' },
-        { status: 404 }
-      );
-    }
+    // Obtener solo las partidas usando SP5 (sp_GetOrdenCompraConDetalle)
+    const result = await storedProcedures.getOrdenCompraConDetalle(ordenId, '01');
 
     return NextResponse.json({
       success: true,
       data: {
-        orden: result.encabezado,
-        partidas: result.partidas
+        partidas: result.partidas || []
       }
     });
 
@@ -52,7 +59,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        error: 'Error al obtener orden de compra',
+        error: 'Error al obtener detalle de la orden',
         details: error instanceof Error ? error.message : 'Error desconocido'
       },
       { status: 500 }

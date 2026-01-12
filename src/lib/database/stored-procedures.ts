@@ -200,7 +200,7 @@ export class StoredProcedures {
     const cuantasPaginas = 0;
 
     const result = await pool.request()
-      .input('RfcProv', sql.VarChar(20), rfc)
+      .input('Rfc', sql.VarChar(20), rfc)
       .input('Empresa', sql.VarChar(5), empresa)
       .input('Estatus', sql.VarChar(15), estatus)
       .input('FechaDesde', sql.Date, this.toDate(fechaDesde))

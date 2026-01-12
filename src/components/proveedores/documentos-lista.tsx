@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { FileText, Download, Check, X, Clock, AlertCircle } from 'lucide-react';
+import { FileText, Download, Check, X, Clock, AlertCircle, Eye, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -19,9 +19,20 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { ProveedorDocumento } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useSession } from 'next-auth/react';
 
 interface DocumentosListaProps {
   proveedor: string;
@@ -57,8 +68,15 @@ export function DocumentosLista({
   empresa,
   refreshTrigger = 0,
 }: DocumentosListaProps) {
+  const { data: session } = useSession();
   const [documentos, setDocumentos] = useState<ProveedorDocumento[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDoc, setSelectedDoc] = useState<ProveedorDocumento | null>(null);
+  const [actionDialog, setActionDialog] = useState<'approve' | 'reject' | 'update' | null>(null);
+  const [actionReason, setActionReason] = useState('');
+  const [processing, setProcessing] = useState(false);
+  
+  const isAdmin = session?.user?.role === 'admin' || session?.user?.role === 'super-admin';
 
   useEffect(() => {
     fetchDocumentos();
@@ -82,6 +100,39 @@ export function DocumentosLista({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDocumentAction = async (action: 'aprobar' | 'rechazar' | 'solicitar_actualizacion') => {
+    if (!selectedDoc) return;
+    
+    setProcessing(true);
+    try {
+      const response = await fetch(`/api/admin/proveedores/${proveedor}/documentos/${selectedDoc.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action,
+          motivo: actionReason.trim() || undefined
+        })
+      });
+      
+      if (response.ok) {
+        await fetchDocumentos(); // Recargar documentos
+        setActionDialog(null);
+        setSelectedDoc(null);
+        setActionReason('');
+      }
+    } catch (error) {
+      console.error('Error en acción de documento:', error);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const openActionDialog = (doc: ProveedorDocumento, action: 'approve' | 'reject' | 'update') => {
+    setSelectedDoc(doc);
+    setActionDialog(action);
+    setActionReason('');
   };
 
   if (loading) {
@@ -175,13 +226,58 @@ export function DocumentosLista({
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => window.open(doc.archivoURL, '_blank')}
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => window.open(doc.archivoURL, '_blank')}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      
+                      {isAdmin && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(doc.archivoURL, '_blank')}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          
+                          {doc.estatus !== 'APROBADO' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openActionDialog(doc, 'approve')}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                          )}
+                          
+                          {doc.estatus !== 'RECHAZADO' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openActionDialog(doc, 'reject')}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          )}
+                          
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openActionDialog(doc, 'update')}
+                            className="text-blue-600 hover:text-blue-700"
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -206,6 +302,59 @@ export function DocumentosLista({
           </div>
         )}
       </CardContent>
+      
+      {/* Dialog para acciones de administrador */}
+      <Dialog open={actionDialog !== null} onOpenChange={() => setActionDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {actionDialog === 'approve' && 'Aprobar Documento'}
+              {actionDialog === 'reject' && 'Rechazar Documento'}
+              {actionDialog === 'update' && 'Solicitar Actualización'}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedDoc?.nombreArchivo} - {selectedDoc?.tipoDocumento}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {actionDialog !== 'approve' && (
+            <div className="space-y-2">
+              <Label htmlFor="reason">
+                {actionDialog === 'reject' ? 'Motivo del rechazo' : 'Observaciones'}
+              </Label>
+              <Textarea
+                id="reason"
+                placeholder={actionDialog === 'reject' 
+                  ? 'Describe el motivo del rechazo...' 
+                  : 'Describe qué necesita actualizarse...'
+                }
+                value={actionReason}
+                onChange={(e) => setActionReason(e.target.value)}
+              />
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActionDialog(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (actionDialog === 'approve') handleDocumentAction('aprobar');
+                if (actionDialog === 'reject') handleDocumentAction('rechazar');
+                if (actionDialog === 'update') handleDocumentAction('solicitar_actualizacion');
+              }}
+              disabled={processing || (actionDialog !== 'approve' && !actionReason.trim())}
+              variant={actionDialog === 'reject' ? 'destructive' : 'default'}
+            >
+              {processing && <RefreshCw className="h-4 w-4 animate-spin mr-2" />}
+              {actionDialog === 'approve' && 'Aprobar'}
+              {actionDialog === 'reject' && 'Rechazar'}
+              {actionDialog === 'update' && 'Solicitar Actualización'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

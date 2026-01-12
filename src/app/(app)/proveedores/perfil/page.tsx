@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/dialog';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
-import { Eye, Upload, Camera, FileCheck, FileClock, FileX, AlertCircle, Loader2, Download, ArrowLeft } from 'lucide-react';
+import { Eye, Upload, Camera, FileCheck, FileClock, FileX, AlertCircle, Loader2, Download, ArrowLeft, Mail } from 'lucide-react';
 import Image from 'next/image';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -234,6 +234,12 @@ export default function PerfilProveedorPage() {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [documentoParaVer, setDocumentoParaVer] = useState<any>(null);
   const [loadingDocumento, setLoadingDocumento] = useState(false);
+  
+  // Estados para acciones de administrador
+  const [adminActionDialog, setAdminActionDialog] = useState<'aprobar' | 'rechazar' | 'solicitar_actualizacion' | 'solicitar_documento' | null>(null);
+  const [selectedDocForAction, setSelectedDocForAction] = useState<any>(null);
+  const [actionReason, setActionReason] = useState('');
+  const [processingAction, setProcessingAction] = useState(false);
 
   // Obtener ID del proveedor desde query params o usar el usuario logueado
   const [proveedorId, setProveedorId] = useState<string>('');
@@ -502,12 +508,42 @@ export default function PerfilProveedorPage() {
     }
   };
 
-  const getDocumentoStatus = (documentoRequerido: string) => {
-    // Buscar en documentosERP por el nombre del documento
-    const docERP = documentosERP.find((d: any) =>
-      d.documentoRequerido.toLowerCase() === documentoRequerido.toLowerCase()
-    );
-    return docERP;
+  // Función para manejar acciones de administrador
+  const handleAdminAction = (docERP: any, action: 'aprobar' | 'rechazar' | 'solicitar_actualizacion' | 'solicitar_documento') => {
+    setSelectedDocForAction(docERP);
+    setAdminActionDialog(action);
+    setActionReason('');
+  };
+
+  const executeAdminAction = async () => {
+    if (!selectedDocForAction || !adminActionDialog) return;
+    
+    setProcessingAction(true);
+    try {
+      const response = await fetch(`/api/admin/proveedores/${proveedorId}/documentos/${selectedDocForAction.idr}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: adminActionDialog,
+          motivo: actionReason.trim() || undefined
+        })
+      });
+      
+      if (response.ok) {
+        await cargarDocumentos(proveedorId, isAdminView); // Recargar documentos
+        setAdminActionDialog(null);
+        setSelectedDocForAction(null);
+        setActionReason('');
+      } else {
+        const result = await response.json();
+        alert(result.error || 'Error al procesar la acción');
+      }
+    } catch (error) {
+      console.error('Error en acción de administrador:', error);
+      alert('Error al procesar la acción');
+    } finally {
+      setProcessingAction(false);
+    }
   };
 
   // Función para visualizar documento
@@ -922,16 +958,57 @@ export default function PerfilProveedorPage() {
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex items-center justify-end gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => openUploadDialog(docERP.documentoRequerido as TipoDocumento)}
-                                  >
-                                    <Upload className="mr-2 h-4 w-4" />
-                                    {docERP.tieneArchivo ? 'Reemplazar' : 'Subir'}
-                                  </Button>
-                                  {docERP.tieneArchivo && (
+                                  {!docERP.tieneArchivo ? (
+                                    // Documentos sin archivo
                                     <>
+                                      {!isAdminView && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => openUploadDialog(docERP.documentoRequerido as TipoDocumento)}
+                                        >
+                                          <Upload className="mr-2 h-4 w-4" />
+                                          Subir
+                                        </Button>
+                                      )}
+                                      
+                                      {isAdminView && (
+                                        <>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => openUploadDialog(docERP.documentoRequerido as TipoDocumento)}
+                                          >
+                                            <Upload className="mr-2 h-4 w-4" />
+                                            Subir por Admin
+                                          </Button>
+                                          
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            title="Solicitar documento al proveedor"
+                                            onClick={() => handleAdminAction(docERP, 'solicitar_documento')}
+                                            className="text-blue-600 hover:text-blue-700"
+                                          >
+                                            <Mail className="h-4 w-4" />
+                                          </Button>
+                                        </>
+                                      )}
+                                    </>
+                                  ) : (
+                                    // Documentos con archivo
+                                    <>
+                                      {!isAdminView && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => openUploadDialog(docERP.documentoRequerido as TipoDocumento)}
+                                        >
+                                          <Upload className="mr-2 h-4 w-4" />
+                                          Reemplazar
+                                        </Button>
+                                      )}
+                                      
                                       <Button
                                         variant="ghost"
                                         size="sm"
@@ -950,6 +1027,44 @@ export default function PerfilProveedorPage() {
                                         <Download className="h-4 w-4" />
                                         <span className="sr-only">Descargar</span>
                                       </Button>
+                                      
+                                      {isAdminView && (
+                                        <>
+                                          {!docERP.autorizado && (
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              title="Aprobar documento"
+                                              onClick={() => handleAdminAction(docERP, 'aprobar')}
+                                              className="text-green-600 hover:text-green-700"
+                                            >
+                                              <FileCheck className="h-4 w-4" />
+                                            </Button>
+                                          )}
+                                          
+                                          {!docERP.rechazado && (
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              title="Rechazar documento"
+                                              onClick={() => handleAdminAction(docERP, 'rechazar')}
+                                              className="text-red-600 hover:text-red-700"
+                                            >
+                                              <FileX className="h-4 w-4" />
+                                            </Button>
+                                          )}
+                                          
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            title="Solicitar actualización"
+                                            onClick={() => handleAdminAction(docERP, 'solicitar_actualizacion')}
+                                            className="text-blue-600 hover:text-blue-700"
+                                          >
+                                            <AlertCircle className="h-4 w-4" />
+                                          </Button>
+                                        </>
+                                      )}
                                     </>
                                   )}
                                 </div>
@@ -1073,6 +1188,63 @@ export default function PerfilProveedorPage() {
                   Descargar
                 </Button>
               )}
+            </div>
+          </DialogContent>
+        </Dialog>
+        {/* Dialog para acciones de administrador */}
+        <Dialog open={adminActionDialog !== null} onOpenChange={() => setAdminActionDialog(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {adminActionDialog === 'aprobar' && 'Aprobar Documento'}
+                {adminActionDialog === 'rechazar' && 'Rechazar Documento'}
+                {adminActionDialog === 'solicitar_actualizacion' && 'Solicitar Actualización'}
+                {adminActionDialog === 'solicitar_documento' && 'Solicitar Documento'}
+              </DialogTitle>
+              <DialogDescription>
+                {selectedDocForAction?.documentoRequerido} - {selectedDocForAction?.nombreArchivo || 'Sin archivo'}
+              </DialogDescription>
+            </DialogHeader>
+            
+            {adminActionDialog !== 'aprobar' && (
+              <div className="space-y-2">
+                <Label htmlFor="actionReason">
+                  {adminActionDialog === 'rechazar' && 'Motivo del rechazo'}
+                  {adminActionDialog === 'solicitar_actualizacion' && 'Observaciones'}
+                  {adminActionDialog === 'solicitar_documento' && 'Mensaje para el proveedor'}
+                </Label>
+                <textarea
+                  id="actionReason"
+                  className="w-full p-2 border rounded-md"
+                  rows={3}
+                  placeholder={
+                    adminActionDialog === 'rechazar' 
+                      ? 'Describe el motivo del rechazo...' 
+                      : adminActionDialog === 'solicitar_actualizacion'
+                      ? 'Describe qué necesita actualizarse...'
+                      : 'Mensaje que se enviará al proveedor solicitando el documento...'
+                  }
+                  value={actionReason}
+                  onChange={(e) => setActionReason(e.target.value)}
+                />
+              </div>
+            )}
+            
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setAdminActionDialog(null)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={executeAdminAction}
+                disabled={processingAction || (adminActionDialog !== 'aprobar' && !actionReason.trim())}
+                variant={adminActionDialog === 'rechazar' ? 'destructive' : 'default'}
+              >
+                {processingAction && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                {adminActionDialog === 'aprobar' && 'Aprobar'}
+                {adminActionDialog === 'rechazar' && 'Rechazar'}
+                {adminActionDialog === 'solicitar_actualizacion' && 'Solicitar Actualización'}
+                {adminActionDialog === 'solicitar_documento' && 'Enviar Solicitud'}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
