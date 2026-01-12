@@ -2,34 +2,10 @@ import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcrypt';
 import sql from 'mssql';
+import { getPortalConnection } from '@/lib/database/multi-tenant-connection';
 import { getUserTenants } from '@/lib/database/hybrid-queries';
 
-// Configuración de conexión a SQL Server (Portal PP)
-const sqlConfig: sql.config = {
-  user: process.env.MSSQL_USER!,
-  password: process.env.MSSQL_PASSWORD!,
-  server: process.env.MSSQL_SERVER!,
-  database: 'PP', // BD del Portal
-  options: {
-    encrypt: process.env.MSSQL_ENCRYPT === 'true',
-    trustServerCertificate: process.env.MSSQL_TRUST_CERT === 'true',
-  },
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000,
-  },
-};
 
-// Pool de conexiones reutilizable
-let pool: sql.ConnectionPool | null = null;
-
-async function getPool() {
-  if (!pool) {
-    pool = await sql.connect(sqlConfig);
-  }
-  return pool;
-}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -49,7 +25,7 @@ export const authOptions: NextAuthOptions = {
 
         try {
           console.log(`[AUTH] Intentando autenticar: ${credentials.email}`);
-          const pool = await getPool();
+          const pool = await getPortalConnection();
 
           // 🔥 PASO 1: Intentar buscar en WebUsuario (tabla principal de usuarios web)
           console.log(`[AUTH] Buscando en WebUsuario...`);

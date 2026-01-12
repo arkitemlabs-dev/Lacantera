@@ -88,7 +88,15 @@ const erpConfig = {
  * Obtiene el pool de conexión para la BD del Portal (PP)
  */
 export async function getPortalConnection(): Promise<sql.ConnectionPool> {
-  if (!portalPool) {
+  if (!portalPool || !portalPool.connected) {
+    if (portalPool) {
+      try {
+        await portalPool.close();
+      } catch (error) {
+        console.log('[PORTAL] Error cerrando pool anterior:', error);
+      }
+    }
+    
     const config: sql.config = {
       ...portalConfig,
       database: 'PP', // Tu BD del portal
@@ -122,8 +130,18 @@ export async function getERPConnection(
 
   const erpDatabase = tenantConfig.erpDatabase;
 
-  // Reutilizar pool si ya existe para esta BD
-  if (!erpPools.has(erpDatabase)) {
+  // Verificar si el pool existe y está conectado
+  const existingPool = erpPools.get(erpDatabase);
+  if (!existingPool || !existingPool.connected) {
+    if (existingPool) {
+      try {
+        await existingPool.close();
+      } catch (error) {
+        console.log(`[ERP] Error cerrando pool anterior para ${erpDatabase}:`, error);
+      }
+      erpPools.delete(erpDatabase);
+    }
+    
     const config: sql.config = {
       ...erpConfig,
       database: erpDatabase,
