@@ -113,6 +113,8 @@ export default function OrdenesDeCompraPage() {
   // Estados de paginación
   const [currentPage, setCurrentPage] = useState(1);
   const [totalRegistros, setTotalRegistros] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [hayMasPaginas, setHayMasPaginas] = useState(false);
 
   // Cargar órdenes usando el Stored Procedure
   const cargarOrdenes = async () => {
@@ -141,12 +143,27 @@ export default function OrdenesDeCompraPage() {
       const result = await response.json();
 
       if (result.success) {
-        setOrdenes(result.data || []);
-        setTotalRegistros(result.pagination?.total || 0);
+        const data = result.data || [];
+        setOrdenes(data);
+
+        // El SP devuelve el total en pagination.total
+        const total = result.pagination?.total || 0;
+        const paginas = result.pagination?.totalPages || 1;
+
+        setTotalRegistros(total);
+        setTotalPaginas(paginas);
+
+        // Si el SP no devuelve total, inferir si hay más páginas
+        // basándose en si recibimos exactamente el límite de registros
+        if (total === 0 && data.length === ITEMS_PER_PAGE) {
+          setHayMasPaginas(true);
+        } else {
+          setHayMasPaginas(false);
+        }
 
         // Extraer proveedores únicos para el filtro
         const proveedoresMap = new Map<string, string>();
-        (result.data || []).forEach((o: any) => {
+        data.forEach((o: any) => {
           if (o.Proveedor && !proveedoresMap.has(o.Proveedor)) {
             proveedoresMap.set(o.Proveedor, o.ProveedorNombre || o.Proveedor);
           }
@@ -197,19 +214,28 @@ export default function OrdenesDeCompraPage() {
     setEstatus('todos');
     setIdOrden('');
     setProveedor('todos');
-    // Volver a la fecha por defecto (1 de enero de 2025)
-    setDateRange({
-      from: new Date(2025, 0, 1),
-      to: undefined,
-    });
+    setDateRange(undefined);
     setCurrentPage(1);
   };
 
-  const totalPages = Math.ceil(filteredOrders.length / ITEMS_PER_PAGE) || 1;
-  const displayedOrders = filteredOrders.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  // La paginación viene del servidor, no hacer slice local
+  // Solo usamos filteredOrders para filtros locales (ID, proveedor)
+  const displayedOrders = filteredOrders;
+
+  // Calcular total de páginas basado en el servidor
+  // Si el SP devuelve total, usarlo; si no, inferir de hayMasPaginas
+  const calcularTotalPaginas = () => {
+    if (totalRegistros > 0) {
+      return Math.ceil(totalRegistros / ITEMS_PER_PAGE);
+    }
+    // Si no hay total del servidor pero hay más páginas, permitir avanzar
+    if (hayMasPaginas) {
+      return currentPage + 1;
+    }
+    return currentPage;
+  };
+
+  const totalPaginasCalculado = calcularTotalPaginas();
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -448,12 +474,18 @@ export default function OrdenesDeCompraPage() {
         </CardContent>
 
         {/* Paginación */}
-        {!loading && filteredOrders.length > 0 && (
+        {!loading && displayedOrders.length > 0 && (
           <div className="flex items-center justify-between p-4 border-t">
             <div className="text-sm text-muted-foreground">
-              Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, filteredOrders.length)} de {filteredOrders.length} órdenes
-              {totalRegistros > 0 && totalRegistros !== filteredOrders.length && (
-                <span className="ml-1">({totalRegistros} total en servidor)</span>
+              {totalRegistros > 0 ? (
+                <>
+                  Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, totalRegistros)} de <strong>{totalRegistros.toLocaleString()}</strong> órdenes
+                </>
+              ) : (
+                <>
+                  Página {currentPage} - {displayedOrders.length} órdenes
+                  {hayMasPaginas && <span className="ml-1">(hay más páginas)</span>}
+                </>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -467,13 +499,13 @@ export default function OrdenesDeCompraPage() {
                 Anterior
               </Button>
               <span className="text-sm text-muted-foreground">
-                Página {currentPage} de {totalPages}
+                Página {currentPage} {totalRegistros > 0 ? `de ${totalPaginasCalculado.toLocaleString()}` : ''}
               </span>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage(prev => prev + 1)}
-                disabled={currentPage >= totalPages}
+                disabled={totalRegistros > 0 ? currentPage >= totalPaginasCalculado : !hayMasPaginas}
               >
                 Siguiente
                 <ChevronRight className="h-4 w-4" />

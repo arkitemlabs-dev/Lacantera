@@ -196,8 +196,9 @@ export class StoredProcedures {
 
     const pool = await this.getPool(empresa || '01');
 
-    // Calcular cantidad de páginas (puede ser 0 si no se necesita)
-    const cuantasPaginas = 0;
+    // Calcular cantidad de páginas para que el SP devuelva el total
+    // Si pasamos 1, el SP debería calcular y devolver el total
+    const cuantasPaginas = 1;
 
     const result = await pool.request()
       .input('Rfc', sql.VarChar(20), rfc)
@@ -211,11 +212,16 @@ export class StoredProcedures {
       .execute('sp_GetOrdenesCompra');
 
     const ordenes = getRecordset<OrdenCompra>(result, 0);
-    const totalRecord = getFirstRecord<{ Total: number }>(result, 1);
+    // El SP devuelve Paginas y Registros en el segundo recordset
+    const paginacionRecord = getFirstRecord<{ Paginas: number; Registros: number; Total: number }>(result, 1);
+
+    // Log para debug
+    console.log('[SP getOrdenesCompra] Paginación recibida:', paginacionRecord);
 
     return {
       ordenes,
-      total: totalRecord?.Total || 0
+      // Intentar con Registros (nombre del SP) o Total como fallback
+      total: paginacionRecord?.Registros || paginacionRecord?.Total || 0
     };
   }
 
