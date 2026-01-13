@@ -163,12 +163,53 @@ export class StoredProcedures {
   }
 
   /**
-   * Helper para convertir fechas
+   * Helper para convertir fechas a objeto Date
+   * Maneja strings en formato 'YYYY-MM-DD' correctamente para SQL Server
    */
   private toDate(value: Date | string | null | undefined): Date | null {
     if (!value) return null;
     if (value instanceof Date) return value;
+
+    // Si es string en formato 'YYYY-MM-DD', parsearlo correctamente
+    // para evitar problemas de zona horaria
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const [year, month, day] = value.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    }
+
     return new Date(value);
+  }
+
+  /**
+   * Helper para convertir fechas a string formato YYYY-MM-DD
+   * SQL Server acepta este formato directamente como VARCHAR
+   */
+  private toDateString(value: Date | string | null | undefined): string | null {
+    if (!value) return null;
+
+    // Si ya es string en formato correcto, devolverlo
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return value;
+    }
+
+    // Si es Date, convertir a string
+    if (value instanceof Date) {
+      const year = value.getFullYear();
+      const month = String(value.getMonth() + 1).padStart(2, '0');
+      const day = String(value.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // Intentar parsear como fecha y convertir
+    const date = new Date(value);
+    if (!isNaN(date.getTime())) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    return null;
   }
 
   // ===========================================================================
@@ -196,27 +237,36 @@ export class StoredProcedures {
 
     const pool = await this.getPool(empresa || '01');
 
-    // Calcular cantidad de páginas para que el SP devuelva el total
+    // Calcular cantidad de páginas para que el SP devuelve el total
     // Si pasamos 1, el SP debería calcular y devolver el total
     const cuantasPaginas = 1;
+
+    // Convertir fechas - el SP espera formato DD-MM-YYYY
+    // Entrada: '2025-10-01' (YYYY-MM-DD) → Salida: '01-10-2025' (DD-MM-YYYY)
+    const convertirFecha = (fecha: string | null): string | null => {
+      if (!fecha) return null;
+      const partes = fecha.split('-'); // ['2025', '10', '01']
+      if (partes.length === 3) {
+        return `${partes[2]}-${partes[1]}-${partes[0]}`; // '01-10-2025'
+      }
+      return fecha;
+    };
+    const fechaDesdeStr = convertirFecha(fechaDesde as string);
+    const fechaHastaStr = convertirFecha(fechaHasta as string);
 
     const result = await pool.request()
       .input('Rfc', sql.VarChar(20), rfc)
       .input('Empresa', sql.VarChar(5), empresa)
       .input('Estatus', sql.VarChar(15), estatus)
-      .input('FechaDesde', sql.Date, this.toDate(fechaDesde))
-      .input('FechaHasta', sql.Date, this.toDate(fechaHasta))
+      .input('FechaDesde', sql.VarChar(10), fechaDesdeStr)
+      .input('FechaHasta', sql.VarChar(10), fechaHastaStr)
       .input('Page', sql.Int, page)
       .input('Limit', sql.Int, limit)
       .input('CuantasPaginas', sql.Int, cuantasPaginas)
       .execute('sp_GetOrdenesCompra');
 
     const ordenes = getRecordset<OrdenCompra>(result, 0);
-    // El SP devuelve Paginas y Registros en el segundo recordset
     const paginacionRecord = getFirstRecord<{ Paginas: number; Registros: number; Total: number }>(result, 1);
-
-    // Log para debug
-    console.log('[SP getOrdenesCompra] Paginación recibida:', paginacionRecord);
 
     return {
       ordenes,

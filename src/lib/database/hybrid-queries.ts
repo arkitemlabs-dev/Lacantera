@@ -101,12 +101,14 @@ export async function getOrdenesCompraHybrid(
 
   if (fechaDesde) {
     erpQuery += ' AND c.FechaEmision >= @fechaDesde';
-    erpParams.fechaDesde = fechaDesde;
+    erpParams.fechaDesde = fechaDesde.toISOString().split('T')[0]; // Solo fecha YYYY-MM-DD
+    console.log('🔍 DEBUG SQL - Fecha desde param:', erpParams.fechaDesde);
   }
 
   if (fechaHasta) {
     erpQuery += ' AND c.FechaEmision <= @fechaHasta';
-    erpParams.fechaHasta = fechaHasta;
+    erpParams.fechaHasta = fechaHasta.toISOString().split('T')[0]; // Solo fecha YYYY-MM-DD
+    console.log('🔍 DEBUG SQL - Fecha hasta param:', erpParams.fechaHasta);
   }
 
   erpQuery += `
@@ -117,6 +119,9 @@ export async function getOrdenesCompraHybrid(
 
   erpParams.offset = offset;
   erpParams.limit = limit;
+
+  console.log('🔍 DEBUG SQL - Query completa:', erpQuery);
+  console.log('🔍 DEBUG SQL - Parámetros:', erpParams);
 
   const erpResult = await hybridDB.queryERP(tenantId, erpQuery, erpParams);
 

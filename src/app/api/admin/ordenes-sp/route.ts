@@ -33,7 +33,6 @@ export async function GET(request: NextRequest) {
       limit: parseInt(searchParams.get('limit') || '50'),
     };
 
-    // Llamar al Stored Procedure
     const result = await storedProcedures.getOrdenesCompra(params);
 
     return NextResponse.json({

@@ -10,6 +10,34 @@ import {
 } from '@/lib/database/hybrid-queries';
 
 /**
+ * Convierte fecha del formato DD-MM-YY a YYYY-MM-DD
+ */
+function convertirFecha(fechaStr: string): string {
+  // Si ya está en formato ISO (YYYY-MM-DD), devolverla tal como está
+  if (fechaStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return fechaStr;
+  }
+  
+  // Si está en formato DD-MM-YY o DD-MM-YYYY
+  const partes = fechaStr.split('-');
+  if (partes.length === 3) {
+    let [dia, mes, año] = partes;
+    
+    // Si el año es de 2 dígitos, convertir a 4 dígitos
+    if (año.length === 2) {
+      const añoNum = parseInt(año);
+      // Asumir que años 00-30 son 2000-2030, y 31-99 son 1931-1999
+      año = añoNum <= 30 ? `20${año}` : `19${año}`;
+    }
+    
+    return `${año}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+  }
+  
+  // Si no se puede convertir, devolver tal como está
+  return fechaStr;
+}
+
+/**
  * GET /api/ordenes-compra-hybrid
  * Obtiene órdenes de compra del ERP con estados del Portal
  *
@@ -53,11 +81,21 @@ export const GET = withTenantContext(async (request, { tenant, user }) => {
     const options: any = { limit, offset };
 
     if (fechaDesdeStr) {
-      options.fechaDesde = new Date(fechaDesdeStr);
+      // Convertir fecha DD-MM-YY a YYYY-MM-DD
+      const fechaDesde = convertirFecha(fechaDesdeStr);
+      console.log('🔍 DEBUG - Fecha desde original:', fechaDesdeStr);
+      console.log('🔍 DEBUG - Fecha desde convertida:', fechaDesde);
+      options.fechaDesde = new Date(fechaDesde);
+      console.log('🔍 DEBUG - Objeto Date desde:', options.fechaDesde);
     }
 
     if (fechaHastaStr) {
-      options.fechaHasta = new Date(fechaHastaStr);
+      // Convertir fecha DD-MM-YY a YYYY-MM-DD
+      const fechaHasta = convertirFecha(fechaHastaStr);
+      console.log('🔍 DEBUG - Fecha hasta original:', fechaHastaStr);
+      console.log('🔍 DEBUG - Fecha hasta convertida:', fechaHasta);
+      options.fechaHasta = new Date(fechaHasta);
+      console.log('🔍 DEBUG - Objeto Date hasta:', options.fechaHasta);
     }
 
     // Consulta híbrida
