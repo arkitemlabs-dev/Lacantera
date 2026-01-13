@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import {
@@ -13,6 +13,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
+  X,
+  User,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -102,13 +104,45 @@ export default function OrdenesDeCompraPage() {
   // Estados de filtros
   const [estatus, setEstatus] = useState('todos');
   const [idOrden, setIdOrden] = useState('');
-  const [proveedor, setProveedor] = useState('todos');
+  const [proveedorBusqueda, setProveedorBusqueda] = useState('');
+  const [proveedorSeleccionado, setProveedorSeleccionado] = useState<{ codigo: string; nombre: string } | null>(null);
+  const [showProveedorDropdown, setShowProveedorDropdown] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const proveedorInputRef = useRef<HTMLInputElement>(null);
+  const proveedorDropdownRef = useRef<HTMLDivElement>(null);
 
   // Estados de datos
   const [ordenes, setOrdenes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [proveedoresUnicos, setProveedoresUnicos] = useState<{ codigo: string; nombre: string }[]>([]);
+
+  // Proveedores filtrados para autocompletado
+  const proveedoresFiltrados = useMemo(() => {
+    if (!proveedorBusqueda.trim()) return proveedoresUnicos.slice(0, 10);
+    const busqueda = proveedorBusqueda.toLowerCase();
+    return proveedoresUnicos
+      .filter(p =>
+        p.nombre.toLowerCase().includes(busqueda) ||
+        p.codigo.toLowerCase().includes(busqueda)
+      )
+      .slice(0, 10);
+  }, [proveedoresUnicos, proveedorBusqueda]);
+
+  // Cerrar dropdown al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        proveedorDropdownRef.current &&
+        !proveedorDropdownRef.current.contains(event.target as Node) &&
+        proveedorInputRef.current &&
+        !proveedorInputRef.current.contains(event.target as Node)
+      ) {
+        setShowProveedorDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Estados de paginación
   const [currentPage, setCurrentPage] = useState(1);
@@ -198,22 +232,23 @@ export default function OrdenesDeCompraPage() {
         order.MovID?.toLowerCase().includes(idOrden.toLowerCase()) ||
         order.ID?.toString().includes(idOrden);
 
-      const proveedorFilter = proveedor === 'todos' ||
-        order.Proveedor === proveedor;
+      const proveedorFilter = !proveedorSeleccionado ||
+        order.Proveedor === proveedorSeleccionado.codigo;
 
       return idFilter && proveedorFilter;
     });
-  }, [ordenes, idOrden, proveedor]);
+  }, [ordenes, idOrden, proveedorSeleccionado]);
 
   // Resetear página cuando cambian los filtros
   useEffect(() => {
     setCurrentPage(1);
-  }, [estatus, proveedor, idOrden, dateRange]);
+  }, [estatus, proveedorSeleccionado, idOrden, dateRange]);
 
   const clearFilters = () => {
     setEstatus('todos');
     setIdOrden('');
-    setProveedor('todos');
+    setProveedorBusqueda('');
+    setProveedorSeleccionado(null);
     setDateRange(undefined);
     setCurrentPage(1);
   };
@@ -295,20 +330,63 @@ export default function OrdenesDeCompraPage() {
               />
             </div>
 
-            {/* Filtro por Proveedor */}
-            <Select value={proveedor} onValueChange={setProveedor}>
-              <SelectTrigger>
-                <SelectValue placeholder="Proveedor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos los proveedores</SelectItem>
-                {proveedoresUnicos.map((prov) => (
-                  <SelectItem key={prov.codigo} value={prov.codigo}>
-                    {prov.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Filtro por Proveedor - Autocompletado */}
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                ref={proveedorInputRef}
+                placeholder="Buscar proveedor..."
+                value={proveedorSeleccionado ? proveedorSeleccionado.nombre : proveedorBusqueda}
+                onChange={(e) => {
+                  setProveedorBusqueda(e.target.value);
+                  setProveedorSeleccionado(null);
+                  setShowProveedorDropdown(true);
+                }}
+                onFocus={() => setShowProveedorDropdown(true)}
+                className={cn(
+                  "pl-9 pr-8",
+                  proveedorSeleccionado && "bg-primary/5 border-primary/30"
+                )}
+              />
+              {(proveedorSeleccionado || proveedorBusqueda) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProveedorBusqueda('');
+                    setProveedorSeleccionado(null);
+                    proveedorInputRef.current?.focus();
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+              {showProveedorDropdown && proveedoresFiltrados.length > 0 && (
+                <div
+                  ref={proveedorDropdownRef}
+                  className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg max-h-60 overflow-auto"
+                >
+                  {proveedoresFiltrados.map((prov) => (
+                    <button
+                      key={prov.codigo}
+                      type="button"
+                      onClick={() => {
+                        setProveedorSeleccionado(prov);
+                        setProveedorBusqueda('');
+                        setShowProveedorDropdown(false);
+                      }}
+                      className={cn(
+                        "w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground",
+                        proveedorSeleccionado?.codigo === prov.codigo && "bg-accent"
+                      )}
+                    >
+                      <div className="font-medium truncate">{prov.nombre}</div>
+                      <div className="text-xs text-muted-foreground">{prov.codigo}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Filtro por Rango de Fechas */}
             <Popover>
