@@ -337,18 +337,55 @@ export class StoredProcedures {
 
     const pool = await this.getPool(empresa);
 
+    // Convertir fechas - el SP espera formato DD-MM-YYYY (igual que el SP de admin)
+    const convertirFecha = (fecha: string | null): string | null => {
+      if (!fecha) return null;
+      const partes = fecha.split('-'); // ['2025', '10', '01']
+      if (partes.length === 3) {
+        return `${partes[2]}-${partes[1]}-${partes[0]}`; // '01-10-2025'
+      }
+      return fecha;
+    };
+    const fechaDesdeStr = convertirFecha(fechaDesde as string);
+    const fechaHastaStr = convertirFecha(fechaHasta as string);
+
+    // Log para debug
+    console.log('[SP getOrdenesCompraProveedor] Parámetros:', {
+      rfc,
+      empresa,
+      estatus,
+      fechaDesdeOriginal: fechaDesde,
+      fechaHastaOriginal: fechaHasta,
+      fechaDesdeStr,
+      fechaHastaStr,
+      page,
+      limit
+    });
+
     const result = await pool.request()
       .input('RFC', sql.VarChar(13), rfc)
       .input('Empresa', sql.VarChar(10), empresa)
       .input('Estatus', sql.VarChar(20), estatus)
-      .input('FechaDesde', sql.Date, this.toDate(fechaDesde))
-      .input('FechaHasta', sql.Date, this.toDate(fechaHasta))
+      .input('FechaDesde', sql.VarChar(10), fechaDesdeStr)
+      .input('FechaHasta', sql.VarChar(10), fechaHastaStr)
       .input('Page', sql.Int, page)
       .input('Limit', sql.Int, limit)
       .execute('sp_GetOrdenesCompraProveedor');
 
     const ordenes = getRecordset<OrdenCompra>(result, 0);
     const totalRecord = getFirstRecord<{ Total: number }>(result, 1);
+
+    // Log resultado
+    console.log('[SP getOrdenesCompraProveedor] Resultado:', {
+      ordenesCount: ordenes.length,
+      total: totalRecord?.Total || 0,
+      primeraOrden: ordenes[0] ? {
+        ID: ordenes[0].ID,
+        MovID: ordenes[0].MovID,
+        FechaEmision: ordenes[0].FechaEmision,
+        Proveedor: ordenes[0].Proveedor
+      } : null
+    });
 
     return {
       ordenes,

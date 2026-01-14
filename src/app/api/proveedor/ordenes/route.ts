@@ -4,7 +4,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
-import { getERPConnection, getPortalConnection } from '@/lib/database/multi-tenant-connection';
+import { getPortalConnection } from '@/lib/database/multi-tenant-connection';
+import { storedProcedures } from '@/lib/database/stored-procedures';
 import sql from 'mssql';
 
 /**
@@ -84,10 +85,7 @@ export async function GET(request: NextRequest) {
     const rfc = userResult.recordset[0].RFC;
     console.log(`📍 RFC del proveedor: ${rfc}`);
 
-    // 4. Conectar al ERP de la empresa
-    const erpPool = await getERPConnection(empresaActual);
-
-    // Determinar el código de empresa según el mapping
+    // 4. Determinar el código de empresa según el mapping
     // El ERP usa códigos numéricos: '01', '02', etc.
     const empresaCodes: { [key: string]: string } = {
       'la-cantera': '01',
@@ -101,151 +99,62 @@ export async function GET(request: NextRequest) {
 
     console.log(`📍 Código empresa ERP: ${empresaCode}`);
 
-    // 5. Obtener órdenes de compra PENDIENTES
-    // Query basado en: SELECT * FROM Compra c JOIN MovTipo mt ON c.Mov=mt.Mov AND mt.Modulo='COMS' AND mt.Clave='COMS.0' AND mt.subClave is NULL JOIN prov p ON c.Proveedor=p.Proveedor WHERE c.Estatus='PENDIENTE' AND RFC='xxx' AND Empresa='01'
-    const ordenesResult = await erpPool.request()
-      .input('rfc', sql.VarChar(13), rfc)
-      .input('empresaCode', sql.VarChar(5), empresaCode)
-      .query(`
-        SELECT
-          c.ID,
-          c.Mov,
-          c.MovID,
-          c.Empresa,
-          c.Estatus,
-          c.Situacion,
-          c.SituacionFecha,
-          c.SituacionUsuario,
-          c.SituacionNota,
-          c.Proveedor,
-          p.Nombre AS NombreProveedor,
-          p.RFC,
-          c.FechaEmision,
-          c.FechaRequerida,
-          c.FechaEntrega,
-          c.Importe,
-          c.Impuestos,
-          c.Saldo,
-          c.DescuentoLineal,
-          c.Moneda,
-          c.TipoCambio,
-          c.Observaciones,
-          c.Condicion,
-          c.Almacen,
-          c.Referencia,
-          c.Proyecto,
-          c.Concepto,
-          c.Prioridad,
-          c.Usuario,
-          c.UltimoCambio,
-          mt.Clave AS TipoMovimiento,
-          mt.Mov AS MovimientoNombre
-        FROM Compra c
-        JOIN MovTipo mt ON c.Mov = mt.Mov
-          AND mt.Modulo = 'COMS'
-          AND mt.Clave = 'COMS.0'
-          AND mt.SubClave IS NULL
-        JOIN Prov p ON c.Proveedor = p.Proveedor
-        WHERE p.RFC = @rfc
-          AND c.Empresa = @empresaCode
-        ORDER BY c.FechaEmision DESC
-      `);
-
-    console.log(`📦 Órdenes encontradas: ${ordenesResult.recordset.length}`);
-
-    // 6. Para cada orden, obtener el detalle (partidas)
-    const ordenes = await Promise.all(
-      ordenesResult.recordset.map(async (orden: any) => {
-        const detalleResult = await erpPool.request()
-          .input('ordenID', sql.Int, orden.ID)
-          .query(`
-            SELECT
-              ID,
-              Renglon,
-              RenglonSub,
-              RenglonID,
-              RenglonTipo,
-              Cantidad,
-              Almacen,
-              Codigo,
-              Articulo,
-              SubCuenta,
-              FechaRequerida,
-              FechaEntrega,
-              Costo,
-              CostoConImpuesto,
-              Impuesto1,
-              Impuesto2,
-              Impuesto3,
-              Retencion1
-            FROM CompraD
-            WHERE ID = @ordenID
-            ORDER BY Renglon
-          `);
-
-        // Calcular total (Importe + Impuestos - DescuentoLineal)
-        const total = (orden.Importe || 0) + (orden.Impuestos || 0) - (orden.DescuentoLineal || 0);
-
-        return {
-          id: orden.ID,
-          mov: orden.Mov,
-          movID: orden.MovID,
-          empresa: orden.Empresa,
-          estatus: orden.Estatus,
-          situacion: orden.Situacion,
-          situacionFecha: orden.SituacionFecha,
-          situacionUsuario: orden.SituacionUsuario,
-          situacionNota: orden.SituacionNota,
-          proveedor: orden.Proveedor,
-          nombreProveedor: orden.NombreProveedor,
-          rfc: orden.RFC,
-          fechaEmision: orden.FechaEmision,
-          fechaRequerida: orden.FechaRequerida,
-          fechaEntrega: orden.FechaEntrega,
-          importe: orden.Importe || 0,
-          impuestos: orden.Impuestos || 0,
-          descuentoLineal: orden.DescuentoLineal || 0,
-          total: total,
-          saldo: orden.Saldo || 0,
-          moneda: orden.Moneda || 'MXN',
-          tipoCambio: orden.TipoCambio || 1,
-          observaciones: orden.Observaciones,
-          condicion: orden.Condicion,
-          almacen: orden.Almacen,
-          referencia: orden.Referencia,
-          proyecto: orden.Proyecto,
-          concepto: orden.Concepto,
-          prioridad: orden.Prioridad,
-          usuario: orden.Usuario,
-          ultimoCambio: orden.UltimoCambio,
-          tipoMovimiento: orden.TipoMovimiento,
-          movimientoNombre: orden.MovimientoNombre,
-
-          // Detalle (partidas)
-          partidas: detalleResult.recordset.map((detalle: any) => ({
-            renglon: detalle.Renglon,
-            renglonSub: detalle.RenglonSub,
-            renglonID: detalle.RenglonID,
-            renglonTipo: detalle.RenglonTipo,
-            cantidad: detalle.Cantidad,
-            almacen: detalle.Almacen,
-            codigo: detalle.Codigo,
-            articulo: detalle.Articulo,
-            subCuenta: detalle.SubCuenta,
-            fechaRequerida: detalle.FechaRequerida,
-            fechaEntrega: detalle.FechaEntrega,
-            costo: detalle.Costo,
-            costoConImpuesto: detalle.CostoConImpuesto,
-            impuesto1: detalle.Impuesto1,
-            impuesto2: detalle.Impuesto2,
-            impuesto3: detalle.Impuesto3,
-            retencion1: detalle.Retencion1,
-            subtotal: (detalle.Cantidad || 0) * (detalle.Costo || 0),
-            totalPartida: (detalle.Cantidad || 0) * (detalle.CostoConImpuesto || 0)
-          }))
-        };
-      })
+    // 5. Obtener órdenes de compra usando el SP específico para proveedores
+    // Usamos el SP sp_GetOrdenesCompraProveedor
+    const spResult = await storedProcedures.getOrdenesCompraProveedor(
+      rfc,
+      empresaCode,
+      {
+        estatus: null, // Todos los estados
+        fechaDesde: null,
+        fechaHasta: null,
+        page: 1,
+        limit: 1000 // Traer todas las órdenes del proveedor
+      }
     );
+
+    console.log(`📦 Órdenes encontradas via SP (proveedor): ${spResult.ordenes.length}`);
+
+    // 6. Mapear las órdenes del SP al formato esperado por el frontend
+    const ordenes = spResult.ordenes.map((orden: any) => {
+      // Calcular total (Importe + Impuestos - DescuentoLineal)
+      const total = (orden.Importe || 0) + (orden.Impuestos || 0) - (orden.DescuentoLineal || 0);
+
+      return {
+        id: orden.ID,
+        mov: orden.Mov,
+        movID: orden.MovID,
+        empresa: orden.Empresa,
+        estatus: orden.Estatus,
+        situacion: orden.Situacion,
+        situacionFecha: orden.SituacionFecha,
+        situacionUsuario: orden.SituacionUsuario,
+        situacionNota: orden.SituacionNota,
+        proveedor: orden.Proveedor,
+        nombreProveedor: orden.ProveedorNombre,
+        rfc: orden.ProveedorRFC,
+        fechaEmision: orden.FechaEmision,
+        fechaRequerida: orden.FechaRequerida,
+        fechaEntrega: orden.FechaEntrega,
+        importe: orden.Importe || 0,
+        impuestos: orden.Impuestos || 0,
+        descuentoLineal: orden.DescuentoLineal || 0,
+        total: total,
+        saldo: orden.Saldo || 0,
+        moneda: orden.Moneda || 'MXN',
+        tipoCambio: orden.TipoCambio || 1,
+        observaciones: orden.Observaciones,
+        condicion: orden.Condicion,
+        almacen: orden.Almacen,
+        referencia: orden.Referencia,
+        proyecto: orden.Proyecto,
+        concepto: orden.Concepto,
+        prioridad: orden.Prioridad,
+        usuario: orden.Usuario,
+        ultimoCambio: orden.UltimoCambio,
+        partidas: [] // Las partidas se cargarán bajo demanda en el detalle
+      };
+    });
 
     // 7. Calcular estadísticas
     const estadisticas = {
