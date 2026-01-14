@@ -1,9 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { ChevronLeft, Loader2, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Loader2, AlertCircle, Package } from 'lucide-react';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -76,24 +75,15 @@ export default function OrderProfilePage({
     setLoading(true);
     setError(null);
     try {
-      console.log('🔍 Cargando orden de compra:', params.orderId);
-      const response = await fetch('/api/proveedor/ordenes');
+      console.log('🔍 Cargando detalle de orden:', params.orderId);
+
+      // Llamar al endpoint de detalle específico
+      const response = await fetch(`/api/proveedor/ordenes/${params.orderId}`);
       const result = await response.json();
 
       if (result.success) {
-        console.log('✅ Órdenes cargadas:', result.data.ordenes);
-        // Buscar la orden específica por ID
-        const ordenEncontrada = result.data.ordenes.find(
-          (o: any) => o.id.toString() === params.orderId
-        );
-
-        if (ordenEncontrada) {
-          setOrder(ordenEncontrada);
-          console.log('✅ Orden encontrada:', ordenEncontrada);
-        } else {
-          setError('Orden no encontrada');
-          console.error('❌ Orden no encontrada con ID:', params.orderId);
-        }
+        console.log('✅ Orden cargada:', result.data);
+        setOrder(result.data.orden);
       } else {
         setError(result.error || 'Error cargando la orden');
         console.error('❌ Error:', result.error);
@@ -164,7 +154,10 @@ export default function OrderProfilePage({
           <div className="md:col-span-2">
             <Card>
               <CardHeader>
-                <CardTitle>Partidas de la Orden</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Partidas de la Orden
+                </CardTitle>
                 <CardDescription>
                   {order.partidas?.length || 0} partida(s) en esta orden
                 </CardDescription>
@@ -175,9 +168,10 @@ export default function OrderProfilePage({
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Renglón</TableHead>
+                          <TableHead className="w-16">Renglón</TableHead>
                           <TableHead>Código</TableHead>
                           <TableHead>Artículo / SubCuenta</TableHead>
+                          <TableHead className="text-center">Unidad</TableHead>
                           <TableHead className="text-right">Cantidad</TableHead>
                           <TableHead className="text-right">Costo</TableHead>
                           <TableHead className="text-right">Subtotal</TableHead>
@@ -186,7 +180,7 @@ export default function OrderProfilePage({
                       <TableBody>
                         {order.partidas.map((partida: any, index: number) => (
                           <TableRow key={index}>
-                            <TableCell className="font-medium">{partida.renglon}</TableCell>
+                            <TableCell className="font-medium text-center">{partida.renglon}</TableCell>
                             <TableCell>
                               <div className="font-mono text-xs">{partida.codigo || 'N/A'}</div>
                             </TableCell>
@@ -203,10 +197,13 @@ export default function OrderProfilePage({
                                 )}
                               </div>
                             </TableCell>
+                            <TableCell className="text-center">
+                              <span className="text-xs text-muted-foreground">{partida.unidad || 'N/A'}</span>
+                            </TableCell>
                             <TableCell className="text-right">
                               {new Intl.NumberFormat('es-MX', {
                                 minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
+                                maximumFractionDigits: 4,
                               }).format(partida.cantidad || 0)}
                             </TableCell>
                             <TableCell className="text-right">
@@ -227,45 +224,61 @@ export default function OrderProfilePage({
                     </Table>
                     <Separator className="my-4" />
                     <div className="grid gap-2 text-right">
-                      <div className="font-medium">
-                        Importe: {new Intl.NumberFormat('es-MX', {
-                          style: 'currency',
-                          currency: order.moneda || 'MXN',
-                        }).format(order.importe || 0)}
+                      <div className="flex justify-end items-center gap-4">
+                        <span className="text-muted-foreground">Importe:</span>
+                        <span className="font-medium w-32">
+                          {new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: order.moneda || 'MXN',
+                          }).format(order.importe || 0)}
+                        </span>
                       </div>
-                      <div className="font-medium">
-                        Impuestos: {new Intl.NumberFormat('es-MX', {
-                          style: 'currency',
-                          currency: order.moneda || 'MXN',
-                        }).format(order.impuestos || 0)}
+                      <div className="flex justify-end items-center gap-4">
+                        <span className="text-muted-foreground">Impuestos:</span>
+                        <span className="font-medium w-32">
+                          {new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: order.moneda || 'MXN',
+                          }).format(order.impuestos || 0)}
+                        </span>
                       </div>
                       {order.descuentoLineal > 0 && (
-                        <div className="font-medium text-green-600">
-                          Descuento: -{new Intl.NumberFormat('es-MX', {
-                            style: 'currency',
-                            currency: order.moneda || 'MXN',
-                          }).format(order.descuentoLineal || 0)}
+                        <div className="flex justify-end items-center gap-4">
+                          <span className="text-muted-foreground">Descuento:</span>
+                          <span className="font-medium text-green-600 w-32">
+                            -{new Intl.NumberFormat('es-MX', {
+                              style: 'currency',
+                              currency: order.moneda || 'MXN',
+                            }).format(order.descuentoLineal || 0)}
+                          </span>
                         </div>
                       )}
-                      <div className="text-lg font-bold">
-                        Total: {new Intl.NumberFormat('es-MX', {
-                          style: 'currency',
-                          currency: order.moneda || 'MXN',
-                        }).format(order.total || 0)}
-                      </div>
-                      {order.saldo > 0 && (
-                        <div className="text-sm text-muted-foreground">
-                          Saldo pendiente: {new Intl.NumberFormat('es-MX', {
+                      <Separator className="my-2" />
+                      <div className="flex justify-end items-center gap-4">
+                        <span className="text-lg font-semibold">Total:</span>
+                        <span className="text-lg font-bold w-32">
+                          {new Intl.NumberFormat('es-MX', {
                             style: 'currency',
                             currency: order.moneda || 'MXN',
-                          }).format(order.saldo || 0)}
+                          }).format(order.total || 0)}
+                        </span>
+                      </div>
+                      {order.saldo > 0 && (
+                        <div className="flex justify-end items-center gap-4 text-sm">
+                          <span className="text-muted-foreground">Saldo pendiente:</span>
+                          <span className="text-muted-foreground w-32">
+                            {new Intl.NumberFormat('es-MX', {
+                              style: 'currency',
+                              currency: order.moneda || 'MXN',
+                            }).format(order.saldo || 0)}
+                          </span>
                         </div>
                       )}
                     </div>
                   </>
                 ) : (
                   <div className="flex flex-col items-center justify-center p-8 text-center">
-                    <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+                    <Package className="h-12 w-12 text-muted-foreground mb-4" />
                     <p className="text-sm text-muted-foreground">
                       No hay partidas registradas para esta orden
                     </p>
@@ -357,6 +370,10 @@ export default function OrderProfilePage({
                     <InfoRow label="Condición" value={order.condicion || 'N/A'} />
                     <InfoRow label="Referencia" value={order.referencia || 'N/A'} />
                     <InfoRow label="Prioridad" value={order.prioridad || 'N/A'} />
+                    <InfoRow label="Moneda" value={order.moneda || 'MXN'} />
+                    {order.tipoCambio && order.tipoCambio !== 1 && (
+                      <InfoRow label="Tipo Cambio" value={order.tipoCambio} />
+                    )}
                     {order.observaciones && (
                       <div className="text-sm mt-2">
                         <span className="text-muted-foreground">Observaciones:</span>
@@ -368,10 +385,6 @@ export default function OrderProfilePage({
               </CardContent>
             </Card>
           </div>
-        </div>
-         <div className="mt-6 flex justify-center gap-2">
-            <Button variant="outline">Rechazar Orden</Button>
-            <Button>Confirmar Orden de Compra</Button>
         </div>
       </div>
     </main>
