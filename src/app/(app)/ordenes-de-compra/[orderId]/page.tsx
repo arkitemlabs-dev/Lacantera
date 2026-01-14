@@ -1,9 +1,8 @@
 'use client';
 import { useState, useEffect, use } from 'react';
 import { useSession } from 'next-auth/react';
-import { ChevronLeft, Loader2, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Loader2, AlertCircle, Package, User, Mail, Phone } from 'lucide-react';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -65,7 +64,7 @@ export default function OrderProfilePage({
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Unwrap params using React.use()
   const { orderId } = use(params);
 
@@ -79,39 +78,21 @@ export default function OrderProfilePage({
     setLoading(true);
     setError(null);
     try {
-      // Primero intentar obtener la orden de la lista actual (si viene de la navegación)
-      const response = await fetch(`/api/admin/ordenes-sp?limit=1000`);
+      console.log('🔍 Cargando detalle de orden:', orderId);
+
+      // Llamar directamente al endpoint de detalle
+      const response = await fetch(`/api/admin/ordenes-sp/${orderId}`);
       const result = await response.json();
 
       if (result.success) {
-        // Buscar la orden en la lista
-        const ordenEncontrada = result.data.find(
-          (o: any) => o.ID.toString() === orderId
-        );
-
-        if (ordenEncontrada) {
-          // Si encontramos la orden en la lista, obtener detalles adicionales
-          const detalleResponse = await fetch(`/api/admin/ordenes-sp/${orderId}`);
-          const detalleResult = await detalleResponse.json();
-          
-          if (detalleResult.success) {
-            // Combinar datos de la lista con detalles adicionales
-            setOrder({
-              ...ordenEncontrada,
-              partidas: detalleResult.data.partidas || []
-            });
-          } else {
-            // Si no hay detalles, usar solo los datos de la lista
-            setOrder(ordenEncontrada);
-          }
-        } else {
-          setError('Orden no encontrada');
-        }
+        console.log('✅ Orden cargada:', result.data);
+        setOrder(result.data.orden);
       } else {
         setError(result.error || 'Error cargando la orden');
+        console.error('❌ Error:', result.error);
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('❌ Error:', error);
       setError('Error al cargar la orden');
     } finally {
       setLoading(false);
@@ -173,10 +154,14 @@ export default function OrderProfilePage({
         </div>
 
         <div className="grid md:grid-cols-3 gap-6">
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 space-y-6">
+            {/* Card de Partidas */}
             <Card>
               <CardHeader>
-                <CardTitle>Partidas de la Orden</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Partidas de la Orden
+                </CardTitle>
                 <CardDescription>
                   {order.partidas?.length || 0} partida(s) en esta orden
                 </CardDescription>
@@ -187,9 +172,10 @@ export default function OrderProfilePage({
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Renglón</TableHead>
+                          <TableHead className="w-16">Renglón</TableHead>
                           <TableHead>Código</TableHead>
                           <TableHead>Artículo / SubCuenta</TableHead>
+                          <TableHead className="text-center">Unidad</TableHead>
                           <TableHead className="text-right">Cantidad</TableHead>
                           <TableHead className="text-right">Costo</TableHead>
                           <TableHead className="text-right">Subtotal</TableHead>
@@ -198,7 +184,7 @@ export default function OrderProfilePage({
                       <TableBody>
                         {order.partidas.map((partida: any, index: number) => (
                           <TableRow key={index}>
-                            <TableCell className="font-medium">{partida.Renglon}</TableCell>
+                            <TableCell className="font-medium text-center">{partida.Renglon}</TableCell>
                             <TableCell>
                               <div className="font-mono text-xs">{partida.Codigo || 'N/A'}</div>
                             </TableCell>
@@ -215,10 +201,13 @@ export default function OrderProfilePage({
                                 )}
                               </div>
                             </TableCell>
+                            <TableCell className="text-center">
+                              <span className="text-xs text-muted-foreground">{partida.Unidad || 'N/A'}</span>
+                            </TableCell>
                             <TableCell className="text-right">
                               {new Intl.NumberFormat('es-MX', {
                                 minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
+                                maximumFractionDigits: 4,
                               }).format(partida.Cantidad || 0)}
                             </TableCell>
                             <TableCell className="text-right">
@@ -231,7 +220,7 @@ export default function OrderProfilePage({
                               {new Intl.NumberFormat('es-MX', {
                                 style: 'currency',
                                 currency: order.Moneda || 'MXN',
-                              }).format((partida.Cantidad || 0) * (partida.Costo || 0))}
+                              }).format(partida.Subtotal || (partida.Cantidad || 0) * (partida.Costo || 0))}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -239,45 +228,61 @@ export default function OrderProfilePage({
                     </Table>
                     <Separator className="my-4" />
                     <div className="grid gap-2 text-right">
-                      <div className="font-medium">
-                        Importe: {new Intl.NumberFormat('es-MX', {
-                          style: 'currency',
-                          currency: order.Moneda || 'MXN',
-                        }).format(order.Importe || 0)}
+                      <div className="flex justify-end items-center gap-4">
+                        <span className="text-muted-foreground">Importe:</span>
+                        <span className="font-medium w-32">
+                          {new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: order.Moneda || 'MXN',
+                          }).format(order.Importe || 0)}
+                        </span>
                       </div>
-                      <div className="font-medium">
-                        Impuestos: {new Intl.NumberFormat('es-MX', {
-                          style: 'currency',
-                          currency: order.Moneda || 'MXN',
-                        }).format(order.Impuestos || 0)}
+                      <div className="flex justify-end items-center gap-4">
+                        <span className="text-muted-foreground">Impuestos:</span>
+                        <span className="font-medium w-32">
+                          {new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: order.Moneda || 'MXN',
+                          }).format(order.Impuestos || 0)}
+                        </span>
                       </div>
                       {order.DescuentoLineal > 0 && (
-                        <div className="font-medium text-green-600">
-                          Descuento: -{new Intl.NumberFormat('es-MX', {
-                            style: 'currency',
-                            currency: order.Moneda || 'MXN',
-                          }).format(order.DescuentoLineal || 0)}
+                        <div className="flex justify-end items-center gap-4">
+                          <span className="text-muted-foreground">Descuento:</span>
+                          <span className="font-medium text-green-600 w-32">
+                            -{new Intl.NumberFormat('es-MX', {
+                              style: 'currency',
+                              currency: order.Moneda || 'MXN',
+                            }).format(order.DescuentoLineal || 0)}
+                          </span>
                         </div>
                       )}
-                      <div className="text-lg font-bold">
-                        Total: {new Intl.NumberFormat('es-MX', {
-                          style: 'currency',
-                          currency: order.Moneda || 'MXN',
-                        }).format((order.Importe || 0) + (order.Impuestos || 0) - (order.DescuentoLineal || 0))}
-                      </div>
-                      {order.Saldo > 0 && (
-                        <div className="text-sm text-muted-foreground">
-                          Saldo pendiente: {new Intl.NumberFormat('es-MX', {
+                      <Separator className="my-2" />
+                      <div className="flex justify-end items-center gap-4">
+                        <span className="text-lg font-semibold">Total:</span>
+                        <span className="text-lg font-bold w-32">
+                          {new Intl.NumberFormat('es-MX', {
                             style: 'currency',
                             currency: order.Moneda || 'MXN',
-                          }).format(order.Saldo || 0)}
+                          }).format(order.Total || (order.Importe || 0) + (order.Impuestos || 0) - (order.DescuentoLineal || 0))}
+                        </span>
+                      </div>
+                      {order.Saldo > 0 && (
+                        <div className="flex justify-end items-center gap-4 text-sm">
+                          <span className="text-muted-foreground">Saldo pendiente:</span>
+                          <span className="text-muted-foreground w-32">
+                            {new Intl.NumberFormat('es-MX', {
+                              style: 'currency',
+                              currency: order.Moneda || 'MXN',
+                            }).format(order.Saldo || 0)}
+                          </span>
                         </div>
                       )}
                     </div>
                   </>
                 ) : (
                   <div className="flex flex-col items-center justify-center p-8 text-center">
-                    <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+                    <Package className="h-12 w-12 text-muted-foreground mb-4" />
                     <p className="text-sm text-muted-foreground">
                       No hay partidas registradas para esta orden
                     </p>
@@ -285,28 +290,60 @@ export default function OrderProfilePage({
                 )}
               </CardContent>
             </Card>
+
+            {/* Card de Proveedor */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Información del Proveedor
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <InfoRow label="Código" value={order.Proveedor} />
+                    <InfoRow label="Nombre" value={order.ProveedorNombre} />
+                    <InfoRow label="RFC" value={order.ProveedorRFC} />
+                  </div>
+                  <div className="space-y-2">
+                    {order.ProveedorEmail && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <span>{order.ProveedorEmail}</span>
+                      </div>
+                    )}
+                    {order.ProveedorTelefono && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <span>{order.ProveedorTelefono}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
+
           <div>
             <Card>
               <CardHeader>
                 <CardTitle>Información General</CardTitle>
-                 <CardDescription>
-                    Detalles de la orden de compra
-                  </CardDescription>
+                <CardDescription>
+                  Detalles de la orden de compra
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                 <div>
+                <div>
                   <h3 className="text-md font-semibold mb-2">Orden</h3>
                   <div className="space-y-1">
                     <InfoRow label="Folio" value={order.MovID || order.ID} />
                     <InfoRow label="Empresa" value={order.Empresa} />
-                    <InfoRow label="Proveedor" value={order.ProveedorNombre} />
-                    <InfoRow label="RFC" value={order.ProveedorRFC} />
                     <InfoRow label="Usuario" value={order.Usuario} />
                   </div>
                 </div>
                 <Separator />
-                 <div>
+                <div>
                   <h3 className="text-md font-semibold mb-2">Estado</h3>
                   <div className="space-y-1">
                     <InfoRow label="Estatus" value={order.Estatus} />
@@ -370,6 +407,10 @@ export default function OrderProfilePage({
                     <InfoRow label="Condición" value={order.Condicion || 'N/A'} />
                     <InfoRow label="Referencia" value={order.Referencia || 'N/A'} />
                     <InfoRow label="Prioridad" value={order.Prioridad || 'N/A'} />
+                    <InfoRow label="Moneda" value={order.Moneda || 'MXN'} />
+                    {order.TipoCambio && order.TipoCambio !== 1 && (
+                      <InfoRow label="Tipo Cambio" value={order.TipoCambio} />
+                    )}
                     {order.Observaciones && (
                       <div className="text-sm mt-2">
                         <span className="text-muted-foreground">Observaciones:</span>
