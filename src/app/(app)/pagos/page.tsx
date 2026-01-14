@@ -30,8 +30,6 @@ import {
   ThumbsUp,
   ThumbsDown,
   Check,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -464,22 +462,29 @@ export default function PagosPage() {
               />
             </CardContent>
             {filteredPayments.length > 0 && (
-              <CardFooter className="flex items-center justify-between border-t pt-4">
+              <CardFooter className="flex items-center justify-between border-t px-6 py-4">
                 <div className="text-sm text-muted-foreground">
-                  Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, filteredPayments.length)} de {filteredPayments.length} pagos
+                  Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredPayments.length)} de {filteredPayments.length} registros
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage(prev => prev - 1)}
-                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
                   >
-                    <ChevronLeft className="h-4 w-4" />
+                    Primera
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                    disabled={currentPage === 1}
+                  >
                     Anterior
                   </Button>
-                  <span className="text-sm text-muted-foreground">
-                    Página {currentPage} de {totalPages}
+                  <span className="text-sm text-muted-foreground px-2">
+                    Página {currentPage} de {totalPages || 1}
                   </span>
                   <Button
                     variant="outline"
@@ -488,7 +493,14 @@ export default function PagosPage() {
                     disabled={currentPage >= totalPages}
                   >
                     Siguiente
-                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage >= totalPages}
+                  >
+                    Última
                   </Button>
                 </div>
               </CardFooter>

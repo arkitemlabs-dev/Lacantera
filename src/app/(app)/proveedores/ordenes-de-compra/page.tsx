@@ -44,6 +44,27 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
+// Mapeo de monedas del ERP a códigos ISO
+const currencyMap: Record<string, string> = {
+  'Pesos': 'MXN',
+  'pesos': 'MXN',
+  'PESOS': 'MXN',
+  'MXN': 'MXN',
+  'Dolares': 'USD',
+  'dolares': 'USD',
+  'DOLARES': 'USD',
+  'USD': 'USD',
+  'Euros': 'EUR',
+  'euros': 'EUR',
+  'EUROS': 'EUR',
+  'EUR': 'EUR',
+};
+
+const getCurrencyCode = (moneda: string | null | undefined): string => {
+  if (!moneda) return 'MXN';
+  return currencyMap[moneda] || 'MXN';
+};
+
 const statusStyles: Record<string, { variant: 'default' | 'destructive' | 'secondary' | 'outline'; className: string }> = {
   'PENDIENTE': {
     variant: 'secondary',
@@ -70,6 +91,8 @@ export default function OrdenesDeCompraPage() {
     const [ordenes, setOrdenes] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [estadisticas, setEstadisticas] = useState<any>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
 
     useEffect(() => {
       cargarOrdenes();
@@ -111,7 +134,18 @@ export default function OrdenesDeCompraPage() {
         return dateFilter && statusFilter && orderNumberFilter;
       });
     }, [ordenes, dateRange, status, orderNumber]);
-  
+
+    // Paginación
+    const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
+
+    // Reset página cuando cambian los filtros
+    useEffect(() => {
+      setCurrentPage(1);
+    }, [dateRange, status, orderNumber]);
+
     const clearFilters = () => {
       setDateRange(undefined);
       setStatus('todas');
@@ -237,7 +271,7 @@ export default function OrdenesDeCompraPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredOrders.map((order) => {
+              {paginatedOrders.map((order) => {
                 const statusStyle = statusStyles[order.estatus] || statusStyles['PENDIENTE'];
                 return (
                   <TableRow key={order.id}>
@@ -275,7 +309,7 @@ export default function OrdenesDeCompraPage() {
                     <TableCell className="text-right">
                       {new Intl.NumberFormat('es-MX', {
                         style: 'currency',
-                        currency: order.moneda || 'MXN',
+                        currency: getCurrencyCode(order.moneda),
                       }).format(order.total || 0)}
                     </TableCell>
                     <TableCell>
@@ -305,6 +339,51 @@ export default function OrdenesDeCompraPage() {
           </Table>
         )}
       </CardContent>
+      {/* Paginación */}
+      {filteredOrders.length > 0 && (
+        <CardFooter className="flex items-center justify-between border-t px-6 py-4">
+          <div className="text-sm text-muted-foreground">
+            Mostrando {startIndex + 1}-{Math.min(endIndex, filteredOrders.length)} de {filteredOrders.length} registros
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+            >
+              Primera
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Anterior
+            </Button>
+            <span className="text-sm text-muted-foreground px-2">
+              Página {currentPage} de {totalPages || 1}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={currentPage >= totalPages}
+            >
+              Siguiente
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage >= totalPages}
+            >
+              Última
+            </Button>
+          </div>
+        </CardFooter>
+      )}
     </Card>
     </main>
   );

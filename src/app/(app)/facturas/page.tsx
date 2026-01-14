@@ -307,20 +307,27 @@ export default function FacturasPage() {
           {filteredInvoices.length > 0 && (
             <div className="flex items-center justify-between p-4 border-t">
               <div className="text-sm text-muted-foreground">
-                Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, filteredInvoices.length)} de {filteredInvoices.length} facturas
+                Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredInvoices.length)} de {filteredInvoices.length} registros
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage <= 1}
+                >
+                  Primera
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(prev => prev - 1)}
                   disabled={currentPage <= 1}
                 >
-                  <ChevronLeft className="h-4 w-4" />
                   Anterior
                 </Button>
-                <span className="text-sm text-muted-foreground">
-                  Página {currentPage} de {totalPages}
+                <span className="text-sm text-muted-foreground px-2">
+                  Página {currentPage} de {totalPages || 1}
                 </span>
                 <Button
                   variant="outline"
@@ -329,7 +336,14 @@ export default function FacturasPage() {
                   disabled={currentPage >= totalPages}
                 >
                   Siguiente
-                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage >= totalPages}
+                >
+                  Última
                 </Button>
               </div>
             </div>

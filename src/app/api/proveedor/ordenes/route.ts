@@ -28,8 +28,10 @@ export async function GET(request: NextRequest) {
 
     const userId = session.user.id;
     const empresaActual = session.user.empresaActual;
+    // El código de proveedor viene directamente de la sesión (de pNetUsuario o WebUsuario)
+    const proveedorFromSession = (session.user as any).proveedor;
 
-    console.log(`📍 Usuario: ${userId}, Empresa: ${empresaActual}`);
+    console.log(`📍 Usuario: ${userId}, Empresa: ${empresaActual}, Proveedor (sesión): ${proveedorFromSession}`);
 
     if (!empresaActual) {
       return NextResponse.json({
@@ -38,54 +40,45 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // 2. Obtener el mapping para saber qué código de proveedor usar en el ERP
+    // 2. Obtener Clave del proveedor desde portal_proveedor_mapping
+    // Esta tabla relaciona el usuario del portal con el código del proveedor en el ERP
     const portalPool = await getPortalConnection();
 
     const mappingResult = await portalPool.request()
       .input('userId', sql.NVarChar(50), userId)
       .input('empresaCode', sql.VarChar(50), empresaActual)
       .query(`
-        SELECT
-          erp_proveedor_code,
-          empresa_code
+        SELECT erp_proveedor_code
         FROM portal_proveedor_mapping
         WHERE portal_user_id = @userId
           AND empresa_code = @empresaCode
           AND activo = 1
       `);
 
-    if (mappingResult.recordset.length === 0) {
+    let clave: string | null = null;
+
+    if (mappingResult.recordset.length > 0) {
+      clave = mappingResult.recordset[0].erp_proveedor_code || null;
+      console.log(`📍 Desde mapping - Clave: ${clave}`);
+    }
+
+    // Fallback: si no hay clave en mapping, usar el de la sesión
+    if (!clave && proveedorFromSession) {
+      clave = proveedorFromSession;
+      console.log(`📍 Usando clave de sesión: ${clave}`);
+    }
+
+    console.log(`📍 Clave final: ${clave}`);
+
+    // Validar que tengamos la clave
+    if (!clave) {
       return NextResponse.json({
         success: false,
-        error: 'No se encontró mapping para esta empresa'
+        error: 'No se encontró código de proveedor para este usuario'
       }, { status: 404 });
     }
 
-    const mapping = mappingResult.recordset[0];
-    const erp_proveedor_code = mapping.erp_proveedor_code;
-
-    console.log(`📍 Código proveedor en ERP: ${erp_proveedor_code}`);
-
-    // 3. Obtener RFC del proveedor del portal para buscar en ERP
-    const userResult = await portalPool.request()
-      .input('userId', sql.NVarChar(50), userId)
-      .query(`
-        SELECT RFC
-        FROM portal_usuarios
-        WHERE IDUsuario = @userId
-      `);
-
-    if (userResult.recordset.length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: 'Usuario no encontrado'
-      }, { status: 404 });
-    }
-
-    const rfc = userResult.recordset[0].RFC;
-    console.log(`📍 RFC del proveedor: ${rfc}`);
-
-    // 4. Determinar el código de empresa según el mapping
+    // 3. Determinar el código de empresa según el mapping
     // El ERP usa códigos numéricos: '01', '02', etc.
     const empresaCodes: { [key: string]: string } = {
       'la-cantera': '01',
@@ -99,21 +92,23 @@ export async function GET(request: NextRequest) {
 
     console.log(`📍 Código empresa ERP: ${empresaCode}`);
 
-    // 5. Obtener órdenes de compra usando el SP específico para proveedores
-    // Usamos el SP sp_GetOrdenesCompraProveedor
+    // 4. Obtener órdenes de compra usando el SP
+    console.log(`📍 Llamando sp_GetOrdenesCompraProveedor - Clave: ${clave}, Empresa: ${empresaCode}`);
+
     const spResult = await storedProcedures.getOrdenesCompraProveedor(
-      rfc,
+      clave,       // @Clave
       empresaCode,
       {
-        estatus: null, // Todos los estados
+        rfc: null,  // @RFC (no lo tenemos desde el mapping)
+        estatus: null,
         fechaDesde: null,
         fechaHasta: null,
         page: 1,
-        limit: 1000 // Traer todas las órdenes del proveedor
+        limit: 1000
       }
     );
 
-    console.log(`📦 Órdenes encontradas via SP (proveedor): ${spResult.ordenes.length}`);
+    console.log(`📦 Órdenes encontradas via SP: ${spResult.ordenes.length}`);
 
     // 6. Mapear las órdenes del SP al formato esperado por el frontend
     const ordenes = spResult.ordenes.map((orden: any) => {
@@ -180,8 +175,7 @@ export async function GET(request: NextRequest) {
       success: true,
       data: {
         empresaActual: empresaActual,
-        codigoProveedorERP: erp_proveedor_code,
-        rfc: rfc,
+        codigoProveedorERP: clave,
         ordenes: ordenes,
         estadisticas: estadisticas
       }

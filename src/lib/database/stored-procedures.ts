@@ -321,13 +321,23 @@ export class StoredProcedures {
   /**
    * SP 4: sp_GetOrdenesCompraProveedor
    * Órdenes de un proveedor específico (Vista Proveedor)
+   *
+   * Flujo de búsqueda:
+   * - Si hay @Clave, busca por clave del proveedor
+   * - Si no hay @Clave pero hay @RFC, busca por RFC
+   * - Si no hay ninguno, no retorna resultados
+   *
+   * @param clave - Código/clave del proveedor (puede ser null si se pasa RFC)
+   * @param empresa - Código de empresa ERP
+   * @param params - Parámetros opcionales (rfc, estatus, fechas, paginación)
    */
   async getOrdenesCompraProveedor(
-    rfc: string,
+    clave: string | null,
     empresa: string,
-    params: Omit<GetOrdenesCompraParams, 'rfc' | 'empresa' | 'proveedor'> = {}
+    params: Omit<GetOrdenesCompraParams, 'empresa' | 'proveedor'> = {}
   ): Promise<GetOrdenesCompraResult> {
     const {
+      rfc = null,
       estatus = null,
       fechaDesde = null,
       fechaHasta = null,
@@ -337,48 +347,51 @@ export class StoredProcedures {
 
     const pool = await this.getPool(empresa);
 
-    // Convertir fechas - el SP espera formato DD-MM-YYYY (igual que el SP de admin)
-    const convertirFecha = (fecha: string | null): string | null => {
-      if (!fecha) return null;
-      const partes = fecha.split('-'); // ['2025', '10', '01']
-      if (partes.length === 3) {
-        return `${partes[2]}-${partes[1]}-${partes[0]}`; // '01-10-2025'
-      }
-      return fecha;
-    };
-    const fechaDesdeStr = convertirFecha(fechaDesde as string);
-    const fechaHastaStr = convertirFecha(fechaHasta as string);
-
     // Log para debug
     console.log('[SP getOrdenesCompraProveedor] Parámetros:', {
+      clave,
       rfc,
       empresa,
       estatus,
-      fechaDesdeOriginal: fechaDesde,
-      fechaHastaOriginal: fechaHasta,
-      fechaDesdeStr,
-      fechaHastaStr,
+      fechaDesde,
+      fechaHasta,
       page,
       limit
     });
 
-    const result = await pool.request()
-      .input('RFC', sql.VarChar(13), rfc)
-      .input('Empresa', sql.VarChar(10), empresa)
-      .input('Estatus', sql.VarChar(20), estatus)
-      .input('FechaDesde', sql.VarChar(10), fechaDesdeStr)
-      .input('FechaHasta', sql.VarChar(10), fechaHastaStr)
-      .input('Page', sql.Int, page)
-      .input('Limit', sql.Int, limit)
-      .execute('sp_GetOrdenesCompraProveedor');
+    let result;
+    try {
+      result = await pool.request()
+        .input('Clave', sql.VarChar(10), clave)
+        .input('Rfc', sql.VarChar(20), rfc)
+        .input('Empresa', sql.VarChar(5), empresa)
+        .input('Estatus', sql.VarChar(15), estatus)
+        .input('FechaDesde', sql.Date, this.toDate(fechaDesde))
+        .input('FechaHasta', sql.Date, this.toDate(fechaHasta))
+        .input('Page', sql.Int, page)
+        .input('Limit', sql.Int, limit)
+        .input('CuantasPaginas', sql.Int, null)
+        .execute('sp_GetOrdenesCompraProveedor');
+    } catch (spError: any) {
+      console.error('[SP getOrdenesCompraProveedor] Error ejecutando SP:', {
+        message: spError.message,
+        code: spError.code,
+        number: spError.number,
+        state: spError.state,
+        class: spError.class,
+        precedingErrors: spError.precedingErrors,
+        originalError: spError.originalError?.message || spError.originalError
+      });
+      throw spError;
+    }
 
     const ordenes = getRecordset<OrdenCompra>(result, 0);
-    const totalRecord = getFirstRecord<{ Total: number }>(result, 1);
+    const totalRecord = getFirstRecord<{ Total: number; Registros: number }>(result, 1);
 
     // Log resultado
     console.log('[SP getOrdenesCompraProveedor] Resultado:', {
       ordenesCount: ordenes.length,
-      total: totalRecord?.Total || 0,
+      total: totalRecord?.Total || totalRecord?.Registros || 0,
       primeraOrden: ordenes[0] ? {
         ID: ordenes[0].ID,
         MovID: ordenes[0].MovID,
@@ -389,7 +402,7 @@ export class StoredProcedures {
 
     return {
       ordenes,
-      total: totalRecord?.Total || 0
+      total: totalRecord?.Total || totalRecord?.Registros || 0
     };
   }
 

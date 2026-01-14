@@ -557,12 +557,11 @@ export default function OrdenesDeCompraPage() {
             <div className="text-sm text-muted-foreground">
               {totalRegistros > 0 ? (
                 <>
-                  Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, totalRegistros)} de <strong>{totalRegistros.toLocaleString()}</strong> órdenes
+                  Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, totalRegistros)} de {totalRegistros.toLocaleString()} registros
                 </>
               ) : (
                 <>
-                  Página {currentPage} - {displayedOrders.length} órdenes
-                  {hayMasPaginas && <span className="ml-1">(hay más páginas)</span>}
+                  Página {currentPage} - {displayedOrders.length} registros
                 </>
               )}
             </div>
@@ -570,14 +569,21 @@ export default function OrdenesDeCompraPage() {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage <= 1}
+              >
+                Primera
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setCurrentPage(prev => prev - 1)}
                 disabled={currentPage <= 1}
               >
-                <ChevronLeft className="h-4 w-4" />
                 Anterior
               </Button>
-              <span className="text-sm text-muted-foreground">
-                Página {currentPage} {totalRegistros > 0 ? `de ${totalPaginasCalculado.toLocaleString()}` : ''}
+              <span className="text-sm text-muted-foreground px-2">
+                Página {currentPage} de {totalPaginasCalculado || 1}
               </span>
               <Button
                 variant="outline"
@@ -586,7 +592,14 @@ export default function OrdenesDeCompraPage() {
                 disabled={totalRegistros > 0 ? currentPage >= totalPaginasCalculado : !hayMasPaginas}
               >
                 Siguiente
-                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(totalPaginasCalculado)}
+                disabled={totalRegistros > 0 ? currentPage >= totalPaginasCalculado : !hayMasPaginas}
+              >
+                Última
               </Button>
             </div>
           </div>

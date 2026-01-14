@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Card,
@@ -116,19 +116,32 @@ export default function PagosProveedorPage() {
     const [dateRange, setDateRange] = useState<DateRange | undefined>();
     const [status, setStatus] = useState('todas');
     const [searchTerm, setSearchTerm] = useState('');
-  
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+
     const filteredPayments = useMemo(() => {
       return payments.filter((payment) => {
         const paymentDate = new Date(payment.date);
-        
+
         const dateFilter = !dateRange?.from || (paymentDate >= dateRange.from && (!dateRange.to || paymentDate <= dateRange.to));
         const statusFilter = status === 'todas' || payment.status.toLowerCase() === status;
         const searchTermFilter = payment.invoice.toLowerCase().includes(searchTerm.toLowerCase());
-  
+
         return dateFilter && statusFilter && searchTermFilter;
       });
     }, [dateRange, status, searchTerm]);
-  
+
+    // Paginación
+    const totalPages = Math.ceil(filteredPayments.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedPayments = filteredPayments.slice(startIndex, endIndex);
+
+    // Reset página cuando cambian los filtros
+    useEffect(() => {
+      setCurrentPage(1);
+    }, [dateRange, status, searchTerm]);
+
     const clearFilters = () => {
       setDateRange(undefined);
       setStatus('todas');
@@ -238,7 +251,7 @@ export default function PagosProveedorPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredPayments.map((payment) => (
+              {paginatedPayments.map((payment) => (
                 <TableRow key={payment.id}>
                   <TableCell className="font-medium">{payment.id}</TableCell>
                   <TableCell>
@@ -294,6 +307,51 @@ export default function PagosProveedorPage() {
             </TableBody>
           </Table>
         </CardContent>
+        {/* Paginación */}
+        {filteredPayments.length > 0 && (
+          <CardFooter className="flex items-center justify-between border-t px-6 py-4">
+            <div className="text-sm text-muted-foreground">
+              Mostrando {startIndex + 1}-{Math.min(endIndex, filteredPayments.length)} de {filteredPayments.length} registros
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+              >
+                Primera
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                Anterior
+              </Button>
+              <span className="text-sm text-muted-foreground px-2">
+                Página {currentPage} de {totalPages || 1}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+              >
+                Siguiente
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage >= totalPages}
+              >
+                Última
+              </Button>
+            </div>
+          </CardFooter>
+        )}
       </Card>
     </main>
   );

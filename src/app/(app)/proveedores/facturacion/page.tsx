@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -99,19 +99,32 @@ export default function FacturacionProveedorPage() {
     const [dateRange, setDateRange] = useState<DateRange | undefined>();
     const [status, setStatus] = useState('todas');
     const [searchTerm, setSearchTerm] = useState('');
-  
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+
     const filteredInvoices = useMemo(() => {
       return invoices.filter((invoice) => {
         const invoiceDate = new Date(invoice.fechaEmision);
-        
+
         const dateFilter = !dateRange?.from || (invoiceDate >= dateRange.from && (!dateRange.to || invoiceDate <= dateRange.to));
         const statusFilter = status === 'todas' || invoice.estado.toLowerCase().replace(' ', '-') === status;
         const searchTermFilter = invoice.folio.toLowerCase().includes(searchTerm.toLowerCase()) || invoice.ordenAsociada.toLowerCase().includes(searchTerm.toLowerCase());
-  
+
         return dateFilter && statusFilter && searchTermFilter;
       });
     }, [dateRange, status, searchTerm]);
-  
+
+    // Paginación
+    const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedInvoices = filteredInvoices.slice(startIndex, endIndex);
+
+    // Reset página cuando cambian los filtros
+    useEffect(() => {
+      setCurrentPage(1);
+    }, [dateRange, status, searchTerm]);
+
     const clearFilters = () => {
       setDateRange(undefined);
       setStatus('todas');
@@ -233,7 +246,7 @@ export default function FacturacionProveedorPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredInvoices.map((invoice) => (
+              {paginatedInvoices.map((invoice) => (
                 <TableRow key={invoice.folio}>
                   <TableCell className="font-medium">{invoice.folio}</TableCell>
                   <TableCell>{invoice.cfdi}</TableCell>
@@ -287,6 +300,51 @@ export default function FacturacionProveedorPage() {
             </TableBody>
           </Table>
         </CardContent>
+        {/* Paginación */}
+        {filteredInvoices.length > 0 && (
+          <CardFooter className="flex items-center justify-between border-t px-6 py-4">
+            <div className="text-sm text-muted-foreground">
+              Mostrando {startIndex + 1}-{Math.min(endIndex, filteredInvoices.length)} de {filteredInvoices.length} registros
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+              >
+                Primera
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                Anterior
+              </Button>
+              <span className="text-sm text-muted-foreground px-2">
+                Página {currentPage} de {totalPages || 1}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+              >
+                Siguiente
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage >= totalPages}
+              >
+                Última
+              </Button>
+            </div>
+          </CardFooter>
+        )}
       </Card>
     </main>
   );
