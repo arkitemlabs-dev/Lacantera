@@ -1,21 +1,46 @@
+// src/app/api/proveedor/facturas/route.ts
+// Endpoint para obtener facturas del proveedor desde el ERP usando Stored Procedures
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
-import { getPortalConnection, getERPConnection } from '@/lib/database/multi-tenant-connection';
+import { getPortalConnection } from '@/lib/database/multi-tenant-connection';
+import { storedProcedures } from '@/lib/database/stored-procedures';
 import sql from 'mssql';
+
+// Mapeo de códigos de empresa del portal a códigos del ERP
+const empresaCodes: Record<string, string> = {
+  'la-cantera': '01',
+  'peralillo': '02',
+  'plaza-galerena': '03',
+  'inmobiliaria-galerena': '04',
+  'icrear': '05'
+};
+
+// Mapeo de estatus del portal a estatus del SP
+// El frontend usa: 'en-revision', 'aprobada', 'pagada', 'rechazada', 'todas'
+// El SP espera: 'EN_REVISION', 'APROBADA', 'PAGADA', 'RECHAZADA', null (para todas)
+const estatusMap: Record<string, string | null> = {
+  'en-revision': 'EN_REVISION',
+  'aprobada': 'APROBADA',
+  'pagada': 'PAGADA',
+  'rechazada': 'RECHAZADA',
+  'todas': null
+};
 
 /**
  * GET /api/proveedor/facturas
  *
- * Obtiene las facturas del proveedor desde las tablas Cxc de los ERPs
- * Consolidado de todas las empresas a las que tiene acceso el proveedor
+ * Obtiene las facturas del proveedor usando el SP sp_GetFacturasProveedor
  *
  * Query Parameters:
- * - empresa (opcional): Filtrar por empresa específica
+ * - empresa (opcional): Filtrar por empresa específica (código del portal)
  * - fecha_desde (opcional): YYYY-MM-DD
  * - fecha_hasta (opcional): YYYY-MM-DD
- * - estatus (opcional): CONCLUIDO, CANCELADO, PENDIENTE, etc.
- * - limite (opcional, default: 50)
+ * - estatus (opcional): en-revision, aprobada, pagada, rechazada, todas
+ * - busqueda (opcional): Búsqueda por folio o número de orden
+ * - page (opcional, default: 1)
+ * - limit (opcional, default: 50)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -31,171 +56,244 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = session.user.id;
-    console.log('📍 Usuario autenticado:', userId);
+    const empresaActual = session.user.empresaActual;
+
+    console.log(`📍 Usuario: ${userId}, Empresa actual: ${empresaActual}`);
+
+    if (!empresaActual) {
+      return NextResponse.json({
+        success: false,
+        error: 'No hay empresa seleccionada'
+      }, { status: 400 });
+    }
 
     // 2. Obtener parámetros de query
     const { searchParams } = new URL(request.url);
-    const empresaFiltro = searchParams.get('empresa');
+    const empresaFiltro = searchParams.get('empresa') || empresaActual;
     const fechaDesde = searchParams.get('fecha_desde');
     const fechaHasta = searchParams.get('fecha_hasta');
-    const estatusFiltro = searchParams.get('estatus');
-    const limite = parseInt(searchParams.get('limite') || '50');
+    const estatusFiltro = searchParams.get('estatus') || 'todas';
+    const busqueda = searchParams.get('busqueda');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '50');
 
-    console.log('📍 Parámetros:', { empresaFiltro, fechaDesde, fechaHasta, estatusFiltro, limite });
+    console.log('📍 Parámetros:', { empresaFiltro, fechaDesde, fechaHasta, estatusFiltro, busqueda, page, limit });
 
-    // 3. Obtener mappings del portal
+    // 3. Obtener RFC del proveedor desde el mapping del portal
     const portalPool = await getPortalConnection();
-    const mappingsResult = await portalPool.request()
+    const mappingResult = await portalPool.request()
       .input('userId', sql.NVarChar(50), userId)
+      .input('empresaCode', sql.VarChar(50), empresaFiltro)
       .query(`
         SELECT
           erp_proveedor_code,
-          empresa_code,
-          permisos
+          rfc_proveedor
         FROM portal_proveedor_mapping
         WHERE portal_user_id = @userId
+          AND empresa_code = @empresaCode
           AND activo = 1
       `);
 
-    if (!mappingsResult.recordset || mappingsResult.recordset.length === 0) {
+    if (!mappingResult.recordset || mappingResult.recordset.length === 0) {
       return NextResponse.json({
         success: false,
-        error: 'No se encontraron empresas asociadas a este proveedor'
+        error: 'No se encontró mapeo de proveedor para esta empresa'
       }, { status: 404 });
     }
 
-    console.log(`✅ Mappings encontrados: ${mappingsResult.recordset.length}`);
+    const { erp_proveedor_code, rfc_proveedor } = mappingResult.recordset[0];
 
-    // 4. Filtrar por empresa si se especificó
-    let mappings = mappingsResult.recordset;
-    if (empresaFiltro) {
-      mappings = mappings.filter(m => m.empresa_code === empresaFiltro);
-      if (mappings.length === 0) {
-        return NextResponse.json({
-          success: false,
-          error: `No tiene acceso a la empresa ${empresaFiltro}`
-        }, { status: 403 });
-      }
+    // Si no tenemos RFC, intentar obtenerlo del ERP usando el código de proveedor
+    let rfcProveedor = rfc_proveedor;
+    if (!rfcProveedor && erp_proveedor_code) {
+      console.log(`📍 RFC no encontrado en mapping, buscando en ERP para proveedor: ${erp_proveedor_code}`);
+      // Podríamos buscar el RFC en el ERP, pero por ahora usamos el código de proveedor
+      // El SP puede buscar por código de proveedor si no se proporciona RFC
     }
 
-    // 5. Consultar facturas de cada empresa
-    const todasLasFacturas: any[] = [];
-    const resumenPorEmpresa: any = {};
+    console.log(`📍 Proveedor ERP: ${erp_proveedor_code}, RFC: ${rfcProveedor}`);
 
-    for (const mapping of mappings) {
-      const { erp_proveedor_code, empresa_code } = mapping;
+    // 4. Convertir código de empresa del portal al código del ERP
+    const empresaCode = empresaCodes[empresaFiltro] || '01';
 
-      try {
-        console.log(`🔍 Consultando facturas en ${empresa_code} para proveedor ${erp_proveedor_code}`);
+    // 5. Mapear estatus del frontend al formato del SP
+    const estatusSP = estatusMap[estatusFiltro] || null;
 
-        const pool = await getERPConnection(empresa_code);
+    console.log(`📍 Llamando sp_GetFacturasProveedor - RFC: ${rfcProveedor}, Empresa: ${empresaCode}, Estatus: ${estatusSP}`);
 
-        // Construir filtros dinámicos
-        let filtroFecha = '';
-        if (fechaDesde && fechaHasta) {
-          filtroFecha = `AND FechaEmision BETWEEN '${fechaDesde}' AND '${fechaHasta}'`;
-        } else if (fechaDesde) {
-          filtroFecha = `AND FechaEmision >= '${fechaDesde}'`;
-        } else if (fechaHasta) {
-          filtroFecha = `AND FechaEmision <= '${fechaHasta}'`;
+    // 6. Llamar al SP para obtener facturas
+    // Nota: Si el SP no está implementado aún, usar query directa como fallback
+    let facturas: any[] = [];
+    let total = 0;
+
+    try {
+      const spResult = await storedProcedures.getFacturasProveedor(
+        rfcProveedor || erp_proveedor_code, // Usar RFC o código de proveedor
+        empresaCode,
+        {
+          estatus: estatusSP || undefined,
+          fechaDesde: fechaDesde || undefined,
+          fechaHasta: fechaHasta || undefined,
+          busqueda: busqueda || undefined,
+          page,
+          limit
         }
+      );
 
-        let filtroEstatus = '';
-        if (estatusFiltro) {
-          filtroEstatus = `AND Estatus = '${estatusFiltro}'`;
+      facturas = spResult.facturas;
+      total = spResult.total;
+      console.log(`📦 Facturas obtenidas via SP: ${facturas.length} de ${total} total`);
+
+    } catch (spError: any) {
+      console.warn(`⚠️ SP no disponible, usando query directa:`, spError.message);
+
+      // Fallback: usar query directa (código existente)
+      const { getERPConnection } = await import('@/lib/database/multi-tenant-connection');
+      const pool = await getERPConnection(empresaFiltro);
+
+      // Construir filtros dinámicos (con parámetros para evitar SQL injection)
+      let whereClause = `WHERE c.Cliente = @CodigoProveedor`;
+
+      if (fechaDesde) {
+        whereClause += ` AND c.FechaEmision >= @FechaDesde`;
+      }
+      if (fechaHasta) {
+        whereClause += ` AND c.FechaEmision <= @FechaHasta`;
+      }
+      if (estatusSP) {
+        // Mapeo inverso de estatus del portal al ERP
+        if (estatusSP === 'EN_REVISION') {
+          whereClause += ` AND c.Estatus = 'PENDIENTE'`;
+        } else if (estatusSP === 'APROBADA') {
+          whereClause += ` AND c.Estatus = 'CONCLUIDO' AND c.Saldo > 0`;
+        } else if (estatusSP === 'PAGADA') {
+          whereClause += ` AND c.Estatus = 'CONCLUIDO' AND c.Saldo = 0`;
+        } else if (estatusSP === 'RECHAZADA') {
+          whereClause += ` AND c.Estatus = 'CANCELADO'`;
         }
+      }
+      if (busqueda) {
+        whereClause += ` AND (c.MovID LIKE @Busqueda OR c.Referencia LIKE @Busqueda)`;
+      }
 
-        // Query a tabla Cxc (Cuentas por Cobrar)
-        // Estructura basada en resultados de exploración:
-        // ID, Empresa, Mov, MovID, FechaEmision, Moneda, Cliente, Importe, Impuestos, Saldo, Estatus, Referencia, etc.
-        const facturasResult = await pool.request().query(`
-          SELECT TOP ${limite}
-            ID,
-            Empresa,
-            Mov AS Folio,
-            MovID,
-            FechaEmision,
-            Moneda,
-            TipoCambio,
-            Cliente AS CodigoCliente,
-            Importe AS Subtotal,
-            Impuestos,
-            (Importe + Impuestos) AS Total,
-            Saldo,
-            Estatus,
-            Referencia,
-            Observaciones,
-            Vencimiento,
-            FechaRegistro,
-            FechaConclusion,
-            FechaCancelacion,
-            Usuario,
-            Condicion,
-            FormaCobro,
-            Concepto,
-            Proyecto
-          FROM Cxc
-          WHERE Cliente = '${erp_proveedor_code}'
-            ${filtroFecha}
-            ${filtroEstatus}
-          ORDER BY FechaEmision DESC
+      const offset = (page - 1) * limit;
+
+      const queryRequest = pool.request()
+        .input('CodigoProveedor', sql.VarChar(20), erp_proveedor_code);
+
+      if (fechaDesde) queryRequest.input('FechaDesde', sql.Date, new Date(fechaDesde));
+      if (fechaHasta) queryRequest.input('FechaHasta', sql.Date, new Date(fechaHasta));
+      if (busqueda) queryRequest.input('Busqueda', sql.VarChar(50), `%${busqueda}%`);
+
+      const facturasResult = await queryRequest.query(`
+        SELECT
+          c.ID,
+          c.Empresa,
+          c.Mov AS Folio,
+          c.MovID,
+          c.FechaEmision,
+          c.Moneda,
+          c.TipoCambio,
+          c.Importe AS Subtotal,
+          c.Impuestos,
+          (c.Importe + c.Impuestos) AS Total,
+          c.Saldo,
+          CASE
+            WHEN c.Estatus = 'PENDIENTE' THEN 'EN_REVISION'
+            WHEN c.Estatus = 'CONCLUIDO' AND c.Saldo > 0 THEN 'APROBADA'
+            WHEN c.Estatus = 'CONCLUIDO' AND c.Saldo = 0 THEN 'PAGADA'
+            WHEN c.Estatus = 'CANCELADO' THEN 'RECHAZADA'
+            ELSE c.Estatus
+          END AS Estatus,
+          c.Referencia,
+          c.Observaciones,
+          c.Vencimiento,
+          c.Usuario,
+          c.FechaRegistro
+        FROM Cxc c
+        ${whereClause}
+        ORDER BY c.FechaEmision DESC
+        OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
+      `);
+
+      facturas = facturasResult.recordset;
+
+      // Obtener total
+      const countResult = await pool.request()
+        .input('CodigoProveedor', sql.VarChar(20), erp_proveedor_code)
+        .query(`
+          SELECT COUNT(*) AS Total
+          FROM Cxc c
+          ${whereClause.replace('@Busqueda', `'%${busqueda || ''}%'`).replace('@FechaDesde', `'${fechaDesde}'`).replace('@FechaHasta', `'${fechaHasta}'`)}
         `);
 
-        console.log(`✅ ${empresa_code}: ${facturasResult.recordset.length} facturas encontradas`);
-
-        // Enriquecer datos con nombre de empresa
-        const facturas = facturasResult.recordset.map(factura => ({
-          ...factura,
-          EmpresaCodigo: empresa_code,
-          EmpresaNombre: empresa_code === 'la-cantera' ? 'La Cantera' :
-                         empresa_code === 'peralillo' ? 'Peralillo' :
-                         empresa_code === 'plaza-galerena' ? 'Plaza Galereña' :
-                         empresa_code === 'inmobiliaria-galerena' ? 'Inmobiliaria Galereña' :
-                         empresa_code === 'icrear' ? 'Icrear' : empresa_code,
-          CodigoProveedor: erp_proveedor_code
-        }));
-
-        todasLasFacturas.push(...facturas);
-
-        // Calcular resumen por empresa
-        const totalFacturas = facturas.length;
-        const montoTotal = facturas.reduce((sum, f) => sum + (parseFloat(f.Total) || 0), 0);
-        const saldoTotal = facturas.reduce((sum, f) => sum + (parseFloat(f.Saldo) || 0), 0);
-
-        resumenPorEmpresa[empresa_code] = {
-          codigoProveedor: erp_proveedor_code,
-          totalFacturas,
-          montoTotal: montoTotal.toFixed(2),
-          saldoTotal: saldoTotal.toFixed(2),
-          montoMoneda: facturas[0]?.Moneda || 'MXN'
-        };
-
-      } catch (error: any) {
-        console.error(`❌ Error consultando ${empresa_code}:`, error.message);
-        resumenPorEmpresa[empresa_code] = {
-          error: error.message,
-          codigoProveedor: erp_proveedor_code
-        };
-      }
+      total = countResult.recordset[0]?.Total || facturas.length;
     }
 
-    console.log('✅ Consulta completada');
+    // 7. Mapear facturas al formato del frontend
+    const facturasFormateadas = facturas.map((factura: any) => ({
+      id: factura.ID,
+      folio: factura.Folio || factura.MovID,
+      cfdi: factura.UUID || `CFDI-${factura.ID}`,
+      serie: factura.Serie,
+      empresa: factura.Empresa,
+      empresaNombre: empresaFiltro === 'la-cantera' ? 'La Cantera' :
+                     empresaFiltro === 'peralillo' ? 'Peralillo' :
+                     empresaFiltro === 'plaza-galerena' ? 'Plaza Galereña' :
+                     empresaFiltro === 'inmobiliaria-galerena' ? 'Inmobiliaria Galereña' :
+                     empresaFiltro === 'icrear' ? 'Icrear' : empresaFiltro,
+      fechaEmision: factura.FechaEmision,
+      moneda: factura.Moneda || 'MXN',
+      tipoCambio: factura.TipoCambio || 1,
+      subtotal: factura.Subtotal || 0,
+      impuestos: factura.Impuestos || 0,
+      total: factura.Total || 0,
+      saldo: factura.Saldo || 0,
+      // Mapear estatus del SP al formato del frontend
+      estado: factura.Estatus === 'EN_REVISION' ? 'En revisión' :
+              factura.Estatus === 'APROBADA' ? 'Aprobada' :
+              factura.Estatus === 'PAGADA' ? 'Pagada' :
+              factura.Estatus === 'RECHAZADA' ? 'Rechazada' : factura.Estatus,
+      ordenAsociada: factura.OrdenCompraMovID || factura.Referencia || '-',
+      ordenCompraID: factura.OrdenCompraID,
+      referencia: factura.Referencia,
+      observaciones: factura.Observaciones,
+      motivoRechazo: factura.MotivoRechazo,
+      urlPDF: factura.UrlPDF,
+      urlXML: factura.UrlXML,
+      fechaRegistro: factura.FechaRegistro,
+      fechaRevision: factura.FechaRevision
+    }));
 
-    // 6. Retornar respuesta consolidada
+    // 8. Calcular estadísticas
+    const estadisticas = {
+      totalFacturas: total,
+      porEstatus: facturasFormateadas.reduce((acc: any, f: any) => {
+        acc[f.estado] = (acc[f.estado] || 0) + 1;
+        return acc;
+      }, {}),
+      montoTotal: facturasFormateadas.reduce((sum: number, f: any) => sum + (f.total || 0), 0),
+      saldoTotal: facturasFormateadas.reduce((sum: number, f: any) => sum + (f.saldo || 0), 0)
+    };
+
+    console.log(`✅ Retornando ${facturasFormateadas.length} facturas`);
+
+    // 9. Retornar respuesta
     return NextResponse.json({
       success: true,
-      userId,
-      totalFacturas: todasLasFacturas.length,
-      totalEmpresas: Object.keys(resumenPorEmpresa).length,
-      filtros: {
-        empresa: empresaFiltro,
-        fecha_desde: fechaDesde,
-        fecha_hasta: fechaHasta,
-        estatus: estatusFiltro,
-        limite
-      },
-      resumenPorEmpresa,
-      facturas: todasLasFacturas
+      data: {
+        empresaActual: empresaFiltro,
+        codigoProveedorERP: erp_proveedor_code,
+        rfcProveedor: rfcProveedor,
+        facturas: facturasFormateadas,
+        estadisticas,
+        paginacion: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      }
     });
 
   } catch (error: any) {

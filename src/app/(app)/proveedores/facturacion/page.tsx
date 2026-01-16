@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -21,7 +21,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Eye, Download, Search, Upload, ListFilter, Calendar as CalendarIcon } from 'lucide-react';
+import { Eye, Download, Upload, ListFilter, Calendar as CalendarIcon, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -42,43 +42,49 @@ import {
     SelectTrigger,
     SelectValue,
   } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type InvoiceStatus = 'En revisión' | 'Pagada' | 'Aprobada' | 'Rechazada';
 
-const invoices = [
-  {
-    folio: 'A-5832',
-    cfdi: 'F-XYZ-123',
-    ordenAsociada: 'OC-127',
-    fechaEmision: '2024-07-19',
-    estado: 'En revisión',
-    monto: 8500.5,
-  },
-  {
-    folio: 'A-5831',
-    cfdi: 'F-ABC-456',
-    ordenAsociada: 'OC-124',
-    fechaEmision: '2024-07-11',
-    estado: 'Pagada',
-    monto: 3200.75,
-  },
-  {
-    folio: 'A-5830',
-    cfdi: 'F-DEF-789',
-    ordenAsociada: 'OC-123',
-    fechaEmision: '2024-07-05',
-    estado: 'Aprobada',
-    monto: 12500.0,
-  },
-  {
-    folio: 'A-5829',
-    cfdi: 'F-GHI-012',
-    ordenAsociada: 'OC-122',
-    fechaEmision: '2024-07-02',
-    estado: 'Rechazada',
-    monto: 1800.0,
-  },
-];
+interface Factura {
+  id: number;
+  folio: string;
+  cfdi: string;
+  serie?: string;
+  empresa: string;
+  empresaNombre: string;
+  fechaEmision: string;
+  moneda: string;
+  tipoCambio: number;
+  subtotal: number;
+  impuestos: number;
+  total: number;
+  saldo: number;
+  estado: InvoiceStatus;
+  ordenAsociada: string;
+  ordenCompraID?: number;
+  referencia?: string;
+  observaciones?: string;
+  motivoRechazo?: string;
+  urlPDF?: string;
+  urlXML?: string;
+  fechaRegistro?: string;
+  fechaRevision?: string;
+}
+
+interface Estadisticas {
+  totalFacturas: number;
+  porEstatus: Record<string, number>;
+  montoTotal: number;
+  saldoTotal: number;
+}
+
+interface Paginacion {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
 
 const getStatusBadgeClass = (status: InvoiceStatus) => {
   switch (status) {
@@ -96,39 +102,101 @@ const getStatusBadgeClass = (status: InvoiceStatus) => {
 };
 
 export default function FacturacionProveedorPage() {
+    const [facturas, setFacturas] = useState<Factura[]>([]);
+    const [estadisticas, setEstadisticas] = useState<Estadisticas | null>(null);
+    const [paginacion, setPaginacion] = useState<Paginacion>({ page: 1, limit: 10, total: 0, totalPages: 1 });
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
     const [dateRange, setDateRange] = useState<DateRange | undefined>();
     const [status, setStatus] = useState('todas');
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
-    const filteredInvoices = useMemo(() => {
-      return invoices.filter((invoice) => {
-        const invoiceDate = new Date(invoice.fechaEmision);
+    // Debounce para búsqueda
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        setDebouncedSearchTerm(searchTerm);
+      }, 500);
+      return () => clearTimeout(timer);
+    }, [searchTerm]);
 
-        const dateFilter = !dateRange?.from || (invoiceDate >= dateRange.from && (!dateRange.to || invoiceDate <= dateRange.to));
-        const statusFilter = status === 'todas' || invoice.estado.toLowerCase().replace(' ', '-') === status;
-        const searchTermFilter = invoice.folio.toLowerCase().includes(searchTerm.toLowerCase()) || invoice.ordenAsociada.toLowerCase().includes(searchTerm.toLowerCase());
+    // Función para cargar facturas
+    const fetchFacturas = useCallback(async () => {
+      setLoading(true);
+      setError(null);
 
-        return dateFilter && statusFilter && searchTermFilter;
-      });
-    }, [dateRange, status, searchTerm]);
+      try {
+        const params = new URLSearchParams();
 
-    // Paginación
-    const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const paginatedInvoices = filteredInvoices.slice(startIndex, endIndex);
+        if (dateRange?.from) {
+          params.set('fecha_desde', format(dateRange.from, 'yyyy-MM-dd'));
+        }
+        if (dateRange?.to) {
+          params.set('fecha_hasta', format(dateRange.to, 'yyyy-MM-dd'));
+        }
+        if (status !== 'todas') {
+          params.set('estatus', status);
+        }
+        if (debouncedSearchTerm) {
+          params.set('busqueda', debouncedSearchTerm);
+        }
+        params.set('page', currentPage.toString());
+        params.set('limit', itemsPerPage.toString());
+
+        const response = await fetch(`/api/proveedor/facturas?${params.toString()}`);
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || 'Error al cargar facturas');
+        }
+
+        setFacturas(result.data.facturas);
+        setEstadisticas(result.data.estadisticas);
+        setPaginacion(result.data.paginacion);
+
+      } catch (err: any) {
+        console.error('Error cargando facturas:', err);
+        setError(err.message || 'Error al cargar facturas');
+        setFacturas([]);
+      } finally {
+        setLoading(false);
+      }
+    }, [dateRange, status, debouncedSearchTerm, currentPage, itemsPerPage]);
+
+    // Cargar facturas al montar y cuando cambian los filtros
+    useEffect(() => {
+      fetchFacturas();
+    }, [fetchFacturas]);
 
     // Reset página cuando cambian los filtros
     useEffect(() => {
       setCurrentPage(1);
-    }, [dateRange, status, searchTerm]);
+    }, [dateRange, status, debouncedSearchTerm]);
 
     const clearFilters = () => {
       setDateRange(undefined);
       setStatus('todas');
       setSearchTerm('');
+      setCurrentPage(1);
+    };
+
+    const formatCurrency = (amount: number, currency: string = 'MXN') => {
+      return new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency: currency,
+      }).format(amount);
+    };
+
+    const formatDate = (dateString: string) => {
+      if (!dateString) return '-';
+      try {
+        return format(new Date(dateString), 'dd/MM/yyyy', { locale: es });
+      } catch {
+        return dateString;
+      }
     };
 
   return (
@@ -139,13 +207,26 @@ export default function FacturacionProveedorPage() {
         <span className="text-foreground">Facturación</span>
       </div>
 
-      <div className="flex items-center justify-end">
-        <Button asChild>
-          <Link href="/proveedores/facturacion/subir">
-            <Upload className="mr-2 h-4 w-4" />
-            Subir Factura (PDF/XML)
-          </Link>
-        </Button>
+      <div className="flex items-center justify-between">
+        <div>
+          {estadisticas && (
+            <p className="text-sm text-muted-foreground">
+              Total: {estadisticas.totalFacturas} facturas | Monto: {formatCurrency(estadisticas.montoTotal)}
+            </p>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={fetchFacturas} disabled={loading}>
+            <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
+            Actualizar
+          </Button>
+          <Button asChild>
+            <Link href="/proveedores/facturacion/subir">
+              <Upload className="mr-2 h-4 w-4" />
+              Subir Factura (PDF/XML)
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -222,6 +303,13 @@ export default function FacturacionProveedorPage() {
         </CardFooter>
         </Card>
 
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Card className="bg-card/70">
         <CardHeader>
@@ -233,6 +321,16 @@ export default function FacturacionProveedorPage() {
             </div>
         </CardHeader>
         <CardContent>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-muted-foreground">Cargando facturas...</span>
+            </div>
+          ) : facturas.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>No se encontraron facturas con los filtros seleccionados.</p>
+            </div>
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -246,26 +344,34 @@ export default function FacturacionProveedorPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedInvoices.map((invoice) => (
-                <TableRow key={invoice.folio}>
+              {facturas.map((invoice) => (
+                <TableRow key={invoice.id}>
                   <TableCell className="font-medium">{invoice.folio}</TableCell>
-                  <TableCell>{invoice.cfdi}</TableCell>
                   <TableCell>
-                     <Link href={`/proveedores/ordenes-de-compra/${invoice.ordenAsociada}`} className="hover:underline text-blue-400">
-                        {invoice.ordenAsociada}
-                    </Link>
+                    <span className="text-xs text-muted-foreground" title={invoice.cfdi}>
+                      {invoice.cfdi.length > 20 ? `${invoice.cfdi.substring(0, 20)}...` : invoice.cfdi}
+                    </span>
                   </TableCell>
-                  <TableCell>{invoice.fechaEmision}</TableCell>
                   <TableCell>
-                    <Badge className={cn('font-normal', getStatusBadgeClass(invoice.estado as InvoiceStatus))}>
+                    {invoice.ordenCompraID ? (
+                      <Link
+                        href={`/proveedores/ordenes-de-compra/${invoice.ordenCompraID}`}
+                        className="hover:underline text-blue-400"
+                      >
+                        {invoice.ordenAsociada}
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground">{invoice.ordenAsociada}</span>
+                    )}
+                  </TableCell>
+                  <TableCell>{formatDate(invoice.fechaEmision)}</TableCell>
+                  <TableCell>
+                    <Badge className={cn('font-normal', getStatusBadgeClass(invoice.estado))}>
                       {invoice.estado}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    {new Intl.NumberFormat('es-MX', {
-                      style: 'currency',
-                      currency: 'MXN',
-                    }).format(invoice.monto)}
+                    {formatCurrency(invoice.total, invoice.moneda)}
                   </TableCell>
                   <TableCell className="text-center">
                     <TooltipProvider>
@@ -281,17 +387,49 @@ export default function FacturacionProveedorPage() {
                             <p>Ver factura</p>
                           </TooltipContent>
                         </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <Download className="h-4 w-4" />
-                              <span className="sr-only">Descargar</span>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Descargar PDF/XML</p>
-                          </TooltipContent>
-                        </Tooltip>
+                        {invoice.urlPDF && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                <a href={invoice.urlPDF} target="_blank" rel="noopener noreferrer">
+                                  <Download className="h-4 w-4" />
+                                  <span className="sr-only">Descargar PDF</span>
+                                </a>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Descargar PDF</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                        {invoice.urlXML && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                <a href={invoice.urlXML} target="_blank" rel="noopener noreferrer">
+                                  <Download className="h-4 w-4" />
+                                  <span className="sr-only">Descargar XML</span>
+                                </a>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Descargar XML</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                        {!invoice.urlPDF && !invoice.urlXML && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" disabled>
+                                <Download className="h-4 w-4 opacity-50" />
+                                <span className="sr-only">Sin archivos</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Sin archivos disponibles</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                       </div>
                     </TooltipProvider>
                   </TableCell>
@@ -299,12 +437,13 @@ export default function FacturacionProveedorPage() {
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
         {/* Paginación */}
-        {filteredInvoices.length > 0 && (
+        {!loading && paginacion.total > 0 && (
           <CardFooter className="flex items-center justify-between border-t px-6 py-4">
             <div className="text-sm text-muted-foreground">
-              Mostrando {startIndex + 1}-{Math.min(endIndex, filteredInvoices.length)} de {filteredInvoices.length} registros
+              Mostrando {((paginacion.page - 1) * paginacion.limit) + 1}-{Math.min(paginacion.page * paginacion.limit, paginacion.total)} de {paginacion.total} registros
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -324,21 +463,21 @@ export default function FacturacionProveedorPage() {
                 Anterior
               </Button>
               <span className="text-sm text-muted-foreground px-2">
-                Página {currentPage} de {totalPages || 1}
+                Página {currentPage} de {paginacion.totalPages || 1}
               </span>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={currentPage >= totalPages}
+                disabled={currentPage >= paginacion.totalPages}
               >
                 Siguiente
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(paginacion.totalPages)}
+                disabled={currentPage >= paginacion.totalPages}
               >
                 Última
               </Button>

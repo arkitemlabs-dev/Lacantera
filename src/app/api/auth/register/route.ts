@@ -7,6 +7,9 @@ import bcrypt from 'bcrypt';
 import { getConnection } from '@/lib/sql-connection';
 import { getPortalConnection } from '@/lib/database/multi-tenant-connection';
 import { autoSyncProveedorByRFC } from '@/lib/services/auto-sync-proveedor';
+import { sendEmail } from '@/lib/email-service';
+import { getWelcomeEmail } from '@/lib/email-templates/proveedor';
+import { getNotificacionSistemaEmail } from '@/lib/email-templates/notificacion';
 
 export async function POST(request: NextRequest) {
   try {
@@ -108,6 +111,30 @@ export async function POST(request: NextRequest) {
         await transaction.commit();
 
         console.log(`✅ [REGISTRO] Administrador creado: ${email} (Usuario: ${usuarioWebCode})`);
+
+        // Enviar email de bienvenida al administrador
+        try {
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+          const welcomeHtml = getNotificacionSistemaEmail({
+            nombreUsuario: nombre,
+            tipo: 'success',
+            titulo: 'Bienvenido al Portal de Proveedores',
+            mensaje: `Tu cuenta de administrador ha sido creada exitosamente. Ya puedes acceder al sistema con tu email: ${email}`,
+            accionTexto: 'Iniciar Sesion',
+            accionUrl: `${baseUrl}/login`,
+            fecha: new Date()
+          });
+
+          await sendEmail({
+            to: email,
+            subject: 'Bienvenido al Portal de Proveedores - La Cantera',
+            html: welcomeHtml
+          });
+
+          console.log(`📧 Email de bienvenida enviado a admin: ${email}`);
+        } catch (emailError: any) {
+          console.error('⚠️ Error enviando email de bienvenida (no critico):', emailError.message);
+        }
 
         return NextResponse.json(
           {
@@ -264,6 +291,28 @@ export async function POST(request: NextRequest) {
       } catch (syncError: any) {
         console.error('⚠️ Error en auto-sincronización (no crítico):', syncError.message);
         // No fallar el registro si falla la sincronización
+      }
+
+      // Enviar email de bienvenida al proveedor
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const welcomeHtml = getWelcomeEmail({
+          nombreProveedor: razonSocial,
+          nombreContacto: nombre,
+          email: email,
+          empresaCliente: 'La Cantera',
+          loginUrl: `${baseUrl}/login`
+        });
+
+        await sendEmail({
+          to: email,
+          subject: 'Bienvenido al Portal de Proveedores - La Cantera',
+          html: welcomeHtml
+        });
+
+        console.log(`📧 Email de bienvenida enviado a proveedor: ${email}`);
+      } catch (emailError: any) {
+        console.error('⚠️ Error enviando email de bienvenida (no critico):', emailError.message);
       }
 
       return NextResponse.json(
