@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
 import { getPortalConnection } from '@/lib/database/multi-tenant-connection';
 import { parseCFDI, validateCFDI } from '@/lib/parsers/cfdi-parser';
+import { validacionCompletaSAT } from '@/lib/sat-validator';
 import sql from 'mssql';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
@@ -148,6 +149,60 @@ export async function POST(request: NextRequest) {
       }, { status: 409 }); // 409 Conflict
     }
 
+    // 7.5. Validar CFDI con el SAT
+    console.log('🔍 Validando CFDI con el SAT...');
+    let validacionSAT = null;
+    let satValidado = false;
+    let satEstado = 'PENDIENTE';
+    let satMensaje = '';
+
+    try {
+      validacionSAT = await validacionCompletaSAT({
+        uuid: cfdiData.uuid,
+        rfcEmisor: cfdiData.rfcEmisor,
+        rfcReceptor: cfdiData.rfcReceptor,
+        total: cfdiData.total
+      });
+
+      satValidado = validacionSAT.aprobada;
+      satEstado = validacionSAT.validacionCFDI.estado;
+      satMensaje = validacionSAT.motivo || '';
+
+      console.log(`   Estado SAT: ${satEstado}`);
+      console.log(`   Aprobada: ${satValidado}`);
+
+      // Si la factura está cancelada en el SAT, rechazar
+      if (validacionSAT.validacionCFDI.estado === 'Cancelado') {
+        return NextResponse.json({
+          success: false,
+          error: 'La factura está CANCELADA en el SAT',
+          validacionSAT: {
+            estado: validacionSAT.validacionCFDI.estado,
+            codigoEstatus: validacionSAT.validacionCFDI.codigoEstatus,
+            fechaConsulta: validacionSAT.validacionCFDI.fechaConsulta
+          }
+        }, { status: 400 });
+      }
+
+      // Si el emisor está en lista negra (EFOS), rechazar
+      if (validacionSAT.validacionEmisor?.enLista) {
+        return NextResponse.json({
+          success: false,
+          error: 'El RFC del emisor está en la lista de contribuyentes incumplidos del SAT',
+          validacionSAT: {
+            emisorEnListaNegra: true,
+            tipo: validacionSAT.validacionEmisor.tipo
+          }
+        }, { status: 400 });
+      }
+
+    } catch (satError: any) {
+      // Si falla la validación SAT, continuar pero marcar como pendiente
+      console.error('⚠️ Error en validación SAT (se continuará con estado pendiente):', satError.message);
+      satEstado = 'PENDIENTE';
+      satMensaje = `Error al validar con SAT: ${satError.message}`;
+    }
+
     // 8. Guardar archivos en el servidor
     const uploadDir = path.join(process.cwd(), 'uploads', 'facturas', empresaCode, cfdiData.uuid);
 
@@ -176,7 +231,13 @@ export async function POST(request: NextRequest) {
     const facturaId = uuidv4();
     const xmlTamano = xmlBuffer.byteLength;
 
-    const insertResult = await portalPool.request()
+    // Preparar datos de validación SAT para BD
+    const satCodigoEstatus = validacionSAT?.validacionCFDI?.codigoEstatus || null;
+    const satEsCancelable = validacionSAT?.validacionCFDI?.esCancelable || null;
+    const satValidacionEFOS = validacionSAT?.validacionCFDI?.validacionEFOS || null;
+    const satFechaConsulta = validacionSAT?.validacionCFDI?.fechaConsulta || null;
+
+    await portalPool.request()
       .input('id', sql.UniqueIdentifier, facturaId)
       .input('portalUserId', sql.NVarChar(50), userId)
       .input('empresaCode', sql.VarChar(50), empresaCode)
@@ -200,6 +261,14 @@ export async function POST(request: NextRequest) {
       .input('pdfRuta', sql.VarChar(500), pdfPath)
       .input('xmlTamano', sql.Int, xmlTamano)
       .input('pdfTamano', sql.Int, pdfTamano)
+      // Campos de validación SAT
+      .input('satValidado', sql.Bit, satValidado ? 1 : 0)
+      .input('satEstado', sql.VarChar(50), satEstado)
+      .input('satCodigoEstatus', sql.VarChar(100), satCodigoEstatus)
+      .input('satEsCancelable', sql.VarChar(50), satEsCancelable)
+      .input('satValidacionEFOS', sql.VarChar(100), satValidacionEFOS)
+      .input('satFechaConsulta', sql.DateTime2, satFechaConsulta)
+      .input('satMensaje', sql.NVarChar(500), satMensaje)
       .query(`
         INSERT INTO proveedor_facturas (
           id, portal_user_id, empresa_code,
@@ -211,6 +280,9 @@ export async function POST(request: NextRequest) {
           moneda, tipo_cambio,
           xml_contenido, xml_ruta, pdf_ruta,
           xml_tamano, pdf_tamano,
+          sat_validado, sat_estado, sat_codigo_estatus,
+          sat_es_cancelable, sat_validacion_efos,
+          sat_fecha_consulta, sat_mensaje,
           estatus, created_at, updated_at
         ) VALUES (
           @id, @portalUserId, @empresaCode,
@@ -222,6 +294,9 @@ export async function POST(request: NextRequest) {
           @moneda, @tipoCambio,
           @xmlContenido, @xmlRuta, @pdfRuta,
           @xmlTamano, @pdfTamano,
+          @satValidado, @satEstado, @satCodigoEstatus,
+          @satEsCancelable, @satValidacionEFOS,
+          @satFechaConsulta, @satMensaje,
           'PENDIENTE', GETDATE(), GETDATE()
         )
       `);
@@ -253,10 +328,7 @@ export async function POST(request: NextRequest) {
       // No fallar por esto
     }
 
-    // 11. TODO: Validar contra SAT (diferido/async)
-    // Esta validación puede hacerse en un proceso separado o cola de tareas
-
-    // 12. Retornar respuesta
+    // 11. Retornar respuesta con información de validación SAT
     return NextResponse.json({
       success: true,
       factura: {
@@ -284,6 +356,15 @@ export async function POST(request: NextRequest) {
       },
       validacion: {
         warnings: validation.warnings
+      },
+      validacionSAT: {
+        validado: satValidado,
+        estado: satEstado,
+        codigoEstatus: satCodigoEstatus,
+        esCancelable: satEsCancelable,
+        validacionEFOS: satValidacionEFOS,
+        fechaConsulta: satFechaConsulta,
+        mensaje: satMensaje || (satValidado ? 'CFDI válido ante el SAT' : 'Pendiente de validación')
       }
     }, { status: 201 });
 
