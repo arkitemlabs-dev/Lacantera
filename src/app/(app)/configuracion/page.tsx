@@ -26,6 +26,7 @@ import {
   Upload,
   Loader2,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import {
   Table,
@@ -102,6 +103,12 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' } 
 
 const availableModules = navItems.filter(item => item.href !== '/dashboard' && item.href !== '/perfil' && item.href !== '/configuracion');
 
+// Roles predeterminados que no se pueden eliminar
+const ROLES_PREDETERMINADOS = ['Super Admin', 'Compras', 'Contabilidad', 'Solo lectura'];
+
+// Key para localStorage
+const ROLES_STORAGE_KEY = 'portal_custom_roles';
+
 export default function ConfiguracionPage() {
   const { userRole } = useAuth();
   const router = useRouter();
@@ -111,8 +118,36 @@ export default function ConfiguracionPage() {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [savingUser, setSavingUser] = useState(false);
 
-  // Estado de roles (local)
-  const [roles, setRoles] = useState<Role[]>(initialRoles.filter(r => r.name !== 'Proveedor'));
+  // Estado de roles (local + localStorage)
+  const [roles, setRoles] = useState<Role[]>(() => {
+    // Cargar roles base (sin Proveedor)
+    const baseRoles = initialRoles.filter(r => r.name !== 'Proveedor');
+
+    // Intentar cargar roles personalizados desde localStorage (solo en cliente)
+    if (typeof window !== 'undefined') {
+      try {
+        const savedRoles = localStorage.getItem(ROLES_STORAGE_KEY);
+        if (savedRoles) {
+          const customRoles: Role[] = JSON.parse(savedRoles);
+          // Combinar roles base con personalizados (evitar duplicados)
+          const allRoles = [...baseRoles];
+          customRoles.forEach(customRole => {
+            if (!allRoles.find(r => r.name === customRole.name)) {
+              allRoles.push(customRole);
+            }
+          });
+          return allRoles;
+        }
+      } catch (e) {
+        console.error('Error cargando roles desde localStorage:', e);
+      }
+    }
+    return baseRoles;
+  });
+
+  // Estado para confirmar eliminación de rol
+  const [isDeleteRoleAlertOpen, setIsDeleteRoleAlertOpen] = useState(false);
+  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
 
   // Estado de diálogos
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -330,14 +365,63 @@ export default function ConfiguracionPage() {
   };
 
   const handleSaveRole = () => {
+    let updatedRoles: Role[];
+
     if (selectedRole) {
-      setRoles(roles.map(r => r.name === selectedRole.name ? { name: currentRoleName, permissions: currentRolePermissions } : r));
+      updatedRoles = roles.map(r => r.name === selectedRole.name ? { name: currentRoleName, permissions: currentRolePermissions } : r);
     } else {
-      setRoles([...roles, { name: currentRoleName, permissions: currentRolePermissions }]);
+      // Verificar que no exista un rol con el mismo nombre
+      if (roles.find(r => r.name.toLowerCase() === currentRoleName.toLowerCase())) {
+        toast({ title: 'Error', description: 'Ya existe un rol con ese nombre', variant: 'destructive' });
+        return;
+      }
+      updatedRoles = [...roles, { name: currentRoleName, permissions: currentRolePermissions }];
     }
+
+    setRoles(updatedRoles);
+
+    // Guardar roles personalizados en localStorage
+    const customRoles = updatedRoles.filter(r => !ROLES_PREDETERMINADOS.includes(r.name));
+    try {
+      localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(customRoles));
+    } catch (e) {
+      console.error('Error guardando roles en localStorage:', e);
+    }
+
     setIsCreateRoleDialogOpen(false);
     setIsEditRoleDialogOpen(false);
     toast({ title: 'Éxito', description: 'Rol guardado correctamente' });
+  };
+
+  const handleDeleteRole = () => {
+    if (!roleToDelete) return;
+
+    // No permitir eliminar roles predeterminados
+    if (ROLES_PREDETERMINADOS.includes(roleToDelete.name)) {
+      toast({ title: 'Error', description: 'No se pueden eliminar los roles predeterminados', variant: 'destructive' });
+      setIsDeleteRoleAlertOpen(false);
+      return;
+    }
+
+    const updatedRoles = roles.filter(r => r.name !== roleToDelete.name);
+    setRoles(updatedRoles);
+
+    // Actualizar localStorage
+    const customRoles = updatedRoles.filter(r => !ROLES_PREDETERMINADOS.includes(r.name));
+    try {
+      localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(customRoles));
+    } catch (e) {
+      console.error('Error guardando roles en localStorage:', e);
+    }
+
+    setIsDeleteRoleAlertOpen(false);
+    setRoleToDelete(null);
+    toast({ title: 'Éxito', description: 'Rol eliminado correctamente' });
+  };
+
+  const handleOpenDeleteRole = (role: Role) => {
+    setRoleToDelete(role);
+    setIsDeleteRoleAlertOpen(true);
   };
 
   const getRolDisplayName = (rol: string) => {
@@ -597,26 +681,63 @@ export default function ConfiguracionPage() {
                     <TableRow>
                       <TableHead>Rol</TableHead>
                       <TableHead>Módulos Permitidos</TableHead>
+                      <TableHead>Permisos</TableHead>
                       <TableHead><span className="sr-only">Acciones</span></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {roles.map((role) => (
-                      <TableRow key={role.name}>
-                        <TableCell className="font-medium">{role.name}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {Object.keys(role.permissions)
-                            .map(href => navItems.find(item => item.href === href)?.title)
-                            .filter(Boolean)
-                            .join(', ') || 'Sin permisos específicos'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="outline" size="sm" onClick={() => handleOpenEditRole(role)}>
-                            Editar
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {roles.map((role) => {
+                      const isPredeterminado = ROLES_PREDETERMINADOS.includes(role.name);
+                      const tieneCrearEditar = Object.values(role.permissions).some(p => p.includes('crear_editar'));
+                      const tieneEliminar = Object.values(role.permissions).some(p => p.includes('eliminar'));
+
+                      return (
+                        <TableRow key={role.name}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {role.name}
+                              {isPredeterminado && (
+                                <Badge variant="secondary" className="text-xs">Predeterminado</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground max-w-xs">
+                            {Object.keys(role.permissions)
+                              .map(href => navItems.find(item => item.href === href)?.title)
+                              .filter(Boolean)
+                              .join(', ') || 'Sin permisos específicos'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Badge variant="outline" className="text-xs">Ver</Badge>
+                              {tieneCrearEditar && (
+                                <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950">Crear/Editar</Badge>
+                              )}
+                              {tieneEliminar && (
+                                <Badge variant="outline" className="text-xs bg-red-50 dark:bg-red-950">Eliminar</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button variant="outline" size="sm" onClick={() => handleOpenEditRole(role)}>
+                                Editar
+                              </Button>
+                              {!isPredeterminado && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => handleOpenDeleteRole(role)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -853,6 +974,28 @@ export default function ConfiguracionPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Alert: Eliminar Rol */}
+      <AlertDialog open={isDeleteRoleAlertOpen} onOpenChange={setIsDeleteRoleAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar rol?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará permanentemente el rol <span className="font-semibold">{roleToDelete?.name}</span>.
+              Los usuarios que tengan este rol asignado deberán ser reasignados a otro rol.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setRoleToDelete(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteRole}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              Eliminar Rol
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }
