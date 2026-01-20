@@ -27,6 +27,8 @@ import {
   Loader2,
   RefreshCw,
   Trash2,
+  ImageIcon,
+  X,
 } from 'lucide-react';
 import {
   Table,
@@ -113,6 +115,23 @@ export default function ConfiguracionPage() {
   const { userRole } = useAuth();
   const router = useRouter();
 
+  // Estado de configuración general
+  const [configForm, setConfigForm] = useState({
+    nombreEmpresa: '',
+    rfc: '',
+    direccionFiscal: '',
+    logoUrl: '',
+    logoNombre: '',
+    idioma: 'es',
+    zonaHoraria: 'America/Mexico_City',
+    moneda: 'MXN',
+    formatoFecha: 'DD/MM/YYYY',
+    formatoNumeros: 'comma',
+  });
+  const [loadingConfig, setLoadingConfig] = useState(true);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
   // Estado de usuarios
   const [users, setUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -171,8 +190,120 @@ export default function ConfiguracionPage() {
       router.push('/dashboard');
     } else {
       cargarUsuarios();
+      cargarConfiguracion();
     }
   }, [userRole, router]);
+
+  const cargarConfiguracion = async () => {
+    setLoadingConfig(true);
+    try {
+      const response = await fetch('/api/admin/configuracion');
+      const result = await response.json();
+
+      if (result.success) {
+        setConfigForm({
+          nombreEmpresa: result.data.nombreEmpresa || '',
+          rfc: result.data.rfc || '',
+          direccionFiscal: result.data.direccionFiscal || '',
+          logoUrl: result.data.logoUrl || '',
+          logoNombre: result.data.logoNombre || '',
+          idioma: result.data.idioma || 'es',
+          zonaHoraria: result.data.zonaHoraria || 'America/Mexico_City',
+          moneda: result.data.moneda || 'MXN',
+          formatoFecha: result.data.formatoFecha || 'DD/MM/YYYY',
+          formatoNumeros: result.data.formatoNumeros || 'comma',
+        });
+      }
+    } catch (error) {
+      console.error('Error cargando configuración:', error);
+    } finally {
+      setLoadingConfig(false);
+    }
+  };
+
+  const handleSaveConfig = async () => {
+    if (!configForm.nombreEmpresa) {
+      toast({ title: 'Error', description: 'El nombre de la empresa es requerido', variant: 'destructive' });
+      return;
+    }
+
+    setSavingConfig(true);
+    try {
+      const response = await fetch('/api/admin/configuracion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(configForm),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({ title: 'Éxito', description: 'Configuración guardada correctamente' });
+      } else {
+        toast({ title: 'Error', description: result.error || 'Error al guardar configuración', variant: 'destructive' });
+      }
+    } catch (error) {
+      console.error('Error guardando configuración:', error);
+      toast({ title: 'Error', description: 'Error al guardar configuración', variant: 'destructive' });
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo
+    if (!['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'].includes(file.type)) {
+      toast({ title: 'Error', description: 'Formato no permitido. Use PNG, JPG, WEBP o SVG.', variant: 'destructive' });
+      return;
+    }
+
+    // Validar tamaño (2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: 'Error', description: 'El archivo excede el tamaño máximo de 2MB', variant: 'destructive' });
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append('logo', file);
+      formData.append('empresaCode', 'CANTERA');
+
+      const response = await fetch('/api/admin/configuracion/logo', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setConfigForm(prev => ({
+          ...prev,
+          logoUrl: result.data.logoUrl,
+          logoNombre: result.data.logoNombre,
+        }));
+        toast({ title: 'Éxito', description: 'Logo subido correctamente' });
+      } else {
+        toast({ title: 'Error', description: result.error || 'Error al subir logo', variant: 'destructive' });
+      }
+    } catch (error) {
+      console.error('Error subiendo logo:', error);
+      toast({ title: 'Error', description: 'Error al subir logo', variant: 'destructive' });
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setConfigForm(prev => ({
+      ...prev,
+      logoUrl: '',
+      logoNombre: '',
+    }));
+  };
 
   const cargarUsuarios = async () => {
     setLoadingUsers(true);
@@ -441,118 +572,197 @@ export default function ConfiguracionPage() {
 
           {/* Tab: Configuración General */}
           <TabsContent value="general">
-            <div className="grid gap-6 mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Información de la Empresa</CardTitle>
-                </CardHeader>
-                <CardContent className="grid md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="companyName">Nombre de la Empresa *</Label>
-                      <Input id="companyName" defaultValue="La Cantera" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="rfc">RFC / NIT *</Label>
-                      <Input id="rfc" defaultValue="" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="fiscalAddress">Dirección Fiscal</Label>
-                      <Input id="fiscalAddress" placeholder="Calle, Número, Colonia, CP, Ciudad, Estado" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Logo de la Empresa</Label>
-                    <div className="relative border-2 border-dashed border-muted rounded-lg p-6 flex flex-col items-center justify-center text-center h-48">
-                      <Upload className="w-8 h-8 text-muted-foreground" />
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Arrastra tu logo aquí o haz clic para seleccionar
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Formatos: PNG, JPG - Máx: 2MB
-                      </p>
-                      <Input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Preferencias del Sistema</CardTitle>
-                </CardHeader>
-                <CardContent className="grid md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="language">Idioma</Label>
-                      <Select defaultValue="es">
-                        <SelectTrigger id="language">
-                          <SelectValue placeholder="Seleccionar idioma" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="es">Español</SelectItem>
-                          <SelectItem value="en">Inglés</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="timezone">Zona Horaria</Label>
-                      <Select defaultValue="gmt-6">
-                        <SelectTrigger id="timezone">
-                          <SelectValue placeholder="Seleccionar zona horaria" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="gmt-6">América/Ciudad de México (GMT-6)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="currency">Moneda Predeterminada</Label>
-                      <Select defaultValue="mxn">
-                        <SelectTrigger id="currency">
-                          <SelectValue placeholder="Seleccionar moneda" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="mxn">MXN - Peso Mexicano</SelectItem>
-                          <SelectItem value="usd">USD - Dólar Americano</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="dateFormat">Formato de Fecha</Label>
-                      <Select defaultValue="ddmmyyyy">
-                        <SelectTrigger id="dateFormat">
-                          <SelectValue placeholder="Seleccionar formato" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ddmmyyyy">DD/MM/YYYY</SelectItem>
-                          <SelectItem value="mmddyyyy">MM/DD/YYYY</SelectItem>
-                          <SelectItem value="yyyymmdd">YYYY-MM-DD</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="numberFormat">Formato de Números</Label>
-                      <Select defaultValue="comma">
-                        <SelectTrigger id="numberFormat">
-                          <SelectValue placeholder="Seleccionar formato" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="comma">1,234.56 (Coma para miles)</SelectItem>
-                          <SelectItem value="dot">1.234,56 (Punto para miles)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="flex justify-end mt-2">
-                <Button>Guardar Configuración</Button>
+            {loadingConfig ? (
+              <div className="flex items-center justify-center p-16">
+                <Loader2 className="h-8 w-8 animate-spin mr-2" />
+                <span>Cargando configuración...</span>
               </div>
-            </div>
+            ) : (
+              <div className="grid gap-6 mt-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Información de la Empresa</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="companyName">Nombre de la Empresa *</Label>
+                        <Input
+                          id="companyName"
+                          value={configForm.nombreEmpresa}
+                          onChange={(e) => setConfigForm(prev => ({ ...prev, nombreEmpresa: e.target.value }))}
+                          placeholder="Nombre de la empresa"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="rfc">RFC / NIT</Label>
+                        <Input
+                          id="rfc"
+                          value={configForm.rfc}
+                          onChange={(e) => setConfigForm(prev => ({ ...prev, rfc: e.target.value.toUpperCase() }))}
+                          placeholder="RFC de la empresa"
+                          maxLength={13}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="fiscalAddress">Dirección Fiscal</Label>
+                        <Input
+                          id="fiscalAddress"
+                          value={configForm.direccionFiscal}
+                          onChange={(e) => setConfigForm(prev => ({ ...prev, direccionFiscal: e.target.value }))}
+                          placeholder="Calle, Número, Colonia, CP, Ciudad, Estado"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Logo de la Empresa</Label>
+                      {configForm.logoUrl ? (
+                        <div className="relative border rounded-lg p-4 h-48 flex flex-col items-center justify-center">
+                          <img
+                            src={configForm.logoUrl}
+                            alt="Logo de la empresa"
+                            className="max-h-32 max-w-full object-contain"
+                          />
+                          <p className="text-xs text-muted-foreground mt-2">{configForm.logoNombre}</p>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 h-8 w-8 text-red-500 hover:text-red-700"
+                            onClick={handleRemoveLogo}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="relative border-2 border-dashed border-muted rounded-lg p-6 flex flex-col items-center justify-center text-center h-48 hover:border-primary/50 transition-colors">
+                          {uploadingLogo ? (
+                            <>
+                              <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
+                              <p className="mt-2 text-sm text-muted-foreground">Subiendo logo...</p>
+                            </>
+                          ) : (
+                            <>
+                              <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                              <p className="mt-2 text-sm text-muted-foreground">
+                                Arrastra tu logo aquí o haz clic para seleccionar
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Formatos: PNG, JPG, WEBP, SVG - Máx: 2MB
+                              </p>
+                            </>
+                          )}
+                          <Input
+                            type="file"
+                            accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            onChange={handleLogoUpload}
+                            disabled={uploadingLogo}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Preferencias del Sistema</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="language">Idioma</Label>
+                        <Select
+                          value={configForm.idioma}
+                          onValueChange={(value) => setConfigForm(prev => ({ ...prev, idioma: value }))}
+                        >
+                          <SelectTrigger id="language">
+                            <SelectValue placeholder="Seleccionar idioma" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="es">Español</SelectItem>
+                            <SelectItem value="en">Inglés</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="timezone">Zona Horaria</Label>
+                        <Select
+                          value={configForm.zonaHoraria}
+                          onValueChange={(value) => setConfigForm(prev => ({ ...prev, zonaHoraria: value }))}
+                        >
+                          <SelectTrigger id="timezone">
+                            <SelectValue placeholder="Seleccionar zona horaria" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="America/Mexico_City">América/Ciudad de México (GMT-6)</SelectItem>
+                            <SelectItem value="America/Monterrey">América/Monterrey (GMT-6)</SelectItem>
+                            <SelectItem value="America/Tijuana">América/Tijuana (GMT-8)</SelectItem>
+                            <SelectItem value="America/Cancun">América/Cancún (GMT-5)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="currency">Moneda Predeterminada</Label>
+                        <Select
+                          value={configForm.moneda}
+                          onValueChange={(value) => setConfigForm(prev => ({ ...prev, moneda: value }))}
+                        >
+                          <SelectTrigger id="currency">
+                            <SelectValue placeholder="Seleccionar moneda" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="MXN">MXN - Peso Mexicano</SelectItem>
+                            <SelectItem value="USD">USD - Dólar Americano</SelectItem>
+                            <SelectItem value="EUR">EUR - Euro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="dateFormat">Formato de Fecha</Label>
+                        <Select
+                          value={configForm.formatoFecha}
+                          onValueChange={(value) => setConfigForm(prev => ({ ...prev, formatoFecha: value }))}
+                        >
+                          <SelectTrigger id="dateFormat">
+                            <SelectValue placeholder="Seleccionar formato" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
+                            <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
+                            <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="numberFormat">Formato de Números</Label>
+                        <Select
+                          value={configForm.formatoNumeros}
+                          onValueChange={(value) => setConfigForm(prev => ({ ...prev, formatoNumeros: value }))}
+                        >
+                          <SelectTrigger id="numberFormat">
+                            <SelectValue placeholder="Seleccionar formato" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="comma">1,234.56 (Coma para miles)</SelectItem>
+                            <SelectItem value="dot">1.234,56 (Punto para miles)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="flex justify-end mt-2">
+                  <Button onClick={handleSaveConfig} disabled={savingConfig}>
+                    {savingConfig && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Guardar Configuración
+                  </Button>
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           {/* Tab: Usuarios */}
