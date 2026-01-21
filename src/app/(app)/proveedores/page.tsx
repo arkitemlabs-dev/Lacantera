@@ -107,7 +107,7 @@ export default function ProveedoresPage() {
     setLoading(false);
   };
   
-  // Proveedores filtrados (sin paginación)
+  // Proveedores filtrados (sin paginación) - ordenados alfabéticamente
   const filteredSuppliers = useMemo(() => {
     return proveedores
       .filter((supplier) => {
@@ -122,6 +122,11 @@ export default function ProveedoresPage() {
           (registroFilter === 'registrado' && supplier.registradoEnPortal === true) ||
           (registroFilter === 'no_registrado' && supplier.registradoEnPortal === false);
         return searchFilter && status && type && registro;
+      })
+      .sort((a, b) => {
+        const nombreA = (a.razonSocial || '').trim().toLowerCase();
+        const nombreB = (b.razonSocial || '').trim().toLowerCase();
+        return nombreA.localeCompare(nombreB, 'es', { sensitivity: 'base' });
       });
   }, [proveedores, searchTerm, statusFilter, typeFilter, registroFilter]);
 
