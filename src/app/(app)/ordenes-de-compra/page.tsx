@@ -101,8 +101,7 @@ const getCurrencyCode = (erpCurrency: string): string => {
 export default function OrdenesDeCompraPage() {
   const { data: session } = useSession();
 
-  // Estados de filtros
-  const [estatus, setEstatus] = useState('todos');
+  // Estados de filtros (solo mostramos órdenes pendientes)
   const [idOrden, setIdOrden] = useState('');
   const [proveedorBusqueda, setProveedorBusqueda] = useState('');
   const [proveedorSeleccionado, setProveedorSeleccionado] = useState<{ codigo: string; nombre: string } | null>(null);
@@ -162,9 +161,8 @@ export default function OrdenesDeCompraPage() {
       params.append('page', currentPage.toString());
       params.append('limit', '10');
 
-      if (estatus !== 'todos') {
-        params.append('estatus', estatus);
-      }
+      // Solo mostrar órdenes pendientes
+      params.append('estatus', 'PENDIENTE');
 
       if (dateRange?.from) {
         params.append('fecha_desde', format(dateRange.from, 'yyyy-MM-dd'));
@@ -223,7 +221,7 @@ export default function OrdenesDeCompraPage() {
     if (session) {
       cargarOrdenes();
     }
-  }, [session, currentPage, estatus, dateRange]);
+  }, [session, currentPage, dateRange]);
 
   // Filtro local por ID de orden y proveedor (búsqueda en tiempo real)
   const filteredOrders = useMemo(() => {
@@ -242,10 +240,9 @@ export default function OrdenesDeCompraPage() {
   // Resetear página cuando cambian los filtros
   useEffect(() => {
     setCurrentPage(1);
-  }, [estatus, proveedorSeleccionado, idOrden, dateRange]);
+  }, [proveedorSeleccionado, idOrden, dateRange]);
 
   const clearFilters = () => {
-    setEstatus('todos');
     setIdOrden('');
     setProveedorBusqueda('');
     setProveedorSeleccionado(null);
@@ -277,12 +274,12 @@ export default function OrdenesDeCompraPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Órdenes de Compra</h1>
+          <h1 className="text-2xl font-bold">Órdenes de Compra Pendientes</h1>
           <p className="text-muted-foreground">
-            Gestione todas las órdenes de compra del sistema.
+            Órdenes de compra pendientes de completar.
             {!loading && totalRegistros > 0 && (
               <span className="ml-2 font-medium text-foreground">
-                ({totalRegistros} {totalRegistros === 1 ? 'registro' : 'registros'} en total)
+                ({totalRegistros} {totalRegistros === 1 ? 'orden pendiente' : 'órdenes pendientes'})
               </span>
             )}
           </p>
@@ -301,24 +298,11 @@ export default function OrdenesDeCompraPage() {
             Filtros
           </CardTitle>
           <CardDescription>
-            Filtre las órdenes por estado, ID o proveedor.
+            Filtre las órdenes por ID, proveedor o fecha.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* Filtro por Estado */}
-            <Select value={estatus} onValueChange={setEstatus}>
-              <SelectTrigger>
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos los estados</SelectItem>
-                <SelectItem value="PENDIENTE">Pendiente</SelectItem>
-                <SelectItem value="CONCLUIDO">Completa</SelectItem>
-                <SelectItem value="CANCELADO">Cancelada</SelectItem>
-              </SelectContent>
-            </Select>
-
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Filtro por ID de Orden */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
