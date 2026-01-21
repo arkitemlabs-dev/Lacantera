@@ -65,7 +65,6 @@ export interface GetOrdenesCompraParams extends PaginationParams, DateRangeParam
   proveedor?: string | null;
   rfc?: string | null;
   empresa?: string | null;
-  estatus?: 'PENDIENTE' | 'CONCLUIDO' | 'CANCELADO' | 'todas' | null;
 }
 
 export interface OrdenCompra {
@@ -217,18 +216,18 @@ export class StoredProcedures {
   // ===========================================================================
 
   /**
-   * SP 1: sp_GetOrdenesCompra
-   * Lista órdenes de compra con paginación y filtros (Vista Admin)
+   * SP 3: sp_GetOrdenesCompra
+   * Lista órdenes de compra PENDIENTES con paginación y filtros (Vista Admin)
+   * El SP fue modificado para solo retornar órdenes pendientes (sin parámetro de estatus)
    *
-   * Parámetros reales del SP:
-   * @RfcProv VARCHAR(20), @Empresa VARCHAR(5), @Estatus VARCHAR(15),
+   * Parámetros del SP:
+   * @RfcProv VARCHAR(20), @Empresa VARCHAR(5),
    * @FechaDesde DATE, @FechaHasta DATE, @Page INT, @Limit INT, @CuantasPaginas INT
    */
   async getOrdenesCompra(params: GetOrdenesCompraParams = {}): Promise<GetOrdenesCompraResult> {
     const {
       rfc = null,
       empresa = '01',
-      estatus = null,
       fechaDesde = null,
       fechaHasta = null,
       page = 1,
@@ -238,26 +237,27 @@ export class StoredProcedures {
     const pool = await this.getPool(empresa || '01');
 
     // Calcular cantidad de páginas para que el SP devuelve el total
-    // Si pasamos 1, el SP debería calcular y devolver el total
     const cuantasPaginas = 1;
 
-    // Convertir fechas - el SP espera formato DD-MM-YYYY
-    // Entrada: '2025-10-01' (YYYY-MM-DD) → Salida: '01-10-2025' (DD-MM-YYYY)
-    const convertirFecha = (fecha: string | null): string | null => {
-      if (!fecha) return null;
-      const partes = fecha.split('-'); // ['2025', '10', '01']
-      if (partes.length === 3) {
-        return `${partes[2]}-${partes[1]}-${partes[0]}`; // '01-10-2025'
+    // Convertir fechas de YYYY-MM-DD a DD/MM/YYYY (formato que espera el SP)
+    const formatDateForSP = (dateStr: string | null | undefined): string | null => {
+      if (!dateStr) return null;
+      // Si viene en formato YYYY-MM-DD, convertir a DD/MM/YYYY
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        const [year, month, day] = dateStr.split('-');
+        return `${day}/${month}/${year}`;
       }
-      return fecha;
+      return dateStr;
     };
-    const fechaDesdeStr = convertirFecha(fechaDesde as string);
-    const fechaHastaStr = convertirFecha(fechaHasta as string);
+
+    const fechaDesdeStr = formatDateForSP(fechaDesde as string);
+    const fechaHastaStr = formatDateForSP(fechaHasta as string);
+
+    console.log('[SP] Fechas enviadas:', { fechaDesdeStr, fechaHastaStr });
 
     const result = await pool.request()
       .input('Rfc', sql.VarChar(20), rfc)
       .input('Empresa', sql.VarChar(5), empresa)
-      .input('Estatus', sql.VarChar(15), estatus)
       .input('FechaDesde', sql.VarChar(10), fechaDesdeStr)
       .input('FechaHasta', sql.VarChar(10), fechaHastaStr)
       .input('Page', sql.Int, page)
@@ -338,7 +338,6 @@ export class StoredProcedures {
   ): Promise<GetOrdenesCompraResult> {
     const {
       rfc = null,
-      estatus = null,
       fechaDesde = null,
       fechaHasta = null,
       page = 1,
@@ -352,7 +351,6 @@ export class StoredProcedures {
       clave,
       rfc,
       empresa,
-      estatus,
       fechaDesde,
       fechaHasta,
       page,
@@ -365,7 +363,6 @@ export class StoredProcedures {
         .input('Clave', sql.VarChar(10), clave)
         .input('Rfc', sql.VarChar(20), rfc)
         .input('Empresa', sql.VarChar(5), empresa)
-        .input('Estatus', sql.VarChar(15), estatus)
         .input('FechaDesde', sql.Date, this.toDate(fechaDesde))
         .input('FechaHasta', sql.Date, this.toDate(fechaHasta))
         .input('Page', sql.Int, page)

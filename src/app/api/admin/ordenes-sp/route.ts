@@ -3,9 +3,10 @@
  *
  * GET /api/admin/ordenes-sp
  *
+ * El SP solo retorna órdenes PENDIENTES (ya no recibe parámetro de estatus)
+ *
  * Query params:
  * - empresa: código de empresa (01, 02, etc.)
- * - estatus: PENDIENTE, CONCLUIDO, CANCELADO, todas
  * - proveedor: código del proveedor
  * - rfc: RFC del proveedor
  * - fecha_desde: fecha mínima (YYYY-MM-DD)
@@ -21,10 +22,8 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
-    // Extraer parámetros de la query
     const params = {
       empresa: searchParams.get('empresa') || '01',
-      estatus: searchParams.get('estatus') as any || null,
       proveedor: searchParams.get('proveedor') || null,
       rfc: searchParams.get('rfc') || null,
       fechaDesde: searchParams.get('fecha_desde') || null,
@@ -33,7 +32,25 @@ export async function GET(request: NextRequest) {
       limit: parseInt(searchParams.get('limit') || '50'),
     };
 
+    console.log('[ordenes-sp] Parámetros recibidos:', {
+      empresa: params.empresa,
+      fechaDesde: params.fechaDesde,
+      fechaHasta: params.fechaHasta,
+      page: params.page,
+      limit: params.limit
+    });
+
     const result = await storedProcedures.getOrdenesCompra(params);
+
+    console.log('[ordenes-sp] Resultado:', {
+      totalOrdenes: result.ordenes.length,
+      total: result.total,
+      primeraOrden: result.ordenes[0] ? {
+        ID: result.ordenes[0].ID,
+        Estatus: result.ordenes[0].Estatus,
+        FechaEmision: result.ordenes[0].FechaEmision
+      } : null
+    });
 
     return NextResponse.json({
       success: true,
