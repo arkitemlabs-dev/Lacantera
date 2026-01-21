@@ -1,6 +1,9 @@
 /**
  * API Route: Acciones sobre documentos de proveedores
  * PATCH /api/admin/proveedores/[id]/documentos/[docId]
+ *
+ * Actualiza el estado de un documento en la tabla ProvDocumentosEstado del portal (PP)
+ * Esta tabla almacena los estados de aprobación/rechazo de forma independiente del ERP
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -11,7 +14,7 @@ import sql from 'mssql';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string; docId: string } }
+  { params }: { params: Promise<{ id: string; docId: string }> }
 ) {
   try {
     // Verificar autenticación
@@ -32,94 +35,140 @@ export async function PATCH(
       );
     }
 
+    const { id: proveedorId, docId } = await params;
     const { action, motivo } = await request.json();
 
-    if (!action || !['aprobar', 'rechazar', 'solicitar_actualizacion'].includes(action)) {
+    console.log('[PATCH DOCUMENTO] Params:', { proveedorId, docId, action, motivo });
+
+    if (!action || !['aprobar', 'rechazar', 'solicitar_actualizacion', 'solicitar_documento'].includes(action)) {
       return NextResponse.json(
         { error: 'Acción inválida' },
         { status: 400 }
       );
     }
 
-    if ((action === 'rechazar' || action === 'solicitar_actualizacion') && !motivo?.trim()) {
+    if ((action === 'rechazar' || action === 'solicitar_actualizacion' || action === 'solicitar_documento') && !motivo?.trim()) {
       return NextResponse.json(
-        { error: 'El motivo es requerido para rechazar o solicitar actualización' },
+        { error: 'El motivo es requerido para esta acción' },
         { status: 400 }
       );
     }
 
-    const pool = await getPortalConnection();
-    const docId = parseInt(params.docId);
-    const proveedorId = parseInt(params.id);
+    // Conectar al Portal (PP)
+    const portalPool = await getPortalConnection();
 
-    if (isNaN(docId) || isNaN(proveedorId)) {
-      return NextResponse.json(
-        { error: 'IDs inválidos' },
-        { status: 400 }
-      );
-    }
+    // Asegurar que la tabla existe
+    await portalPool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='ProvDocumentosEstado' AND xtype='U')
+      CREATE TABLE ProvDocumentosEstado (
+        ID INT IDENTITY(1,1) PRIMARY KEY,
+        DocumentoIDR INT NOT NULL,
+        ProveedorCodigo VARCHAR(20) NOT NULL,
+        Estatus VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+        Observaciones NVARCHAR(500) NULL,
+        RevisadoPor VARCHAR(100) NULL,
+        FechaRevision DATETIME2 NULL,
+        CreatedAt DATETIME2 DEFAULT GETDATE(),
+        UpdatedAt DATETIME2 DEFAULT GETDATE()
+      )
+    `);
 
-    // Mapear acción a estado
-    let nuevoEstado: string;
+    // Determinar el estatus según la acción
+    let estatus = 'PENDIENTE';
+    let observaciones = motivo || null;
+
     switch (action) {
       case 'aprobar':
-        nuevoEstado = 'aprobado';
+        estatus = 'APROBADO';
+        observaciones = motivo || 'Documento aprobado';
         break;
       case 'rechazar':
-        nuevoEstado = 'rechazado';
+        estatus = 'RECHAZADO';
         break;
       case 'solicitar_actualizacion':
-        nuevoEstado = 'pendiente';
+        estatus = 'PENDIENTE';
+        observaciones = `Actualización solicitada: ${motivo}`;
         break;
-      default:
-        throw new Error('Acción no válida');
+      case 'solicitar_documento':
+        estatus = 'SOLICITADO';
+        break;
     }
 
-    // Actualizar documento
-    await pool.request()
-      .input('docId', sql.Int, docId)
-      .input('proveedorId', sql.Int, proveedorId)
-      .input('estado', sql.VarChar(20), nuevoEstado)
-      .input('motivo', sql.VarChar(500), motivo || null)
-      .input('usuarioRevision', sql.VarChar(50), session.user.id)
-      .input('fechaRevision', sql.DateTime2, new Date())
+    const revisadoPor = session.user.name || session.user.email || 'Admin Portal';
+
+    // Verificar si ya existe un registro para este documento
+    const existingRecord = await portalPool.request()
+      .input('documentoIDR', sql.Int, parseInt(docId))
+      .input('proveedorCodigo', sql.VarChar(20), proveedorId)
       .query(`
-        UPDATE ProveedorDocumento 
-        SET 
-          Estado = @estado,
-          MotivoRechazo = @motivo,
-          UsuarioRevision = @usuarioRevision,
-          FechaRevision = @fechaRevision
-        WHERE ID = @docId 
-          AND ProveedorID = @proveedorId
+        SELECT ID FROM ProvDocumentosEstado
+        WHERE DocumentoIDR = @documentoIDR AND ProveedorCodigo = @proveedorCodigo
       `);
 
-    // Registrar en audit log
-    await pool.request()
-      .input('usuarioId', sql.VarChar(50), session.user.id)
-      .input('accion', sql.VarChar(100), `documento_${action}`)
-      .input('recurso', sql.VarChar(100), `proveedor_${proveedorId}_documento_${docId}`)
-      .input('detalles', sql.NVarChar(sql.MAX), JSON.stringify({
-        proveedorId,
-        documentoId: docId,
-        accion: action,
-        motivo: motivo || null,
-        timestamp: new Date().toISOString()
-      }))
-      .input('ip', sql.VarChar(45), request.headers.get('x-forwarded-for') || 'unknown')
-      .input('userAgent', sql.VarChar(500), request.headers.get('user-agent') || 'unknown')
-      .query(`
-        INSERT INTO AuditLog (UsuarioID, Accion, Recurso, Detalles, IP, UserAgent, Timestamp)
-        VALUES (@usuarioId, @accion, @recurso, @detalles, @ip, @userAgent, GETDATE())
-      `);
+    if (existingRecord.recordset.length > 0) {
+      // Actualizar registro existente
+      await portalPool.request()
+        .input('documentoIDR', sql.Int, parseInt(docId))
+        .input('proveedorCodigo', sql.VarChar(20), proveedorId)
+        .input('estatus', sql.VarChar(20), estatus)
+        .input('observaciones', sql.NVarChar(500), observaciones)
+        .input('revisadoPor', sql.VarChar(100), revisadoPor)
+        .query(`
+          UPDATE ProvDocumentosEstado
+          SET
+            Estatus = @estatus,
+            Observaciones = @observaciones,
+            RevisadoPor = @revisadoPor,
+            FechaRevision = GETDATE(),
+            UpdatedAt = GETDATE()
+          WHERE DocumentoIDR = @documentoIDR AND ProveedorCodigo = @proveedorCodigo
+        `);
+      console.log('[PATCH DOCUMENTO] Registro actualizado en portal');
+    } else {
+      // Insertar nuevo registro
+      await portalPool.request()
+        .input('documentoIDR', sql.Int, parseInt(docId))
+        .input('proveedorCodigo', sql.VarChar(20), proveedorId)
+        .input('estatus', sql.VarChar(20), estatus)
+        .input('observaciones', sql.NVarChar(500), observaciones)
+        .input('revisadoPor', sql.VarChar(100), revisadoPor)
+        .query(`
+          INSERT INTO ProvDocumentosEstado (DocumentoIDR, ProveedorCodigo, Estatus, Observaciones, RevisadoPor, FechaRevision)
+          VALUES (@documentoIDR, @proveedorCodigo, @estatus, @observaciones, @revisadoPor, GETDATE())
+        `);
+      console.log('[PATCH DOCUMENTO] Nuevo registro creado en portal');
+    }
+
+    // Generar mensaje de respuesta
+    let mensaje = '';
+    switch (action) {
+      case 'aprobar':
+        mensaje = 'Documento aprobado correctamente';
+        break;
+      case 'rechazar':
+        mensaje = 'Documento rechazado correctamente';
+        break;
+      case 'solicitar_actualizacion':
+        mensaje = 'Solicitud de actualización registrada';
+        break;
+      case 'solicitar_documento':
+        mensaje = 'Solicitud de documento enviada al proveedor';
+        break;
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Documento ${action === 'aprobar' ? 'aprobado' : action === 'rechazar' ? 'rechazado' : 'marcado para actualización'} correctamente`
+      message: mensaje,
+      data: {
+        documentoId: parseInt(docId),
+        proveedorId,
+        action,
+        estatus
+      }
     });
 
   } catch (error) {
-    console.error('Error en acción de documento:', error);
+    console.error('[PATCH DOCUMENTO] Error:', error);
     return NextResponse.json(
       {
         success: false,

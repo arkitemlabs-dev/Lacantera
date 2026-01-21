@@ -1,10 +1,11 @@
 // src/app/api/admin/proveedores/[id]/documentos/route.ts
 // Endpoint para que el admin obtenga documentos de cualquier proveedor
+// Combina datos del ERP (AnexoCta) con estados del portal (ProvDocumentosEstado)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
-import { getERPConnection } from '@/lib/database/multi-tenant-connection';
+import { getERPConnection, getPortalConnection } from '@/lib/database/multi-tenant-connection';
 import sql from 'mssql';
 
 /**
@@ -112,7 +113,47 @@ export async function GET(
       console.log('[ADMIN DOCUMENTOS] Primer anexo:', anexosResult.recordset[0]);
     }
 
-    // Combinar datos: documentos requeridos + archivos del proveedor
+    // Obtener estados de documentos desde el portal (PP)
+    let estadosPortal: any[] = [];
+    try {
+      const portalPool = await getPortalConnection();
+
+      // Asegurar que la tabla existe
+      await portalPool.request().query(`
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='ProvDocumentosEstado' AND xtype='U')
+        CREATE TABLE ProvDocumentosEstado (
+          ID INT IDENTITY(1,1) PRIMARY KEY,
+          DocumentoIDR INT NOT NULL,
+          ProveedorCodigo VARCHAR(20) NOT NULL,
+          Estatus VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+          Observaciones NVARCHAR(500) NULL,
+          RevisadoPor VARCHAR(100) NULL,
+          FechaRevision DATETIME2 NULL,
+          CreatedAt DATETIME2 DEFAULT GETDATE(),
+          UpdatedAt DATETIME2 DEFAULT GETDATE()
+        )
+      `);
+
+      const estadosResult = await portalPool.request()
+        .input('proveedorCodigo', sql.VarChar(20), codigoProveedor)
+        .query(`
+          SELECT DocumentoIDR, Estatus, Observaciones, RevisadoPor, FechaRevision
+          FROM ProvDocumentosEstado
+          WHERE ProveedorCodigo = @proveedorCodigo
+        `);
+      estadosPortal = estadosResult.recordset;
+      console.log(`[ADMIN DOCUMENTOS] Estados del portal obtenidos: ${estadosPortal.length}`);
+    } catch (portalError) {
+      console.log('[ADMIN DOCUMENTOS] No se pudieron obtener estados del portal:', portalError);
+    }
+
+    // Crear mapa de estados del portal por IDR
+    const estadosMap = new Map<number, any>();
+    estadosPortal.forEach((estado: any) => {
+      estadosMap.set(estado.DocumentoIDR, estado);
+    });
+
+    // Combinar datos: documentos requeridos + archivos del proveedor + estados del portal
     const documentos = documentosRequeridosResult.recordset.map((docRequerido: any) => {
       // Buscar anexos que correspondan a este documento requerido
       const anexos = anexosResult.recordset.filter((anexo: any) => {
@@ -154,6 +195,30 @@ export async function GET(
 
       const anexoReciente = anexos.length > 0 ? anexos[0] : null;
 
+      // Obtener estado del portal si existe
+      const estadoPortal = anexoReciente ? estadosMap.get(anexoReciente.IDR) : null;
+
+      // Determinar estado: priorizar portal sobre ERP
+      let autorizado = false;
+      let rechazado = false;
+      let observaciones = null;
+      let revisadoPor = null;
+      let fechaRevision = null;
+
+      if (estadoPortal) {
+        // Usar estado del portal
+        autorizado = estadoPortal.Estatus === 'APROBADO';
+        rechazado = estadoPortal.Estatus === 'RECHAZADO';
+        observaciones = estadoPortal.Observaciones;
+        revisadoPor = estadoPortal.RevisadoPor;
+        fechaRevision = estadoPortal.FechaRevision;
+      } else if (anexoReciente) {
+        // Fallback a estado del ERP
+        autorizado = anexoReciente.Autorizado === 1;
+        rechazado = anexoReciente.Rechazado === 1;
+        observaciones = anexoReciente.Observaciones;
+      }
+
       return {
         documentoRequerido: docRequerido.Documento,
         grupo: docRequerido.Grupo,
@@ -170,25 +235,32 @@ export async function GET(
           fechaAlta: anexoReciente.FechaAlta,
           fechaUltimoCambio: anexoReciente.FechaUltimoCambio,
           usuario: anexoReciente.Usuario,
-          autorizado: anexoReciente.Autorizado === 1,
-          rechazado: anexoReciente.Rechazado === 1,
-          observaciones: anexoReciente.Observaciones,
+          autorizado,
+          rechazado,
+          observaciones,
+          revisadoPor,
+          fechaRevision,
           comentario: anexoReciente.Comentario,
           vencimiento: anexoReciente.Vencimiento,
+          estadoPortal: estadoPortal?.Estatus || null,
         }),
 
-        anexos: anexos.map((a: any) => ({
-          idr: a.IDR,
-          nombreArchivo: a.NombreDocumento,
-          rutaArchivo: a.RutaArchivo,
-          tipo: a.Tipo,
-          fechaAlta: a.FechaAlta,
-          fechaUltimoCambio: a.FechaUltimoCambio,
-          usuario: a.Usuario,
-          autorizado: a.Autorizado === 1,
-          rechazado: a.Rechazado === 1,
-          observaciones: a.Observaciones,
-        }))
+        anexos: anexos.map((a: any) => {
+          const estadoAnexo = estadosMap.get(a.IDR);
+          return {
+            idr: a.IDR,
+            nombreArchivo: a.NombreDocumento,
+            rutaArchivo: a.RutaArchivo,
+            tipo: a.Tipo,
+            fechaAlta: a.FechaAlta,
+            fechaUltimoCambio: a.FechaUltimoCambio,
+            usuario: a.Usuario,
+            autorizado: estadoAnexo ? estadoAnexo.Estatus === 'APROBADO' : a.Autorizado === 1,
+            rechazado: estadoAnexo ? estadoAnexo.Estatus === 'RECHAZADO' : a.Rechazado === 1,
+            observaciones: estadoAnexo?.Observaciones || a.Observaciones,
+            estadoPortal: estadoAnexo?.Estatus || null,
+          };
+        })
       };
     });
 
@@ -214,6 +286,156 @@ export async function GET(
     return NextResponse.json(
       {
         error: 'Error al obtener documentos del proveedor',
+        details: error.message,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST /api/admin/proveedores/[id]/documentos
+ * Sube un nuevo documento para un proveedor (admin)
+ */
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Verificar autenticación
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { success: false, error: 'No autenticado' },
+        { status: 401 }
+      );
+    }
+
+    // Verificar que sea administrador
+    if (session.user.role !== 'super-admin' && session.user.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'No autorizado. Se requiere rol de administrador.' },
+        { status: 403 }
+      );
+    }
+
+    const { id } = await params;
+    const body = await request.json();
+    const { tipoDocumento, file, fileName, fileType } = body;
+
+    console.log(`[ADMIN DOCUMENTOS POST] Subiendo documento para proveedor ${id}`);
+    console.log(`[ADMIN DOCUMENTOS POST] Tipo: ${tipoDocumento}, Archivo: ${fileName}`);
+
+    if (!tipoDocumento || !file || !fileName) {
+      return NextResponse.json(
+        { success: false, error: 'Datos incompletos: se requiere tipoDocumento, file y fileName' },
+        { status: 400 }
+      );
+    }
+
+    // Conectar al ERP
+    const erpPool = await getERPConnection('la-cantera');
+
+    // Verificar que el proveedor existe
+    const provResult = await erpPool.request()
+      .input('searchId', sql.VarChar(20), id)
+      .query(`SELECT Proveedor, Nombre FROM Prov WHERE Proveedor = @searchId`);
+
+    if (provResult.recordset.length === 0) {
+      return NextResponse.json(
+        { success: false, error: `Proveedor ${id} no encontrado` },
+        { status: 404 }
+      );
+    }
+
+    const codigoProveedor = provResult.recordset[0].Proveedor;
+
+    // Convertir base64 a buffer
+    const base64Data = file.split(',')[1] || file;
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    // Crear la estructura de directorios para guardar el archivo
+    // Formato: {ERP_ANEXOS_PATH}/Proveedores/{Año}/{Mes}/{Día}/{nombreArchivo}
+    const now = new Date();
+    const year = now.getFullYear().toString();
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+
+    // Ruta base para anexos (configurar en variables de entorno)
+    const erpAnexosPath = process.env.ERP_ANEXOS_PATH || 'C:\\Anexos';
+
+    // Sanitizar nombre de archivo
+    const timestamp = Date.now();
+    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const finalFileName = `${timestamp}-${sanitizedFileName}`;
+
+    // Construir ruta completa
+    const relativePath = `Proveedores\\${codigoProveedor}\\${year}\\${month}\\${day}`;
+    const fullDirPath = `${erpAnexosPath}\\${relativePath}`;
+    const fullFilePath = `${fullDirPath}\\${finalFileName}`;
+
+    // Importar fs dinámicamente para escribir el archivo
+    const fs = await import('fs');
+    const path = await import('path');
+
+    // Crear directorios si no existen
+    try {
+      fs.mkdirSync(fullDirPath, { recursive: true });
+    } catch (mkdirError) {
+      console.error('[ADMIN DOCUMENTOS POST] Error creando directorio:', mkdirError);
+    }
+
+    // Guardar el archivo
+    try {
+      fs.writeFileSync(fullFilePath, buffer);
+      console.log(`[ADMIN DOCUMENTOS POST] Archivo guardado en: ${fullFilePath}`);
+    } catch (writeError: any) {
+      console.error('[ADMIN DOCUMENTOS POST] Error guardando archivo:', writeError);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Error al guardar el archivo en el servidor',
+          details: writeError.message
+        },
+        { status: 500 }
+      );
+    }
+
+    // Insertar registro en AnexoCta
+    const insertResult = await erpPool.request()
+      .input('rama', sql.VarChar(10), 'CXP')
+      .input('cuenta', sql.VarChar(20), codigoProveedor)
+      .input('nombre', sql.VarChar(255), tipoDocumento)
+      .input('direccion', sql.VarChar(500), fullFilePath)
+      .input('documento', sql.VarChar(50), tipoDocumento)
+      .input('usuario', sql.VarChar(50), session.user.name || session.user.email || 'Admin Portal')
+      .query(`
+        INSERT INTO AnexoCta (Rama, Cuenta, Nombre, Direccion, Documento, Alta, Usuario, Autorizado, Rechazado)
+        OUTPUT INSERTED.IDR
+        VALUES (@rama, @cuenta, @nombre, @direccion, @documento, GETDATE(), @usuario, 0, 0)
+      `);
+
+    const nuevoIDR = insertResult.recordset[0]?.IDR;
+
+    console.log(`[ADMIN DOCUMENTOS POST] Documento insertado con IDR: ${nuevoIDR}`);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Documento subido correctamente',
+      data: {
+        idr: nuevoIDR,
+        rutaArchivo: fullFilePath,
+        nombreArchivo: finalFileName,
+        tipoDocumento
+      }
+    });
+
+  } catch (error: any) {
+    console.error('[ADMIN DOCUMENTOS POST] Error:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Error al subir el documento',
         details: error.message,
       },
       { status: 500 }

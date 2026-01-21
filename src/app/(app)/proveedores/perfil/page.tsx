@@ -485,21 +485,47 @@ export default function PerfilProveedorPage() {
     try {
       const base64 = await fileToBase64(selectedFile);
 
-      const result = await uploadDocumentoProveedor({
-        proveedorId,
-        tipoDocumento: selectedDocTipo,
-        file: base64,
-        fileName: selectedFile.name,
-        fileType: selectedFile.type,
-      });
+      // Si es vista de admin, usar el endpoint de admin que guarda en el ERP
+      if (isAdminView) {
+        const response = await fetch(`/api/admin/proveedores/${proveedorId}/documentos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tipoDocumento: selectedDocTipo,
+            file: base64,
+            fileName: selectedFile.name,
+            fileType: selectedFile.type,
+          })
+        });
 
-      if (result.success) {
-        await cargarDocumentos(proveedorId); // This re-fetches the documents, including the new date
-        setUploadDialogOpen(false);
-        setSelectedFile(null);
-        setSelectedDocTipo(null);
+        const result = await response.json();
+
+        if (result.success) {
+          await cargarDocumentos(proveedorId, true);
+          setUploadDialogOpen(false);
+          setSelectedFile(null);
+          setSelectedDocTipo(null);
+        } else {
+          alert(result.error || 'Error al subir el documento');
+        }
       } else {
-        alert(result.error);
+        // Vista de proveedor: usar la acción original
+        const result = await uploadDocumentoProveedor({
+          proveedorId,
+          tipoDocumento: selectedDocTipo,
+          file: base64,
+          fileName: selectedFile.name,
+          fileType: selectedFile.type,
+        });
+
+        if (result.success) {
+          await cargarDocumentos(proveedorId);
+          setUploadDialogOpen(false);
+          setSelectedFile(null);
+          setSelectedDocTipo(null);
+        } else {
+          alert(result.error);
+        }
       }
     } catch (error: any) {
       alert(error.message);
