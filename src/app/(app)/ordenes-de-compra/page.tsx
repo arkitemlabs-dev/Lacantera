@@ -103,6 +103,7 @@ export default function OrdenesDeCompraPage() {
 
   // Estados de filtros (solo mostramos órdenes pendientes)
   const [idOrden, setIdOrden] = useState('');
+  const [debouncedIdOrden, setDebouncedIdOrden] = useState('');
   const [proveedorBusqueda, setProveedorBusqueda] = useState('');
   const [proveedorSeleccionado, setProveedorSeleccionado] = useState<{ codigo: string; nombre: string } | null>(null);
   const [showProveedorDropdown, setShowProveedorDropdown] = useState(false);
@@ -113,18 +114,27 @@ export default function OrdenesDeCompraPage() {
   // Estados de datos
   const [ordenes, setOrdenes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingProveedores, setLoadingProveedores] = useState(true);
   const [proveedoresUnicos, setProveedoresUnicos] = useState<{ codigo: string; nombre: string }[]>([]);
+
+  // Debounce para búsqueda por ID de orden
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedIdOrden(idOrden);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [idOrden]);
 
   // Proveedores filtrados para autocompletado
   const proveedoresFiltrados = useMemo(() => {
-    if (!proveedorBusqueda.trim()) return proveedoresUnicos.slice(0, 10);
+    if (!proveedorBusqueda.trim()) return proveedoresUnicos.slice(0, 15);
     const busqueda = proveedorBusqueda.toLowerCase();
     return proveedoresUnicos
       .filter(p =>
         p.nombre.toLowerCase().includes(busqueda) ||
         p.codigo.toLowerCase().includes(busqueda)
       )
-      .slice(0, 10);
+      .slice(0, 15);
   }, [proveedoresUnicos, proveedorBusqueda]);
 
   // Cerrar dropdown al hacer clic fuera
@@ -142,6 +152,23 @@ export default function OrdenesDeCompraPage() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Cargar lista de proveedores (solo una vez al inicio)
+  const cargarProveedores = async () => {
+    setLoadingProveedores(true);
+    try {
+      const response = await fetch('/api/admin/ordenes-sp/proveedores?empresa=01');
+      const result = await response.json();
+
+      if (result.success) {
+        setProveedoresUnicos(result.data || []);
+      }
+    } catch (error) {
+      console.error('Error cargando proveedores:', error);
+    } finally {
+      setLoadingProveedores(false);
+    }
+  };
 
   // Estados de paginación
   const [currentPage, setCurrentPage] = useState(1);
@@ -163,6 +190,15 @@ export default function OrdenesDeCompraPage() {
 
       // Solo mostrar órdenes pendientes
       params.append('estatus', 'PENDIENTE');
+
+      // Filtros enviados al servidor
+      if (debouncedIdOrden) {
+        params.append('movId', debouncedIdOrden);
+      }
+
+      if (proveedorSeleccionado) {
+        params.append('proveedor', proveedorSeleccionado.codigo);
+      }
 
       if (dateRange?.from) {
         params.append('fecha_desde', format(dateRange.from, 'yyyy-MM-dd'));
@@ -192,20 +228,6 @@ export default function OrdenesDeCompraPage() {
         } else {
           setHayMasPaginas(false);
         }
-
-        // Extraer proveedores únicos para el filtro
-        const proveedoresMap = new Map<string, string>();
-        data.forEach((o: any) => {
-          if (o.Proveedor && !proveedoresMap.has(o.Proveedor)) {
-            proveedoresMap.set(o.Proveedor, o.ProveedorNombre || o.Proveedor);
-          }
-        });
-
-        const proveedoresList = Array.from(proveedoresMap.entries())
-          .map(([codigo, nombre]) => ({ codigo, nombre }))
-          .sort((a, b) => a.nombre.localeCompare(b.nombre));
-
-        setProveedoresUnicos(proveedoresList);
       } else {
         console.error('Error cargando órdenes:', result.error);
       }
@@ -216,43 +238,36 @@ export default function OrdenesDeCompraPage() {
     }
   };
 
+  // Cargar proveedores al inicio (solo una vez)
+  useEffect(() => {
+    if (session) {
+      cargarProveedores();
+    }
+  }, [session]);
+
   // Cargar órdenes al iniciar y cuando cambian los filtros
   useEffect(() => {
     if (session) {
       cargarOrdenes();
     }
-  }, [session, currentPage, dateRange]);
-
-  // Filtro local por ID de orden y proveedor (búsqueda en tiempo real)
-  const filteredOrders = useMemo(() => {
-    return ordenes.filter((order) => {
-      const idFilter = !idOrden ||
-        order.MovID?.toLowerCase().includes(idOrden.toLowerCase()) ||
-        order.ID?.toString().includes(idOrden);
-
-      const proveedorFilter = !proveedorSeleccionado ||
-        order.Proveedor === proveedorSeleccionado.codigo;
-
-      return idFilter && proveedorFilter;
-    });
-  }, [ordenes, idOrden, proveedorSeleccionado]);
+  }, [session, currentPage, dateRange, debouncedIdOrden, proveedorSeleccionado]);
 
   // Resetear página cuando cambian los filtros
   useEffect(() => {
     setCurrentPage(1);
-  }, [proveedorSeleccionado, idOrden, dateRange]);
+  }, [proveedorSeleccionado, debouncedIdOrden, dateRange]);
 
   const clearFilters = () => {
     setIdOrden('');
+    setDebouncedIdOrden('');
     setProveedorBusqueda('');
     setProveedorSeleccionado(null);
     setDateRange(undefined);
     setCurrentPage(1);
   };
 
-  // La paginación viene del servidor, no hacer slice local
-  // Solo usamos filteredOrders para filtros locales (ID, proveedor)
-  const displayedOrders = filteredOrders;
+  // Los filtros ahora se aplican en el servidor, usamos las órdenes directamente
+  const displayedOrders = ordenes;
 
   // Calcular total de páginas basado en el servidor
   // Si el SP devuelve total, usarlo; si no, inferir de hayMasPaginas
@@ -345,29 +360,40 @@ export default function OrdenesDeCompraPage() {
                   <X className="h-4 w-4" />
                 </button>
               )}
-              {showProveedorDropdown && proveedoresFiltrados.length > 0 && (
+              {showProveedorDropdown && (
                 <div
                   ref={proveedorDropdownRef}
                   className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg max-h-60 overflow-auto"
                 >
-                  {proveedoresFiltrados.map((prov) => (
-                    <button
-                      key={prov.codigo}
-                      type="button"
-                      onClick={() => {
-                        setProveedorSeleccionado(prov);
-                        setProveedorBusqueda('');
-                        setShowProveedorDropdown(false);
-                      }}
-                      className={cn(
-                        "w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground",
-                        proveedorSeleccionado?.codigo === prov.codigo && "bg-accent"
-                      )}
-                    >
-                      <div className="font-medium truncate">{prov.nombre}</div>
-                      <div className="text-xs text-muted-foreground">{prov.codigo}</div>
-                    </button>
-                  ))}
+                  {loadingProveedores ? (
+                    <div className="flex items-center justify-center p-4">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <span className="text-sm text-muted-foreground">Cargando proveedores...</span>
+                    </div>
+                  ) : proveedoresFiltrados.length > 0 ? (
+                    proveedoresFiltrados.map((prov) => (
+                      <button
+                        key={prov.codigo}
+                        type="button"
+                        onClick={() => {
+                          setProveedorSeleccionado(prov);
+                          setProveedorBusqueda('');
+                          setShowProveedorDropdown(false);
+                        }}
+                        className={cn(
+                          "w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground",
+                          proveedorSeleccionado?.codigo === prov.codigo && "bg-accent"
+                        )}
+                      >
+                        <div className="font-medium truncate">{prov.nombre}</div>
+                        <div className="text-xs text-muted-foreground">{prov.codigo}</div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="p-4 text-center text-sm text-muted-foreground">
+                      No se encontraron proveedores
+                    </div>
+                  )}
                 </div>
               )}
             </div>
