@@ -100,7 +100,6 @@ export async function GET(request: NextRequest) {
       empresaCode,
       {
         rfc: null,  // @RFC (no lo tenemos desde el mapping)
-        estatus: null,
         fechaDesde: null,
         fechaHasta: null,
         page: 1,
