@@ -2,6 +2,7 @@
 // Gestor de conexiones para arquitectura híbrida: Portal (PP) + ERP Intelisis
 
 import sql from 'mssql';
+import { ACTIVE_TENANT_CONFIGS } from './tenant-configs';
 
 /**
  * Configuración de empresas con sus respectivas BDs ERP
@@ -13,7 +14,7 @@ export interface TenantERPConfig {
   codigoEmpresa: string; // Código en tabla Empresa del ERP
 }
 
-const TENANT_CONFIGS: Record<string, TenantERPConfig> = {
+const TENANT_CONFIGS: Record<string, TenantERPConfig> = ACTIVE_TENANT_CONFIGS as Record<string, TenantERPConfig> || {
   'la-cantera': {
     id: 'la-cantera',
     nombre: 'La Cantera Desarrollos Mineros',
