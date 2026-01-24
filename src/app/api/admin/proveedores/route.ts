@@ -5,6 +5,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
 import { getProveedoresConDatosERP } from '@/lib/database/admin-proveedores-queries';
+import { 
+  getProveedorConSP,
+  crearProveedorConSP,
+  actualizarProveedorConSP,
+  validarDatosProveedor,
+  erpAFormulario 
+} from '@/lib/database/admin-proveedores-queries';
+import type { FormProveedorAdmin } from '@/types/admin-proveedores';
 
 /**
  * GET /api/admin/proveedores
@@ -58,6 +66,144 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         error: 'Error al obtener proveedores',
+        details: error.message,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST /api/admin/proveedores
+ * Crea un nuevo proveedor usando el SP spDatosProveedor
+ */
+export async function POST(request: NextRequest) {
+  try {
+    // Verificar autenticación
+    const session = await getServerSession(authOptions);
+
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { error: 'No autenticado' },
+        { status: 401 }
+      );
+    }
+
+    // Verificar que sea administrador
+    if (session.user.role !== 'super-admin' && session.user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'No autorizado. Se requiere rol de administrador.' },
+        { status: 403 }
+      );
+    }
+
+    // Obtener datos del proveedor del body
+    const proveedorData: FormProveedorAdmin = await request.json();
+
+    console.log(`[API PROVEEDORES] Admin ${session.user.id} creando proveedor: ${proveedorData.nombre}`);
+
+    // Validar datos antes de enviar al SP
+    const validacion = validarDatosProveedor(proveedorData);
+    if (!validacion.valido) {
+      return NextResponse.json(
+        { 
+          error: 'Datos de proveedor inválidos', 
+          detalles: validacion.errores 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Crear proveedor usando el SP
+    const result = await crearProveedorConSP(proveedorData);
+
+    if (result.success) {
+      return NextResponse.json({
+        success: true,
+        message: result.message || 'Proveedor creado exitosamente',
+        data: result.data
+      }, { status: 201 });
+    } else {
+      return NextResponse.json({
+        error: 'Error al crear proveedor',
+        detalles: result.error
+      }, { status: 500 });
+    }
+
+  } catch (error: any) {
+    console.error('[API PROVEEDORES] Error en POST:', error);
+    return NextResponse.json(
+      {
+        error: 'Error interno al crear proveedor',
+        details: error.message,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PUT /api/admin/proveedores
+ * Actualiza un proveedor existente usando el SP spDatosProveedor
+ */
+export async function PUT(request: NextRequest) {
+  try {
+    // Verificar autenticación
+    const session = await getServerSession(authOptions);
+
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { error: 'No autenticado' },
+        { status: 401 }
+      );
+    }
+
+    // Verificar que sea administrador
+    if (session.user.role !== 'super-admin' && session.user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'No autorizado. Se requiere rol de administrador.' },
+        { status: 403 }
+      );
+    }
+
+    // Obtener datos del proveedor del body
+    const proveedorData: FormProveedorAdmin = await request.json();
+
+    console.log(`[API PROVEEDORES] Admin ${session.user.id} actualizando proveedor: ${proveedorData.nombre}`);
+
+    // Validar datos antes de enviar al SP
+    const validacion = validarDatosProveedor(proveedorData);
+    if (!validacion.valido) {
+      return NextResponse.json(
+        { 
+          error: 'Datos de proveedor inválidos', 
+          detalles: validacion.errores 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Actualizar proveedor usando el SP
+    const result = await actualizarProveedorConSP(proveedorData);
+
+    if (result.success) {
+      return NextResponse.json({
+        success: true,
+        message: result.message || 'Proveedor actualizado exitosamente',
+        data: result.data
+      });
+    } else {
+      return NextResponse.json({
+        error: 'Error al actualizar proveedor',
+        detalles: result.error
+      }, { status: 500 });
+    }
+
+  } catch (error: any) {
+    console.error('[API PROVEEDORES] Error en PUT:', error);
+    return NextResponse.json(
+      {
+        error: 'Error interno al actualizar proveedor',
         details: error.message,
       },
       { status: 500 }

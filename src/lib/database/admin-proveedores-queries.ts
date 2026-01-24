@@ -2,6 +2,15 @@
 // Queries para gestión de proveedores (Admin) - Combina Portal + ERP
 
 import { hybridDB, getTenantConfig } from './multi-tenant-connection';
+import { getStoredProcedures } from './stored-procedures';
+import type { 
+  ProveedorSPParams, 
+  ConsultaProveedorParams, 
+  ProveedorERP,
+  SPProveedorResult,
+  FormProveedorAdmin,
+  FiltrosProveedoresAdmin
+} from '@/types/admin-proveedores';
 
 /**
  * Interface para proveedor con datos del portal y ERP
@@ -274,29 +283,36 @@ export async function getProveedoresConDatosERP(
     }
 
     // 5. Aplicar filtros si se especificaron
-    let proveedoresFiltrados = proveedores;
-    
+    let proveedoresFiltrados = [...proveedores];
+
     if (busqueda) {
-      const term = busqueda.toLowerCase();
+      const busquedaNorm = busqueda.toLowerCase();
       proveedoresFiltrados = proveedoresFiltrados.filter(p =>
-        p.portalNombre.toLowerCase().includes(term) ||
-        p.erpDatos?.rfc?.toLowerCase().includes(term) ||
-        p.portalEmail.toLowerCase().includes(term) ||
-        p.erpDatos?.proveedor?.toLowerCase().includes(term)
+        p.portalNombre.toLowerCase().includes(busquedaNorm) ||
+        p.portalEmail.toLowerCase().includes(busquedaNorm) ||
+        p.erpDatos?.rfc?.toLowerCase().includes(busquedaNorm) ||
+        p.erpDatos?.proveedor?.toLowerCase().includes(busquedaNorm)
+      );
+    }
+
+    if (estatusPortal && estatusPortal !== 'todos') {
+      proveedoresFiltrados = proveedoresFiltrados.filter(p =>
+        p.portalEstatus.toLowerCase() === estatusPortal.toLowerCase()
       );
     }
 
     // 6. Paginación
     const total = proveedoresFiltrados.length;
-    const paginados = proveedoresFiltrados.slice(offset, offset + limit);
-    console.log(`[getProveedoresConDatosERP] Total ERP: ${erpResult.recordset.length}, Total procesados: ${total}, devolviendo ${paginados.length}`);
+    const proveedoresPaginados = proveedoresFiltrados.slice(offset, offset + limit);
+
+    console.log(`[getProveedoresConDatosERP] Retornando ${proveedoresPaginados.length} de ${total} proveedores`);
 
     return {
-      proveedores: paginados,
+      proveedores: proveedoresPaginados,
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / limit)
     };
 
   } catch (error: any) {
@@ -306,400 +322,107 @@ export async function getProveedoresConDatosERP(
 }
 
 /**
- * Obtiene un proveedor específico con todos sus datos
+ * Obtiene un proveedor específico por ID (del portal o ERP)
  */
-export async function getProveedorCompleto(portalUserId: string) {
+export async function getProveedorPorId(
+  id: string,
+  options: {
+    incluirDatosERP?: boolean;
+    empresaCode?: string;
+  } = {}
+): Promise<ProveedorCompleto | null> {
+  const { incluirDatosERP = true, empresaCode = 'la-cantera' } = options;
+
   try {
-    // Verificar si es un proveedor solo del ERP (no registrado en portal)
-    if (portalUserId.startsWith('erp_')) {
-      const codigoERP = portalUserId.replace('erp_', '');
+    console.log(`[getProveedorPorId] Buscando proveedor: ${id}`);
+
+    // 1. Si el ID empieza con "erp_", es un proveedor que solo existe en ERP
+    if (id.startsWith('erp_')) {
+      const codigoERP = id.replace('erp_', '');
       return await getProveedorSoloERP(codigoERP);
     }
 
-    // Buscar específicamente el proveedor registrado en portal
-    const portalResult = await hybridDB.queryPortal(
-      `
+    // 2. Buscar en el portal por ID
+    const portalResult = await hybridDB.queryPortal(`
       SELECT
-        u.IDUsuario as portalUserId,
-        u.eMail as portalEmail,
-        u.Nombre as portalNombre,
-        u.Estatus as portalEstatus,
-        u.FechaRegistro as portalFechaRegistro,
-        'proveedor' as portalRol,
-        u.Telefono as portalTelefono,
-        u.Usuario as portalProveedorRef
+        u.IDUsuario,
+        u.eMail,
+        u.Nombre,
+        u.Estatus,
+        u.FechaRegistro,
+        u.Telefono,
+        u.Usuario
       FROM pNetUsuario u
       WHERE u.IDUsuario = @userId AND u.IDUsuarioTipo = 4
-      `,
-      { userId: parseInt(portalUserId) }
-    );
+    `, { userId: id });
 
     if (portalResult.recordset.length === 0) {
-      throw new Error('Proveedor no encontrado');
+      console.log(`[getProveedorPorId] Usuario ${id} no encontrado en portal`);
+      return null;
     }
 
-    const portalProv = portalResult.recordset[0];
+    const portalUser = portalResult.recordset[0];
 
-    // Crear mapeo simple usando el código de proveedor
-    const empresasAsignadas = portalProv.portalProveedorRef ? [{
-      empresaCode: 'la-cantera',
-      empresaName: 'La Cantera',
-      erpProveedorCode: portalProv.portalProveedorRef,
-      mappingActivo: true,
-    }] : [];
-
-    // Obtener datos del ERP si hay mapeos
-    let erpDatos: ProveedorCompleto['erpDatos'] = undefined;
-
-    if (empresasAsignadas.length > 0) {
-      const primeraEmpresa = empresasAsignadas[0];
-
-      try {
-        const erpResult = await hybridDB.queryERP(
-          primeraEmpresa.empresaCode,
-          `
-          SELECT TOP 1
-            p.Proveedor,
-            p.Nombre,
-            p.RFC,
-            p.eMail1,
-            p.eMail2,
-            p.Telefono,
-            p.Contacto1,
-            p.Direccion,
-            p.Colonia,
-            p.Poblacion,
-            p.Estado,
-            p.Pais,
-            p.CodigoPostal,
-            p.Condicion,
-            p.FormaPago,
-            p.Categoria,
-            p.Descuento,
-            p.ProvBancoSucursal,
-            p.ProvCuenta,
-            p.Estatus,
-            p.Situacion,
-            p.SituacionFecha,
-            p.SituacionNota,
-            p.SituacionUsuario,
-            p.Alta,
-            p.UltimoCambio,
-            p.TieneMovimientos,
-            p.Tipo,
-            p.DiaRevision1,
-            p.DiaRevision2,
-            p.HorarioRevision,
-            p.DiaPago1,
-            p.DiaPago2,
-            p.HorarioPago,
-            p.Comprador,
-            p.Agente,
-            p.CentroCostos,
-            p.DefMoneda
-          FROM Prov p
-          WHERE p.Proveedor = @proveedorCode
-          `,
-          { proveedorCode: primeraEmpresa.erpProveedorCode }
-        );
+    // 3. Buscar mapeo a ERP
+    let erpDatos = null;
+    if (incluirDatosERP) {
+      // Buscar por código de usuario (si existe)
+      if (portalUser.Usuario) {
+        const erpResult = await hybridDB.queryERP(empresaCode, `
+          SELECT * FROM Prov 
+          WHERE Proveedor = @codigo AND UPPER(Estatus) = 'ALTA'
+        `, { codigo: portalUser.Usuario });
 
         if (erpResult.recordset.length > 0) {
           const erp = erpResult.recordset[0];
-
-          const diasRevision: string[] = [];
-          if (erp.DiaRevision1) diasRevision.push(erp.DiaRevision1);
-          if (erp.DiaRevision2) diasRevision.push(erp.DiaRevision2);
-
-          const diasPago: string[] = [];
-          if (erp.DiaPago1) diasPago.push(erp.DiaPago1);
-          if (erp.DiaPago2) diasPago.push(erp.DiaPago2);
-
-          erpDatos = {
-            proveedor: erp.Proveedor,
-            nombre: erp.Nombre,
-            rfc: erp.RFC,
-            email1: erp.eMail1,
-            email2: erp.eMail2,
-            telefono: erp.Telefono,
-            contacto1: erp.Contacto1,
-            direccion: erp.Direccion,
-            colonia: erp.Colonia,
-            ciudad: erp.Poblacion,
-            estado: erp.Estado,
-            pais: erp.Pais,
-            codigoPostal: erp.CodigoPostal,
-            condicionPago: erp.Condicion,
-            formaPago: erp.FormaPago,
-            categoria: erp.Categoria,
-            descuento: erp.Descuento,
-            banco: erp.ProvBancoSucursal,
-            cuenta: erp.ProvCuenta,
-            estatus: 'ALTA', // Forzar ALTA ya que solo consultamos proveedores activos
-            situacion: erp.Situacion,
-            situacionFecha: erp.SituacionFecha,
-            situacionNota: erp.SituacionNota,
-            situacionUsuario: erp.SituacionUsuario,
-            alta: erp.Alta,
-            ultimoCambio: erp.UltimoCambio,
-            tieneMovimientos: erp.TieneMovimientos === 1,
-            tipo: erp.Tipo,
-            diasRevision,
-            diasPago,
-            comprador: erp.Comprador,
-            agente: erp.Agente,
-            centroCostos: erp.CentroCostos,
-            moneda: erp.DefMoneda,
-          };
+          erpDatos = await mapearDatosERP(erp);
         }
-      } catch (erpError: any) {
-        console.error(`Error obteniendo datos ERP para ${primeraEmpresa.erpProveedorCode}:`, erpError.message);
+      }
+
+      // Si no se encontró por código, buscar por nombre o RFC
+      if (!erpDatos) {
+        // Buscar por nombre similar
+        const erpResult = await hybridDB.queryERP(empresaCode, `
+          SELECT * FROM Prov 
+          WHERE UPPER(Nombre) LIKE @nombre AND UPPER(Estatus) = 'ALTA'
+        `, { nombre: `%${portalUser.Nombre.toUpperCase()}%` });
+
+        if (erpResult.recordset.length > 0) {
+          erpDatos = await mapearDatosERP(erpResult.recordset[0]);
+        }
       }
     }
 
     return {
-      portalUserId: portalProv.portalUserId,
-      portalEmail: portalProv.portalEmail,
-      portalNombre: portalProv.portalNombre,
-      portalEstatus: portalProv.portalEstatus,
-      portalFechaRegistro: portalProv.portalFechaRegistro,
-      portalRol: portalProv.portalRol,
-      portalTelefono: portalProv.portalTelefono,
-      empresasAsignadas,
-      erpDatos,
+      portalUserId: portalUser.IDUsuario,
+      portalEmail: portalUser.eMail,
+      portalNombre: portalUser.Nombre,
+      portalEstatus: portalUser.Estatus,
+      portalFechaRegistro: portalUser.FechaRegistro,
+      portalRol: 'proveedor',
+      portalTelefono: portalUser.Telefono,
+      empresasAsignadas: [{
+        empresaCode: 'la-cantera',
+        empresaName: 'La Cantera',
+        erpProveedorCode: portalUser.Usuario || '',
+        mappingActivo: !!erpDatos,
+      }],
+     
     };
 
   } catch (error: any) {
-    console.error('Error en getProveedorCompleto:', error);
+    console.error(`Error en getProveedorPorId(${id}):`, error);
     throw error;
   }
 }
 
 /**
- * Obtiene un proveedor por código ERP exacto desde la tabla Prov
+ * Helper: Mapear datos del ERP al formato esperado
  */
-export async function getProveedorPorCodigoERP(codigoERP: string): Promise<ProveedorCompleto> {
-  const erpResult = await hybridDB.queryERP('la-cantera', `
-    SELECT
-      p.Proveedor,
-      p.Nombre,
-      p.NombreCorto,
-      p.RFC,
-      p.CURP,
-      p.Direccion,
-      p.DireccionNumero,
-      p.DireccionNumeroInt,
-      p.EntreCalles,
-      p.Colonia,
-      p.Poblacion,
-      p.Estado,
-      p.Pais,
-      p.CodigoPostal,
-      p.Telefonos,
-      p.Fax,
-      p.Contacto1,
-      p.Contacto2,
-      p.Extencion1,
-      p.Extencion2,
-      p.eMail1,
-      p.eMail2,
-      p.Categoria,
-      p.Familia,
-      p.Descuento,
-      p.Comprador,
-      p.Condicion,
-      p.FormaPago,
-      p.DiaRevision1,
-      p.DiaRevision2,
-      p.HorarioRevision,
-      p.DiaPago1,
-      p.DiaPago2,
-      p.HorarioPago,
-      p.Beneficiario,
-      p.BeneficiarioNombre,
-      p.LeyendaCheque,
-      p.Agente,
-      p.Situacion,
-      p.SituacionFecha,
-      p.SituacionUsuario,
-      p.SituacionNota,
-      p.Estatus,
-      p.UltimoCambio,
-      p.Alta,
-      p.Tipo,
-      p.DefMoneda,
-      p.ProvBancoSucursal,
-      p.ProvCuenta,
-      p.TieneMovimientos,
-      p.CentroCostos,
-      p.Cuenta,
-      p.CuentaRetencion,
-      p.FiscalRegimen,
-      p.Comision,
-      p.Importe1,
-      p.Importe2
-    FROM Prov p
-    WHERE p.Proveedor = @codigoERP
-  `, { codigoERP });
-
-  if (erpResult.recordset.length === 0) {
-    throw new Error(`Proveedor ${codigoERP} no encontrado`);
-  }
-
-  const erp = erpResult.recordset[0];
-
-  const diasRevision: string[] = [];
-  if (erp.DiaRevision1) diasRevision.push(erp.DiaRevision1);
-  if (erp.DiaRevision2) diasRevision.push(erp.DiaRevision2);
-
-  const diasPago: string[] = [];
-  if (erp.DiaPago1) diasPago.push(erp.DiaPago1);
-  if (erp.DiaPago2) diasPago.push(erp.DiaPago2);
-
-  return {
-    portalUserId: `erp_${codigoERP}`,
-    portalEmail: erp.eMail1 || '',
-    portalNombre: erp.Nombre,
-    portalEstatus: 'INACTIVO',
-    portalFechaRegistro: null,
-    portalRol: 'proveedor',
-    portalTelefono: erp.Telefonos || '',
-    empresasAsignadas: [{
-      empresaCode: 'la-cantera',
-      empresaName: 'La Cantera',
-      erpProveedorCode: erp.Proveedor,
-      mappingActivo: true,
-    }],
-    erpDatos: {
-      proveedor: erp.Proveedor,
-      nombre: erp.Nombre,
-      nombreCorto: erp.NombreCorto,
-      rfc: erp.RFC,
-      curp: erp.CURP,
-      direccion: erp.Direccion,
-      direccionNumero: erp.DireccionNumero,
-      direccionNumeroInt: erp.DireccionNumeroInt,
-      entreCalles: erp.EntreCalles,
-      colonia: erp.Colonia,
-      ciudad: erp.Poblacion,
-      estado: erp.Estado,
-      pais: erp.Pais,
-      codigoPostal: erp.CodigoPostal,
-      telefono: erp.Telefonos,
-      fax: erp.Fax,
-      contacto1: erp.Contacto1,
-      contacto2: erp.Contacto2,
-      extension1: erp.Extencion1,
-      extension2: erp.Extencion2,
-      email1: erp.eMail1,
-      email2: erp.eMail2,
-      categoria: erp.Categoria,
-      familia: erp.Familia,
-      descuento: erp.Descuento,
-      comprador: erp.Comprador,
-      condicionPago: erp.Condicion,
-      formaPago: erp.FormaPago,
-      diasRevision,
-      diasPago,
-      beneficiario: erp.Beneficiario,
-      beneficiarioNombre: erp.BeneficiarioNombre,
-      leyendaCheque: erp.LeyendaCheque,
-      agente: erp.Agente,
-      situacion: erp.Situacion,
-      situacionFecha: erp.SituacionFecha,
-      situacionUsuario: erp.SituacionUsuario,
-      situacionNota: erp.SituacionNota,
-      estatus: erp.Estatus,
-      ultimoCambio: erp.UltimoCambio,
-      alta: erp.Alta,
-      tipo: erp.Tipo,
-      moneda: erp.DefMoneda,
-      banco: erp.ProvBancoSucursal,
-      cuenta: erp.ProvCuenta,
-      tieneMovimientos: erp.TieneMovimientos === 1,
-      centroCostos: erp.CentroCostos,
-      cuentaContable: erp.Cuenta,
-      cuentaRetencion: erp.CuentaRetencion,
-      fiscalRegimen: erp.FiscalRegimen,
-      comision: erp.Comision,
-      importe1: erp.Importe1,
-      importe2: erp.Importe2,
-    },
-  };
-}
-
 /**
- * Obtiene un proveedor por ID desde la tabla Prov
+ * Helper: Mapear datos del ERP al formato esperado
  */
-export async function getProveedorPorID(id: string): Promise<ProveedorCompleto> {
-  const erpResult = await hybridDB.queryERP('la-cantera', `
-    SELECT
-      p.Proveedor,
-      p.Nombre,
-      p.NombreCorto,
-      p.RFC,
-      p.CURP,
-      p.Direccion,
-      p.DireccionNumero,
-      p.DireccionNumeroInt,
-      p.EntreCalles,
-      p.Colonia,
-      p.Poblacion,
-      p.Estado,
-      p.Pais,
-      p.CodigoPostal,
-      p.Telefonos,
-      p.Fax,
-      p.Contacto1,
-      p.Contacto2,
-      p.Extencion1,
-      p.Extencion2,
-      p.eMail1,
-      p.eMail2,
-      p.Categoria,
-      p.Familia,
-      p.Descuento,
-      p.Comprador,
-      p.Condicion,
-      p.FormaPago,
-      p.DiaRevision1,
-      p.DiaRevision2,
-      p.HorarioRevision,
-      p.DiaPago1,
-      p.DiaPago2,
-      p.HorarioPago,
-      p.Beneficiario,
-      p.BeneficiarioNombre,
-      p.LeyendaCheque,
-      p.Agente,
-      p.Situacion,
-      p.SituacionFecha,
-      p.SituacionUsuario,
-      p.SituacionNota,
-      p.Estatus,
-      p.UltimoCambio,
-      p.Alta,
-      p.Tipo,
-      p.DefMoneda,
-      p.ProvBancoSucursal,
-      p.ProvCuenta,
-      p.TieneMovimientos,
-      p.CentroCostos,
-      p.Cuenta,
-      p.CuentaRetencion,
-      p.FiscalRegimen,
-      p.Comision,
-      p.Importe1,
-      p.Importe2
-    FROM Prov p
-    WHERE p.Proveedor = @id
-  `, { id });
-
-  if (erpResult.recordset.length === 0) {
-    throw new Error('Proveedor no encontrado por ID');
-  }
-
-  const erp = erpResult.recordset[0];
-
+async function mapearDatosERP(erp: any) {
   const diasRevision: string[] = [];
   if (erp.DiaRevision1) diasRevision.push(erp.DiaRevision1);
   if (erp.DiaRevision2) diasRevision.push(erp.DiaRevision2);
@@ -709,392 +432,49 @@ export async function getProveedorPorID(id: string): Promise<ProveedorCompleto> 
   if (erp.DiaPago2) diasPago.push(erp.DiaPago2);
 
   return {
-    portalUserId: `id_${id}`,
-    portalEmail: erp.eMail1 || '',
-    portalNombre: erp.Nombre,
-    portalEstatus: 'INACTIVO',
-    portalFechaRegistro: null,
-    portalRol: 'proveedor',
-    portalTelefono: erp.Telefonos || '',
-    empresasAsignadas: [{
-      empresaCode: 'la-cantera',
-      empresaName: 'La Cantera',
-      erpProveedorCode: erp.Proveedor,
-      mappingActivo: true,
-    }],
-    erpDatos: {
-      proveedor: erp.Proveedor,
-      nombre: erp.Nombre,
-      nombreCorto: erp.NombreCorto,
-      rfc: erp.RFC,
-      curp: erp.CURP,
-      direccion: erp.Direccion,
-      direccionNumero: erp.DireccionNumero,
-      direccionNumeroInt: erp.DireccionNumeroInt,
-      entreCalles: erp.EntreCalles,
-      colonia: erp.Colonia,
-      ciudad: erp.Poblacion,
-      estado: erp.Estado,
-      pais: erp.Pais,
-      codigoPostal: erp.CodigoPostal,
-      telefono: erp.Telefonos,
-      fax: erp.Fax,
-      contacto1: erp.Contacto1,
-      contacto2: erp.Contacto2,
-      extension1: erp.Extencion1,
-      extension2: erp.Extencion2,
-      email1: erp.eMail1,
-      email2: erp.eMail2,
-      categoria: erp.Categoria,
-      familia: erp.Familia,
-      descuento: erp.Descuento,
-      comprador: erp.Comprador,
-      condicionPago: erp.Condicion,
-      formaPago: erp.FormaPago,
-      diasRevision,
-      diasPago,
-      beneficiario: erp.Beneficiario,
-      beneficiarioNombre: erp.BeneficiarioNombre,
-      leyendaCheque: erp.LeyendaCheque,
-      agente: erp.Agente,
-      situacion: erp.Situacion,
-      situacionFecha: erp.SituacionFecha,
-      situacionUsuario: erp.SituacionUsuario,
-      situacionNota: erp.SituacionNota,
-      estatus: erp.Estatus,
-      ultimoCambio: erp.UltimoCambio,
-      alta: erp.Alta,
-      tipo: erp.Tipo,
-      moneda: erp.DefMoneda,
-      banco: erp.ProvBancoSucursal,
-      cuenta: erp.ProvCuenta,
-      tieneMovimientos: erp.TieneMovimientos === 1,
-      centroCostos: erp.CentroCostos,
-      cuentaContable: erp.Cuenta,
-      cuentaRetencion: erp.CuentaRetencion,
-      fiscalRegimen: erp.FiscalRegimen,
-      comision: erp.Comision,
-      importe1: erp.Importe1,
-      importe2: erp.Importe2,
-    },
+    proveedor: erp.Proveedor,
+    nombre: erp.Nombre,
+    rfc: erp.RFC,
+    email1: erp.eMail1,
+    email2: erp.eMail2,
+    telefono: erp.Telefonos,
+    contacto1: erp.Contacto1,
+    contacto2: erp.Contacto2,
+    extension1: erp.Extencion1,
+    extension2: erp.Extencion2,
+    categoria: erp.Categoria,
+    familia: erp.Familia,
+    descuento: erp.Descuento,
+    comprador: erp.Comprador,
+    condicionPago: erp.Condicion,
+    formaPago: erp.FormaPago,
+    diasRevision,
+    diasPago,
+    beneficiario: erp.Beneficiario,
+    beneficiarioNombre: erp.BeneficiarioNombre,
+    leyendaCheque: erp.LeyendaCheque,
+    agente: erp.Agente,
+    situacion: erp.Situacion,
+    situacionFecha: erp.SituacionFecha,
+    situacionUsuario: erp.SituacionUsuario,
+    situacionNota: erp.SituacionNota,
+    estatus: erp.Estatus,
+    ultimoCambio: erp.UltimoCambio,
+    alta: erp.Alta,
+    tipo: erp.Tipo,
+    moneda: erp.DefMoneda,
+    banco: erp.ProvBancoSucursal,
+    cuenta: erp.ProvCuenta,
+    tieneMovimientos: erp.TieneMovimientos === 1,
+    centroCostos: erp.CentroCostos,
+    direccion: erp.Direccion,
+    colonia: erp.Colonia,
+    ciudad: erp.Poblacion,
+    estado: erp.Estado,
+    pais: erp.Pais,
+    codigoPostal: erp.CodigoPostal
   };
-}
 
-/**
- * Obtiene un proveedor por nombre o RFC desde la tabla Prov
- */
-export async function getProveedorPorNombreORFC(busqueda: string): Promise<ProveedorCompleto> {
-  const erpResult = await hybridDB.queryERP('la-cantera', `
-    SELECT
-      p.Proveedor,
-      p.Nombre,
-      p.NombreCorto,
-      p.RFC,
-      p.CURP,
-      p.Direccion,
-      p.DireccionNumero,
-      p.DireccionNumeroInt,
-      p.EntreCalles,
-      p.Colonia,
-      p.Poblacion,
-      p.Estado,
-      p.Pais,
-      p.CodigoPostal,
-      p.Telefonos,
-      p.Fax,
-      p.Contacto1,
-      p.Contacto2,
-      p.Extencion1,
-      p.Extencion2,
-      p.eMail1,
-      p.eMail2,
-      p.Categoria,
-      p.Familia,
-      p.Descuento,
-      p.Comprador,
-      p.Condicion,
-      p.FormaPago,
-      p.DiaRevision1,
-      p.DiaRevision2,
-      p.HorarioRevision,
-      p.DiaPago1,
-      p.DiaPago2,
-      p.HorarioPago,
-      p.Beneficiario,
-      p.BeneficiarioNombre,
-      p.LeyendaCheque,
-      p.Agente,
-      p.Situacion,
-      p.SituacionFecha,
-      p.SituacionUsuario,
-      p.SituacionNota,
-      p.Estatus,
-      p.UltimoCambio,
-      p.Alta,
-      p.Tipo,
-      p.DefMoneda,
-      p.ProvBancoSucursal,
-      p.ProvCuenta,
-      p.TieneMovimientos,
-      p.CentroCostos,
-      p.Cuenta,
-      p.CuentaRetencion,
-      p.FiscalRegimen,
-      p.Comision,
-      p.Importe1,
-      p.Importe2
-    FROM Prov p
-    WHERE p.Proveedor = @busqueda
-       OR p.RFC = @busqueda 
-       OR UPPER(p.Nombre) LIKE '%' + UPPER(@busqueda) + '%'
-       OR UPPER(p.NombreCorto) LIKE '%' + UPPER(@busqueda) + '%'
-    ORDER BY 
-      CASE 
-        WHEN p.Proveedor = @busqueda THEN 1
-        WHEN p.RFC = @busqueda THEN 2
-        WHEN UPPER(p.Nombre) = UPPER(@busqueda) THEN 3
-        WHEN UPPER(p.Nombre) LIKE UPPER(@busqueda) + '%' THEN 4
-        ELSE 5
-      END
-  `, { busqueda });
-
-  if (erpResult.recordset.length === 0) {
-    throw new Error('Proveedor no encontrado por nombre o RFC');
-  }
-
-  const erp = erpResult.recordset[0];
-
-  const diasRevision: string[] = [];
-  if (erp.DiaRevision1) diasRevision.push(erp.DiaRevision1);
-  if (erp.DiaRevision2) diasRevision.push(erp.DiaRevision2);
-
-  const diasPago: string[] = [];
-  if (erp.DiaPago1) diasPago.push(erp.DiaPago1);
-  if (erp.DiaPago2) diasPago.push(erp.DiaPago2);
-
-  return {
-    portalUserId: `search_${busqueda}`,
-    portalEmail: erp.eMail1 || '',
-    portalNombre: erp.Nombre,
-    portalEstatus: 'INACTIVO',
-    portalFechaRegistro: null,
-    portalRol: 'proveedor',
-    portalTelefono: erp.Telefonos || '',
-    empresasAsignadas: [{
-      empresaCode: 'la-cantera',
-      empresaName: 'La Cantera',
-      erpProveedorCode: erp.Proveedor,
-      mappingActivo: true,
-    }],
-    erpDatos: {
-      proveedor: erp.Proveedor,
-      nombre: erp.Nombre,
-      nombreCorto: erp.NombreCorto,
-      rfc: erp.RFC,
-      curp: erp.CURP,
-      direccion: erp.Direccion,
-      direccionNumero: erp.DireccionNumero,
-      direccionNumeroInt: erp.DireccionNumeroInt,
-      entreCalles: erp.EntreCalles,
-      colonia: erp.Colonia,
-      ciudad: erp.Poblacion,
-      estado: erp.Estado,
-      pais: erp.Pais,
-      codigoPostal: erp.CodigoPostal,
-      telefono: erp.Telefonos,
-      fax: erp.Fax,
-      contacto1: erp.Contacto1,
-      contacto2: erp.Contacto2,
-      extension1: erp.Extencion1,
-      extension2: erp.Extencion2,
-      email1: erp.eMail1,
-      email2: erp.eMail2,
-      categoria: erp.Categoria,
-      familia: erp.Familia,
-      descuento: erp.Descuento,
-      comprador: erp.Comprador,
-      condicionPago: erp.Condicion,
-      formaPago: erp.FormaPago,
-      diasRevision,
-      diasPago,
-      beneficiario: erp.Beneficiario,
-      beneficiarioNombre: erp.BeneficiarioNombre,
-      leyendaCheque: erp.LeyendaCheque,
-      agente: erp.Agente,
-      situacion: erp.Situacion,
-      situacionFecha: erp.SituacionFecha,
-      situacionUsuario: erp.SituacionUsuario,
-      situacionNota: erp.SituacionNota,
-      estatus: erp.Estatus,
-      ultimoCambio: erp.UltimoCambio,
-      alta: erp.Alta,
-      tipo: erp.Tipo,
-      moneda: erp.DefMoneda,
-      banco: erp.ProvBancoSucursal,
-      cuenta: erp.ProvCuenta,
-      tieneMovimientos: erp.TieneMovimientos === 1,
-      centroCostos: erp.CentroCostos,
-      cuentaContable: erp.Cuenta,
-      cuentaRetencion: erp.CuentaRetencion,
-      fiscalRegimen: erp.FiscalRegimen,
-      comision: erp.Comision,
-      importe1: erp.Importe1,
-      importe2: erp.Importe2,
-    },
-  };
-}
-
-/**
- * Obtiene un proveedor por RFC desde la tabla Prov
- */
-export async function getProveedorPorRFC(rfc: string): Promise<ProveedorCompleto> {
-  const erpResult = await hybridDB.queryERP('la-cantera', `
-    SELECT
-      p.Proveedor,
-      p.Nombre,
-      p.NombreCorto,
-      p.RFC,
-      p.CURP,
-      p.Direccion,
-      p.DireccionNumero,
-      p.DireccionNumeroInt,
-      p.EntreCalles,
-      p.Colonia,
-      p.Poblacion,
-      p.Estado,
-      p.Pais,
-      p.CodigoPostal,
-      p.Telefonos,
-      p.Fax,
-      p.Contacto1,
-      p.Contacto2,
-      p.Extencion1,
-      p.Extencion2,
-      p.eMail1,
-      p.eMail2,
-      p.Categoria,
-      p.Familia,
-      p.Descuento,
-      p.Comprador,
-      p.Condicion,
-      p.FormaPago,
-      p.DiaRevision1,
-      p.DiaRevision2,
-      p.HorarioRevision,
-      p.DiaPago1,
-      p.DiaPago2,
-      p.HorarioPago,
-      p.Beneficiario,
-      p.BeneficiarioNombre,
-      p.LeyendaCheque,
-      p.Agente,
-      p.Situacion,
-      p.SituacionFecha,
-      p.SituacionUsuario,
-      p.SituacionNota,
-      p.Estatus,
-      p.UltimoCambio,
-      p.Alta,
-      p.Tipo,
-      p.DefMoneda,
-      p.ProvBancoSucursal,
-      p.ProvCuenta,
-      p.TieneMovimientos,
-      p.CentroCostos,
-      p.Cuenta,
-      p.CuentaRetencion,
-      p.FiscalRegimen,
-      p.Comision,
-      p.Importe1,
-      p.Importe2
-    FROM Prov p
-    WHERE p.RFC = @rfc
-  `, { rfc });
-
-  if (erpResult.recordset.length === 0) {
-    throw new Error('Proveedor no encontrado por RFC');
-  }
-
-  const erp = erpResult.recordset[0];
-
-  const diasRevision: string[] = [];
-  if (erp.DiaRevision1) diasRevision.push(erp.DiaRevision1);
-  if (erp.DiaRevision2) diasRevision.push(erp.DiaRevision2);
-
-  const diasPago: string[] = [];
-  if (erp.DiaPago1) diasPago.push(erp.DiaPago1);
-  if (erp.DiaPago2) diasPago.push(erp.DiaPago2);
-
-  return {
-    portalUserId: `rfc_${rfc}`,
-    portalEmail: erp.eMail1 || '',
-    portalNombre: erp.Nombre,
-    portalEstatus: 'INACTIVO',
-    portalFechaRegistro: null,
-    portalRol: 'proveedor',
-    portalTelefono: erp.Telefono || '',
-    empresasAsignadas: [{
-      empresaCode: 'la-cantera',
-      empresaName: 'La Cantera',
-      erpProveedorCode: erp.Proveedor,
-      mappingActivo: true,
-    }],
-    erpDatos: {
-      proveedor: erp.Proveedor,
-      nombre: erp.Nombre,
-      nombreCorto: erp.NombreCorto,
-      rfc: erp.RFC,
-      curp: erp.CURP,
-      direccion: erp.Direccion,
-      direccionNumero: erp.DireccionNumero,
-      direccionNumeroInt: erp.DireccionNumeroInt,
-      entreCalles: erp.EntreCalles,
-      colonia: erp.Colonia,
-      ciudad: erp.Poblacion,
-      estado: erp.Estado,
-      pais: erp.Pais,
-      codigoPostal: erp.CodigoPostal,
-      telefono: erp.Telefonos,
-      fax: erp.Fax,
-      contacto1: erp.Contacto1,
-      contacto2: erp.Contacto2,
-      extension1: erp.Extencion1,
-      extension2: erp.Extencion2,
-      email1: erp.eMail1,
-      email2: erp.eMail2,
-      categoria: erp.Categoria,
-      familia: erp.Familia,
-      descuento: erp.Descuento,
-      comprador: erp.Comprador,
-      condicionPago: erp.Condicion,
-      formaPago: erp.FormaPago,
-      diasRevision,
-      diasPago,
-      beneficiario: erp.Beneficiario,
-      beneficiarioNombre: erp.BeneficiarioNombre,
-      leyendaCheque: erp.LeyendaCheque,
-      agente: erp.Agente,
-      situacion: erp.Situacion,
-      situacionFecha: erp.SituacionFecha,
-      situacionUsuario: erp.SituacionUsuario,
-      situacionNota: erp.SituacionNota,
-      estatus: erp.Estatus,
-      ultimoCambio: erp.UltimoCambio,
-      alta: erp.Alta,
-      tipo: erp.Tipo,
-      moneda: erp.DefMoneda,
-      banco: erp.ProvBancoSucursal,
-      cuenta: erp.ProvCuenta,
-      tieneMovimientos: erp.TieneMovimientos === 1,
-      centroCostos: erp.CentroCostos,
-      cuentaContable: erp.Cuenta,
-      cuentaRetencion: erp.CuentaRetencion,
-      fiscalRegimen: erp.FiscalRegimen,
-      comision: erp.Comision,
-      importe1: erp.Importe1,
-      importe2: erp.Importe2,
-    },
-  };
 }
 
 /**
@@ -1302,4 +682,317 @@ function getEmpresaName(code: string): string {
     'icrear': 'Icrear',
   };
   return map[code] || code;
+}
+
+// =============================================================================
+// NUEVAS FUNCIONES CON STORED PROCEDURE spDatosProveedor
+// =============================================================================
+
+/**
+ * Obtiene un proveedor específico usando el SP spDatosProveedor
+ * Reemplaza la lógica anterior que hacia consultas directas
+ */
+export async function getProveedorConSP(params: {
+  empresa: string;
+  rfc?: string;
+  nombre?: string;
+  codigo?: string;
+}): Promise<ProveedorERP | null> {
+  const sp = getStoredProcedures();
+  
+  try {
+    console.log('[getProveedorConSP] Consultando proveedor con SP:', params);
+    
+    const result = await sp.consultarProveedor({
+      empresa: params.empresa,
+      rfc: params.rfc,
+      nombre: params.nombre,
+      codigo: params.codigo
+    });
+
+    if (result.success && result.data) {
+      console.log(`[getProveedorConSP] Proveedor encontrado: ${result.data.Nombre}`);
+      return result.data;
+    }
+
+    console.log('[getProveedorConSP] Proveedor no encontrado');
+    return null;
+
+  } catch (error: any) {
+    console.error('[getProveedorConSP] Error:', error);
+    throw new Error(`Error al consultar proveedor: ${error.message}`);
+  }
+}
+
+/**
+ * Lista proveedores usando el SP spDatosProveedor con diferentes criterios
+ * Puede buscar por nombre parcial, RFC, etc.
+ */
+export async function listarProveedoresConSP(params: {
+  empresa: string;
+  busqueda?: string;
+  limite?: number;
+}): Promise<ProveedorERP[]> {
+  const sp = getStoredProcedures();
+  
+  try {
+    console.log('[listarProveedoresConSP] Listando proveedores:', params);
+    
+    // Si hay búsqueda, intentar diferentes criterios
+    if (params.busqueda) {
+      const busqueda = params.busqueda.trim();
+      
+      // Intentar por nombre primero
+      let result = await sp.spDatosProveedor({
+        empresa: params.empresa,
+        operacion: 'C',
+        proveedor: busqueda
+      });
+      
+      // Si no encontró por nombre y parece un RFC, intentar por RFC
+      if ((!result.success || result.data.length === 0) && /^[A-Z]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(busqueda)) {
+        result = await sp.spDatosProveedor({
+          empresa: params.empresa,
+          operacion: 'C',
+          rfc: busqueda
+        });
+      }
+      
+      // Si no encontró y parece un código, intentar por código
+      if ((!result.success || result.data.length === 0) && /^[A-Z0-9]+$/.test(busqueda) && busqueda.length <= 10) {
+        result = await sp.spDatosProveedor({
+          empresa: params.empresa,
+          operacion: 'C',
+          cveProv: busqueda
+        });
+      }
+      
+      if (result.success && Array.isArray(result.data)) {
+        return result.data.slice(0, params.limite || 50);
+      }
+    }
+    
+    // Si no hay búsqueda específica, consultar todos (esto puede requerir ajustar el SP)
+    const result = await sp.spDatosProveedor({
+      empresa: params.empresa,
+      operacion: 'C'
+    });
+    
+    if (result.success && Array.isArray(result.data)) {
+      return result.data.slice(0, params.limite || 100);
+    }
+    
+    return [];
+
+  } catch (error: any) {
+    console.error('[listarProveedoresConSP] Error:', error);
+    throw new Error(`Error al listar proveedores: ${error.message}`);
+  }
+}
+
+/**
+ * Crea un nuevo proveedor usando el SP spDatosProveedor
+ */
+export async function crearProveedorConSP(data: FormProveedorAdmin): Promise<SPProveedorResult> {
+  const sp = getStoredProcedures();
+  
+  try {
+    console.log('[crearProveedorConSP] Creando proveedor:', data.nombre);
+    
+    // Mapear datos del formulario a parámetros del SP
+    const params: ProveedorSPParams = {
+      empresa: data.empresa,
+      operacion: 'A',
+      nombre: data.nombre,
+      nombreC: data.nombreCorto,
+      rfcProv: data.rfc,
+      curp: data.curp,
+      regimen: data.regimen,
+      direccion: data.direccion,
+      numExt: data.numeroExterior,
+      numInt: data.numeroInterior,
+      entreCalles: data.entreCalles,
+      colonia: data.colonia,
+      poblacion: data.ciudad,
+      estado: data.estado,
+      pais: data.pais,
+      codigoPostal: data.codigoPostal,
+      contacto1: data.contactoPrincipal,
+      contacto2: data.contactoSecundario,
+      email1: data.email1,
+      email2: data.email2,
+      telefonos: data.telefonos,
+      fax: data.fax,
+      extension1: data.extension1,
+      extension2: data.extension2,
+      bancoSucursal: data.banco,
+      cuenta: data.cuentaBancaria,
+      beneficiario: data.beneficiario,
+      beneficiarioNombre: data.nombreBeneficiario,
+      leyendaCheque: data.leyendaCheque
+    };
+    
+    const result = await sp.crearProveedor(params);
+    
+    if (result.success) {
+      console.log('[crearProveedorConSP] Proveedor creado exitosamente');
+    } else {
+      console.error('[crearProveedorConSP] Error al crear proveedor:', result.error);
+    }
+    
+    return result;
+
+  } catch (error: any) {
+    console.error('[crearProveedorConSP] Error:', error);
+    return {
+      success: false,
+      data: [],
+      error: error.message || 'Error desconocido al crear proveedor'
+    };
+  }
+}
+
+/**
+ * Actualiza un proveedor existente usando el SP spDatosProveedor
+ */
+export async function actualizarProveedorConSP(data: FormProveedorAdmin): Promise<SPProveedorResult> {
+  const sp = getStoredProcedures();
+  
+  try {
+    console.log('[actualizarProveedorConSP] Actualizando proveedor:', data.nombre);
+    
+    // Mapear datos del formulario a parámetros del SP
+    const params: ProveedorSPParams = {
+      empresa: data.empresa,
+      operacion: 'M',
+      // Para modificar, necesitamos al menos uno de estos criterios de búsqueda
+      rfc: data.rfc, // Usar RFC como criterio principal de búsqueda
+      nombre: data.nombre,
+      nombreC: data.nombreCorto,
+      rfcProv: data.rfc,
+      curp: data.curp,
+      regimen: data.regimen,
+      direccion: data.direccion,
+      numExt: data.numeroExterior,
+      numInt: data.numeroInterior,
+      entreCalles: data.entreCalles,
+      colonia: data.colonia,
+      poblacion: data.ciudad,
+      estado: data.estado,
+      pais: data.pais,
+      codigoPostal: data.codigoPostal,
+      contacto1: data.contactoPrincipal,
+      contacto2: data.contactoSecundario,
+      email1: data.email1,
+      email2: data.email2,
+      telefonos: data.telefonos,
+      fax: data.fax,
+      extension1: data.extension1,
+      extension2: data.extension2,
+      bancoSucursal: data.banco,
+      cuenta: data.cuentaBancaria,
+      beneficiario: data.beneficiario,
+      beneficiarioNombre: data.nombreBeneficiario,
+      leyendaCheque: data.leyendaCheque
+    };
+    
+    const result = await sp.actualizarProveedor(params);
+    
+    if (result.success) {
+      console.log('[actualizarProveedorConSP] Proveedor actualizado exitosamente');
+    } else {
+      console.error('[actualizarProveedorConSP] Error al actualizar proveedor:', result.error);
+    }
+    
+    return result;
+
+  } catch (error: any) {
+    console.error('[actualizarProveedorConSP] Error:', error);
+    return {
+      success: false,
+      data: [],
+      error: error.message || 'Error desconocido al actualizar proveedor'
+    };
+  }
+}
+
+/**
+ * Valida los datos de un proveedor antes de crear/actualizar
+ */
+export function validarDatosProveedor(data: FormProveedorAdmin): { valido: boolean; errores: string[] } {
+  const errores: string[] = [];
+  
+  // Validaciones obligatorias
+  if (!data.nombre?.trim()) {
+    errores.push('El nombre del proveedor es obligatorio');
+  }
+  
+  if (!data.rfc?.trim()) {
+    errores.push('El RFC es obligatorio');
+  } else if (!/^[A-Z]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(data.rfc)) {
+    errores.push('El RFC no tiene el formato válido');
+  }
+  
+  if (!data.empresa?.trim()) {
+    errores.push('La empresa es obligatoria');
+  }
+  
+  // Validaciones opcionales pero con formato
+  if (data.email1 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email1)) {
+    errores.push('El email principal no tiene formato válido');
+  }
+  
+  if (data.email2 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email2)) {
+    errores.push('El email secundario no tiene formato válido');
+  }
+  
+  if (data.codigoPostal && !/^[0-9]{5}$/.test(data.codigoPostal)) {
+    errores.push('El código postal debe tener 5 dígitos');
+  }
+  
+  return {
+    valido: errores.length === 0,
+    errores
+  };
+}
+
+/**
+ * Convierte datos del ERP al formato de formulario para edición
+ */
+export function erpAFormulario(erp: ProveedorERP, empresa: string): FormProveedorAdmin {
+  return {
+    nombre: erp.Nombre || '',
+    nombreCorto: erp.NombreCorto || '',
+    rfc: erp.RFC || '',
+    curp: erp.CURP || '',
+    regimen: erp.FiscalRegimen || '',
+    direccion: erp.Direccion || '',
+    numeroExterior: erp.DireccionNumero || '',
+    numeroInterior: erp.DireccionNumeroInt || '',
+    entreCalles: erp.EntreCalles || '',
+    colonia: erp.Colonia || '',
+    ciudad: erp.Poblacion || '',
+    estado: erp.Estado || '',
+    pais: erp.Pais || 'MÉXICO',
+    codigoPostal: erp.CodigoPostal || '',
+    contactoPrincipal: erp.Contacto1 || '',
+    contactoSecundario: erp.Contacto2 || '',
+    telefonos: erp.Telefonos || '',
+    fax: erp.Fax || '',
+    extension1: erp.Extencion1 || '',
+    extension2: erp.Extencion2 || '',
+    email1: erp.eMail1 || '',
+    email2: erp.eMail2 || '',
+    banco: erp.ProvBancoSucursal || '',
+    cuentaBancaria: erp.ProvCuenta || '',
+    beneficiario: erp.Beneficiario || 0,
+    nombreBeneficiario: erp.BeneficiarioNombre || '',
+    leyendaCheque: erp.LeyendaCheque || '',
+    categoria: erp.Categoria || '',
+    condicionPago: erp.Condicion || '',
+    formaPago: erp.FormaPago || '',
+    descuento: erp.Descuento || 0,
+    empresa: empresa,
+    activo: erp.Estatus === 'ALTA'
+  };
 }

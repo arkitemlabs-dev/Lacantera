@@ -27,7 +27,10 @@ interface AuditLogViewerProps {
   registroID?: string;
 }
 
-const accionConfig = {
+// Definir el tipo de las acciones válidas
+type AccionType = 'CREATE' | 'UPDATE' | 'DELETE' | 'READ' | 'APPROVE' | 'REJECT';
+
+const accionConfig: Record<AccionType, { label: string; className: string }> = {
   CREATE: {
     label: 'Creado',
     className: 'bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-200',
@@ -57,7 +60,7 @@ const accionConfig = {
 export function AuditLogViewer({ tabla, registroID }: AuditLogViewerProps) {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedLog, setExpandedLog] = useState<string | null>(null);
+  const [expandedLog, setExpandedLog] = useState<string | number | null>(null);
 
   useEffect(() => {
     fetchLogs();
@@ -136,23 +139,32 @@ export function AuditLogViewer({ tabla, registroID }: AuditLogViewerProps) {
           </TableHeader>
           <TableBody>
             {logs.map((log) => {
-              const isExpanded = expandedLog === log.logID;
+              // Obtener el ID del log de forma segura
+              const logId = log.id || `log-${Math.random()}`;
+              const isExpanded = expandedLog === logId;
+
+              // Obtener la configuración de la acción de forma segura
+              const accion = log.accion as AccionType;
+              const actionConfig = accionConfig[accion] || {
+                label: log.accion || 'Desconocido',
+                className: 'bg-gray-100 text-gray-800 dark:bg-gray-500/20 dark:text-gray-200'
+              };
 
               return (
                 <>
                   <TableRow
-                    key={log.logID}
+                    key={logId}
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() =>
-                      setExpandedLog(isExpanded ? null : log.logID)
+                      setExpandedLog(isExpanded ? null : logId)
                     }
                   >
                     <TableCell>
                       <Badge
                         variant="outline"
-                        className={accionConfig[log.accion].className}
+                        className={actionConfig.className}
                       >
-                        {accionConfig[log.accion].label}
+                        {actionConfig.label}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -190,7 +202,7 @@ export function AuditLogViewer({ tabla, registroID }: AuditLogViewerProps) {
                   </TableRow>
 
                   {isExpanded && (
-                    <TableRow key={`${log.logID}-details`}>
+                    <TableRow key={`${logId}-details`}>
                       <TableCell colSpan={5} className="bg-muted/30">
                         <div className="p-4 space-y-4">
                           <div className="grid grid-cols-2 gap-4 text-sm">

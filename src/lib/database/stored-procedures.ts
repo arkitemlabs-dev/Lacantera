@@ -7,6 +7,12 @@
 
 import sql from 'mssql';
 import { getERPConnection } from './multi-tenant-connection';
+import type { 
+  ProveedorSPParams, 
+  ConsultaProveedorParams, 
+  ProveedorERP, 
+  SPProveedorResult 
+} from '@/types/admin-proveedores';
 
 // =============================================================================
 // MAPEO DE CÓDIGOS DE EMPRESA A TENANT IDs
@@ -265,137 +271,15 @@ export class StoredProcedures {
       .input('CuantasPaginas', sql.Int, cuantasPaginas)
       .execute('sp_GetOrdenesCompra');
 
-    const ordenes = getRecordset<OrdenCompra>(result, 0);
-    const paginacionRecord = getFirstRecord<{ Paginas: number; Registros: number; Total: number }>(result, 1);
-
-    return {
-      ordenes,
-      // Intentar con Registros (nombre del SP) o Total como fallback
-      total: paginacionRecord?.Registros || paginacionRecord?.Total || 0
-    };
-  }
-
-  /**
-   * SP 2: sp_GetOrdenCompraPorID
-   * Obtiene detalle de una orden específica
-   */
-  async getOrdenCompraPorID(id: number, empresa?: string): Promise<{ orden: OrdenCompra | null; partidas: unknown[] }> {
-    const pool = await this.getPool(empresa || '01');
-
-    const result = await pool.request()
-      .input('ID', sql.Int, id)
-      .input('Empresa', sql.VarChar(10), empresa || null)
-      .execute('sp_GetOrdenCompraPorID');
-
-    return {
-      orden: getFirstRecord<OrdenCompra>(result, 0),
-      partidas: getRecordset(result, 1)
-    };
-  }
-
-  /**
-   * SP 3: sp_GetOrdenesCompraStats
-   * Estadísticas para dashboard de órdenes
-   */
-  async getOrdenesCompraStats(empresa?: string, estatus?: string): Promise<{
-    totales: unknown;
-    topProveedores: unknown[];
-    porMes: unknown[];
-    porEstatus: unknown[];
-  }> {
-    const pool = await this.getPool(empresa || '01');
-
-    const result = await pool.request()
-      .input('Estatus', sql.VarChar(20), estatus || null)
-      .input('Empresa', sql.VarChar(10), empresa || null)
-      .execute('sp_GetOrdenesCompraStats');
-
-    return {
-      totales: getFirstRecord(result, 0) || {},
-      topProveedores: getRecordset(result, 1),
-      porMes: getRecordset(result, 2),
-      porEstatus: getRecordset(result, 3)
-    };
-  }
-
-  /**
-   * SP 4: sp_GetOrdenesCompraProveedor
-   * Órdenes de un proveedor específico (Vista Proveedor)
-   *
-   * Flujo de búsqueda:
-   * - Si hay @Clave, busca por clave del proveedor
-   * - Si no hay @Clave pero hay @RFC, busca por RFC
-   * - Si no hay ninguno, no retorna resultados
-   *
-   * @param clave - Código/clave del proveedor (puede ser null si se pasa RFC)
-   * @param empresa - Código de empresa ERP
-   * @param params - Parámetros opcionales (rfc, estatus, fechas, paginación)
-   */
-  async getOrdenesCompraProveedor(
-    clave: string | null,
-    empresa: string,
-    params: Omit<GetOrdenesCompraParams, 'empresa' | 'proveedor'> = {}
-  ): Promise<GetOrdenesCompraResult> {
-    const {
-      rfc = null,
-      fechaDesde = null,
-      fechaHasta = null,
-      page = 1,
-      limit = 50
-    } = params;
-
-    const pool = await this.getPool(empresa);
-
-    // Log para debug
-    console.log('[SP getOrdenesCompraProveedor] Parámetros:', {
-      clave,
-      rfc,
-      empresa,
-      fechaDesde,
-      fechaHasta,
-      page,
-      limit
-    });
-
-    let result;
-    try {
-      result = await pool.request()
-        .input('Clave', sql.VarChar(10), clave)
-        .input('Rfc', sql.VarChar(20), rfc)
-        .input('Empresa', sql.VarChar(5), empresa)
-        .input('FechaDesde', sql.Date, this.toDate(fechaDesde))
-        .input('FechaHasta', sql.Date, this.toDate(fechaHasta))
-        .input('Page', sql.Int, page)
-        .input('Limit', sql.Int, limit)
-        .input('CuantasPaginas', sql.Int, null)
-        .execute('sp_GetOrdenesCompraProveedor');
-    } catch (spError: any) {
-      console.error('[SP getOrdenesCompraProveedor] Error ejecutando SP:', {
-        message: spError.message,
-        code: spError.code,
-        number: spError.number,
-        state: spError.state,
-        class: spError.class,
-        precedingErrors: spError.precedingErrors,
-        originalError: spError.originalError?.message || spError.originalError
-      });
-      throw spError;
-    }
+    console.log(`[SP] Recordsets devueltos: ${result.recordsets.length}`);
 
     const ordenes = getRecordset<OrdenCompra>(result, 0);
-    const totalRecord = getFirstRecord<{ Total: number; Registros: number }>(result, 1);
 
-    // Log resultado
-    console.log('[SP getOrdenesCompraProveedor] Resultado:', {
-      ordenesCount: ordenes.length,
-      total: totalRecord?.Total || totalRecord?.Registros || 0,
-      primeraOrden: ordenes[0] ? {
-        ID: ordenes[0].ID,
-        MovID: ordenes[0].MovID,
-        FechaEmision: ordenes[0].FechaEmision,
-        Proveedor: ordenes[0].Proveedor
-      } : null
-    });
+    // El SP puede devolver el total en el segundo recordset
+    const totalRecord = getFirstRecord<{ Total?: number; Registros?: number; TotalRegistros?: number }>(result, 1);
+
+    console.log(`[SP] Órdenes encontradas: ${ordenes.length}`);
+    console.log(`[SP] Total desde SP:`, totalRecord);
 
     return {
       ordenes,
@@ -641,6 +525,163 @@ export class StoredProcedures {
       ordenCompra: getFirstRecord(result, 1),
       partidas: getRecordset(result, 2)
     };
+  }
+
+  // ===========================================================================
+  // PROVEEDORES
+  // ===========================================================================
+
+  /**
+   * SP: spDatosProveedor
+   * Gestiona datos de proveedores: Consulta, Alta, Modificación
+   * 
+   * @param params Parámetros del SP según la operación
+   * @returns Resultado con datos del proveedor o confirmación de operación
+   */
+  async spDatosProveedor(params: ProveedorSPParams | ConsultaProveedorParams): Promise<SPProveedorResult> {
+    const {
+      empresa,
+      operacion,
+      rfc = '',
+      proveedor = '',
+      cveProv = ''
+    } = params;
+
+    try {
+      const pool = await this.getPool(empresa);
+      const request = pool.request()
+        .input('Empresa', sql.VarChar(10), empresa)
+        .input('Operacion', sql.VarChar(1), operacion)
+        .input('Rfc', sql.VarChar(20), rfc)
+        .input('Proveedor', sql.VarChar(200), proveedor)
+        .input('CveProv', sql.VarChar(10), cveProv);
+
+      // Solo agregar parámetros adicionales para operaciones de Alta/Modificación
+      if (operacion === 'A' || operacion === 'M') {
+        const fullParams = params as ProveedorSPParams;
+        
+        request
+          .input('Nombre', sql.VarChar(100), fullParams.nombre || '')
+          .input('NombreC', sql.VarChar(20), fullParams.nombreC || '')
+          .input('RfcProv', sql.VarChar(15), fullParams.rfcProv || '')
+          .input('Curp', sql.VarChar(30), fullParams.curp || '')
+          .input('Regimen', sql.VarChar(30), fullParams.regimen || '')
+          .input('Direccion', sql.VarChar(100), fullParams.direccion || '')
+          .input('NumExt', sql.VarChar(20), fullParams.numExt || '')
+          .input('NumInt', sql.VarChar(20), fullParams.numInt || '')
+          .input('EntreCalles', sql.VarChar(100), fullParams.entreCalles || '')
+          .input('Colonia', sql.VarChar(100), fullParams.colonia || '')
+          .input('Poblacion', sql.VarChar(100), fullParams.poblacion || '')
+          .input('Estado', sql.VarChar(30), fullParams.estado || '')
+          .input('Pais', sql.VarChar(100), fullParams.pais || '')
+          .input('Codigopostal', sql.VarChar(15), fullParams.codigoPostal || '')
+          .input('Contacto1', sql.VarChar(50), fullParams.contacto1 || '')
+          .input('Contacto2', sql.VarChar(50), fullParams.contacto2 || '')
+          .input('Email1', sql.VarChar(50), fullParams.email1 || '')
+          .input('Email2', sql.VarChar(50), fullParams.email2 || '')
+          .input('Telefonos', sql.VarChar(100), fullParams.telefonos || '')
+          .input('Fax', sql.VarChar(50), fullParams.fax || '')
+          .input('Extension1', sql.VarChar(10), fullParams.extension1 || '')
+          .input('Extension2', sql.VarChar(10), fullParams.extension2 || '')
+          .input('BancoSucursal', sql.VarChar(50), fullParams.bancoSucursal || '')
+          .input('Cuenta', sql.VarChar(20), fullParams.cuenta || '')
+          .input('Beneficiario', sql.Int, fullParams.beneficiario || 0)
+          .input('BeneficiarioNombre', sql.VarChar(100), fullParams.beneficiarioNombre || '')
+          .input('LeyendaCheque', sql.VarChar(100), fullParams.leyendaCheque || '');
+      }
+
+      const result = await request.execute('spDatosProveedor');
+
+      console.log(`[SP] spDatosProveedor ejecutado. Operación: ${operacion}, Empresa: ${empresa}`);
+
+      // Para consultas, devolver los datos del recordset
+      if (operacion === 'C') {
+        const proveedores = getRecordset<ProveedorERP>(result, 0);
+        return {
+          success: true,
+          data: proveedores,
+          message: `${proveedores.length} proveedor(es) encontrado(s)`
+        };
+      }
+
+      // Para Alta/Modificación, devolver confirmación
+      // El SP puede devolver un mensaje de éxito o error en el primer recordset
+      const confirmacion = getFirstRecord(result, 0) as any;
+      
+      return {
+        success: true,
+        data: confirmacion ? [confirmacion] : [],
+        message: operacion === 'A' ? 'Proveedor creado exitosamente' : 'Proveedor actualizado exitosamente'
+      };
+
+    } catch (error: any) {
+      console.error('[SP] Error en spDatosProveedor:', error);
+      
+      return {
+        success: false,
+        data: [],
+        error: error.message || 'Error desconocido en el stored procedure',
+        message: `Error en operación ${operacion} para empresa ${empresa}`
+      };
+    }
+  }
+
+  /**
+   * Método helper para consultar un proveedor específico
+   * Simplifica las consultas más comunes
+   */
+  async consultarProveedor(params: {
+    empresa: string;
+    rfc?: string;
+    nombre?: string;
+    codigo?: string;
+  }): Promise<SPProveedorResult<ProveedorERP | null>> {
+    const consultaParams: ConsultaProveedorParams = {
+      empresa: params.empresa,
+      operacion: 'C',
+      rfc: params.rfc,
+      proveedor: params.nombre,
+      cveProv: params.codigo
+    };
+
+    const result = await this.spDatosProveedor(consultaParams);
+    
+    if (result.success && Array.isArray(result.data) && result.data.length > 0) {
+      return {
+        ...result,
+        data: result.data[0] as ProveedorERP
+      };
+    }
+
+    return {
+      ...result,
+      data: null,
+      message: 'Proveedor no encontrado'
+    };
+  }
+
+  /**
+   * Método helper para crear un nuevo proveedor
+   */
+  async crearProveedor(params: Omit<ProveedorSPParams, 'operacion'> & { empresa: string }): Promise<SPProveedorResult> {
+    const createParams: ProveedorSPParams = {
+      ...params,
+      operacion: 'A'
+    };
+
+    return await this.spDatosProveedor(createParams);
+  }
+
+  /**
+   * Método helper para actualizar un proveedor existente
+   */
+  async actualizarProveedor(params: Omit<ProveedorSPParams, 'operacion'> & { empresa: string }): Promise<SPProveedorResult> {
+    const updateParams: ProveedorSPParams = {
+      ...params,
+      operacion: 'M'
+    };
+
+    return await this.spDatosProveedor(updateParams);
   }
 }
 
