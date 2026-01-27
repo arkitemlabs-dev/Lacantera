@@ -568,6 +568,7 @@ export class StoredProcedures {
    * @returns Resultado con datos del proveedor o confirmación de operación
    */
   async spDatosProveedor(params: ProveedorSPParams | ConsultaProveedorParams): Promise<SPProveedorResult> {
+    console.log('[SP DEBUG] spDatosProveedor received params:', JSON.stringify(params, null, 2));
     const {
       empresa,
       operacion,
@@ -685,7 +686,7 @@ export class StoredProcedures {
       const confirmacion = getFirstRecord(result, 0) as any;
 
       // Verificar si hay mensaje de error del SP
-      const spErrorMessage = confirmacion?.Error || confirmacion?.Mensaje || confirmacion?.error || confirmacion?.ErrorMessage;
+      const spErrorMessage = confirmacion?.Error || confirmacion?.Mensaje || confirmacion?.error || confirmacion?.ErrorMessage || confirmacion?.[''];
 
       // Determinar si fue exitoso
       let spSuccess = true;

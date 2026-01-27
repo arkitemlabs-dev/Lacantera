@@ -699,6 +699,7 @@ export async function getProveedorConSP(params: {
   nombre?: string;
   codigo?: string;
 }): Promise<ProveedorERP | null> {
+  console.log('[getProveedorConSP] RECIBIDO:', JSON.stringify(params, null, 2));
   const sp = getStoredProcedures();
 
   try {
@@ -779,37 +780,44 @@ export async function crearProveedorConSP(data: FormProveedorAdmin): Promise<SPP
   try {
     console.log('[crearProveedorConSP] Creando proveedor:', data.nombre);
 
+    // Helper: Convertir null/undefined a cadena vacía para el SP
+    const cleanValue = (value: any): string => {
+      if (value === null || value === undefined) return '';
+      if (typeof value === 'string') return value.trim();
+      return String(value);
+    };
+
     // Mapear datos del formulario a parámetros del SP
     const params: ProveedorSPParams = {
       empresa: data.empresa,
       operacion: 'A',
-      nombre: data.nombre,
-      nombreC: data.nombreCorto,
-      rfcProv: data.rfc,
-      curp: data.curp,
-      regimen: data.regimen,
-      direccion: data.direccion,
-      numExt: data.numeroExterior,
-      numInt: data.numeroInterior,
-      entreCalles: data.entreCalles,
-      colonia: data.colonia,
-      poblacion: data.ciudad,
-      estado: data.estado,
-      pais: data.pais,
-      codigoPostal: data.codigoPostal,
-      contacto1: data.contactoPrincipal,
-      contacto2: data.contactoSecundario,
-      email1: data.email1,
-      email2: data.email2,
-      telefonos: data.telefonos,
-      fax: data.fax,
-      extension1: data.extension1,
-      extension2: data.extension2,
-      bancoSucursal: data.banco,
-      cuenta: data.cuentaBancaria,
-      beneficiario: data.beneficiario,
-      beneficiarioNombre: data.nombreBeneficiario,
-      leyendaCheque: data.leyendaCheque
+      nombre: cleanValue(data.nombre),
+      nombreC: cleanValue(data.nombreCorto),
+      rfcProv: cleanValue(data.rfc),
+      curp: cleanValue(data.curp),
+      regimen: cleanValue(data.regimen),
+      direccion: cleanValue(data.direccion),
+      numExt: cleanValue(data.numeroExterior),
+      numInt: cleanValue(data.numeroInterior),
+      entreCalles: cleanValue(data.entreCalles),
+      colonia: cleanValue(data.colonia),
+      poblacion: cleanValue(data.ciudad),
+      estado: cleanValue(data.estado),
+      pais: cleanValue(data.pais),
+      codigoPostal: cleanValue(data.codigoPostal),
+      contacto1: cleanValue(data.contactoPrincipal),
+      contacto2: cleanValue(data.contactoSecundario),
+      email1: cleanValue(data.email1),
+      email2: cleanValue(data.email2),
+      telefonos: cleanValue(data.telefonos),
+      fax: cleanValue(data.fax),
+      extension1: cleanValue(data.extension1),
+      extension2: cleanValue(data.extension2),
+      bancoSucursal: cleanValue(data.banco),
+      cuenta: cleanValue(data.cuentaBancaria),
+      beneficiario: data.beneficiario ?? 0,
+      beneficiarioNombre: cleanValue(data.nombreBeneficiario),
+      leyendaCheque: cleanValue(data.leyendaCheque)
     };
 
     const result = await sp.crearProveedor(params);
@@ -841,56 +849,72 @@ export async function actualizarProveedorConSP(data: FormProveedorAdmin): Promis
   try {
     console.log('[actualizarProveedorConSP] Iniciando actualización para:', data.nombre);
 
-    // USAR ACTUALIZACIÓN DIRECTA (Bypass del SP defectuoso)
-    // Se ha identificado que spDatosProveedor con Operacion='M' no persiste los cambios
+    /*
+    // RESPALDO: ACTUALIZACIÓN DIRECTA (Por si el SP falla de nuevo)
     console.log('[actualizarProveedorConSP] 🔄 Usando actualización DIRECTA (bypass del SP)');
-
     const directResult = await actualizarProveedorDirecto(
       data.empresa,
       data.cveProv || '',
       data
     );
-
     if (directResult.success) {
-      console.log('[actualizarProveedorConSP] ✅ Éxito con actualización directa');
-
-      // Opcional: Llamar al SP de todos modos para que quede registro en bitácora de Intelisis si existe
-      // Pero no dependemos de su resultado para el éxito de la operación
-      try {
-        const cleanValue = (value: any): string => {
-          if (value === null || value === undefined) return '';
-          if (typeof value === 'string') return value.trim();
-          return String(value);
-        };
-
-        const spParams: ProveedorSPParams = {
-          empresa: data.empresa,
-          operacion: 'M',
-          cveProv: data.cveProv,
-          rfc: '',
-          proveedor: '',
-          nombre: cleanValue(data.nombre),
-          rfcProv: cleanValue(data.rfc),
-          telefonos: cleanValue(data.telefonos),
-        };
-        await sp.actualizarProveedor(spParams);
-      } catch (spError) {
-        console.warn('[actualizarProveedorConSP] Error silencioso al llamar al SP de auditoría:', spError);
-      }
-
-      return {
-        success: true,
-        data: [],
-        message: directResult.message || 'Proveedor actualizado exitosamente'
-      };
-    } else {
-      console.error('[actualizarProveedorConSP] ❌ Falló la actualización directa:', directResult.error);
-      return {
-        success: false,
-        data: [],
-        error: directResult.error || 'Error en la actualización directa'
-      };
+      return { success: true, data: [], message: directResult.message };
     }
+    */
+
+    // Helper: Convertir null/undefined a cadena vacía para el SP
+    const cleanValue = (value: any): string => {
+      if (value === null || value === undefined) return '';
+      if (typeof value === 'string') return value.trim();
+      return String(value);
+    };
+
+    // Mapear datos del formulario a parámetros del SP
+    const params: ProveedorSPParams = {
+      empresa: data.empresa,
+      operacion: 'M',
+      cveProv: data.cveProv,
+      rfc: '',        // Limpiar búsqueda
+      proveedor: '',  // Limpiar búsqueda
+      nombre: cleanValue(data.nombre),
+      nombreC: cleanValue(data.nombreCorto),
+      rfcProv: cleanValue(data.rfc),
+      curp: cleanValue(data.curp),
+      regimen: cleanValue(data.regimen),
+      direccion: cleanValue(data.direccion),
+      numExt: cleanValue(data.numeroExterior),
+      numInt: cleanValue(data.numeroInterior),
+      entreCalles: cleanValue(data.entreCalles),
+      colonia: cleanValue(data.colonia),
+      poblacion: cleanValue(data.ciudad),
+      estado: cleanValue(data.estado),
+      pais: cleanValue(data.pais),
+      codigoPostal: cleanValue(data.codigoPostal),
+      contacto1: cleanValue(data.contactoPrincipal),
+      contacto2: cleanValue(data.contactoSecundario),
+      email1: cleanValue(data.email1),
+      email2: cleanValue(data.email2),
+      telefonos: cleanValue(data.telefonos),
+      fax: cleanValue(data.fax),
+      extension1: cleanValue(data.extension1),
+      extension2: cleanValue(data.extension2),
+      bancoSucursal: cleanValue(data.banco),
+      cuenta: cleanValue(data.cuentaBancaria),
+      beneficiario: data.beneficiario ?? 0,
+      beneficiarioNombre: cleanValue(data.nombreBeneficiario),
+      leyendaCheque: cleanValue(data.leyendaCheque)
+    };
+
+    console.log('[actualizarProveedorConSP] Llamando a SP spDatosProveedor con Operacion M');
+    const result = await sp.actualizarProveedor(params);
+
+    if (result.success) {
+      console.log('[actualizarProveedorConSP] ✅ Éxito con el Stored Procedure');
+    } else {
+      console.error('[actualizarProveedorConSP] ❌ Falló el SP:', result.error);
+    }
+
+    return result;
 
   } catch (error: any) {
     console.error('[actualizarProveedorConSP] ❌ Error crítico:', error);
