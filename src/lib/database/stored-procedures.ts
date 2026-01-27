@@ -6,13 +6,22 @@
  */
 
 import sql from 'mssql';
-import { getERPConnection } from './multi-tenant-connection';
-import type { 
-  ProveedorSPParams, 
-  ConsultaProveedorParams, 
-  ProveedorERP, 
-  SPProveedorResult 
+import { getERPConnection, getTenantConfig } from './multi-tenant-connection';
+import type {
+  ProveedorSPParams,
+  ConsultaProveedorParams,
+  ProveedorERP,
+  SPProveedorResult
 } from '@/types/admin-proveedores';
+
+// DEBUG STORE GLOBAL
+class DebugStore {
+  static lastCall: any = null;
+  static lastResult: any = null;
+  static error: any = null;
+}
+
+export { DebugStore };
 
 // =============================================================================
 // MAPEO DE CÓDIGOS DE EMPRESA A TENANT IDs
@@ -30,6 +39,13 @@ const EMPRESA_TO_TENANT: Record<string, string> = {
   '03': 'plaza-galerena',
   '04': 'inmobiliaria-galerena',
   '05': 'icrear',
+  '06': 'la-cantera',
+  '07': 'peralillo',
+  'LCDM': 'la-cantera',
+  'PERA': 'peralillo',
+  'PLAZ': 'plaza-galerena',
+  'INMO': 'inmobiliaria-galerena',
+  'ICRE': 'icrear',
   // También permitir usar el tenant ID directamente
   'la-cantera': 'la-cantera',
   'peralillo': 'peralillo',
@@ -162,9 +178,22 @@ export class StoredProcedures {
    * Obtiene la conexión al ERP según el código de empresa
    * Convierte automáticamente códigos como '01' a tenant IDs como 'la-cantera'
    */
-  private async getPool(empresaCode: string = '01'): Promise<sql.ConnectionPool> {
+  private async getPool(empresaCode: string = 'la-cantera'): Promise<sql.ConnectionPool> {
     const tenantId = empresaToTenant(empresaCode);
     return await getERPConnection(tenantId);
+  }
+
+  /**
+   * Helper para obtener el código de empresa del ERP basado en tenant o parámetro
+   */
+  private getEmpresaERP(empresa: string | null | undefined): string {
+    if (!empresa) return '01'; // Default general
+    try {
+      const config = getTenantConfig(empresa);
+      return config.erpEmpresa;
+    } catch (e) {
+      return empresa;
+    }
   }
 
   /**
@@ -263,7 +292,7 @@ export class StoredProcedures {
 
     const result = await pool.request()
       .input('Rfc', sql.VarChar(20), rfc)
-      .input('Empresa', sql.VarChar(5), empresa)
+      .input('Empresa', sql.VarChar(10), this.getEmpresaERP(empresa))
       .input('FechaDesde', sql.VarChar(10), fechaDesdeStr)
       .input('FechaHasta', sql.VarChar(10), fechaHastaStr)
       .input('Page', sql.Int, page)
@@ -299,7 +328,7 @@ export class StoredProcedures {
 
     const result = await pool.request()
       .input('OrdenID', sql.Int, ordenId)
-      .input('Empresa', sql.VarChar(10), empresa || null)
+      .input('Empresa', sql.VarChar(10), this.getEmpresaERP(empresa))
       .execute('sp_GetOrdenCompraConDetalle');
 
     return {
@@ -348,7 +377,7 @@ export class StoredProcedures {
     const result = await pool.request()
       .input('Proveedor', sql.VarChar(20), proveedor)
       .input('RFC', sql.VarChar(13), rfc)
-      .input('Empresa', sql.VarChar(10), empresa)
+      .input('Empresa', sql.VarChar(10), this.getEmpresaERP(empresa))
       .input('Estatus', sql.VarChar(20), estatus)
       .input('FechaDesde', sql.Date, this.toDate(fechaDesde))
       .input('FechaHasta', sql.Date, this.toDate(fechaHasta))
@@ -379,7 +408,7 @@ export class StoredProcedures {
 
     const result = await pool.request()
       .input('ID', sql.Int, id)
-      .input('Empresa', sql.VarChar(10), empresa || null)
+      .input('Empresa', sql.VarChar(10), this.getEmpresaERP(empresa))
       .execute('sp_GetFacturaPorID');
 
     return {
@@ -403,7 +432,7 @@ export class StoredProcedures {
     const pool = await this.getPool(empresa || '01');
 
     const result = await pool.request()
-      .input('Empresa', sql.VarChar(10), empresa || null)
+      .input('Empresa', sql.VarChar(10), this.getEmpresaERP(empresa))
       .input('Proveedor', sql.VarChar(20), proveedor || null)
       .input('FechaDesde', sql.Date, this.toDate(fechaDesde))
       .input('FechaHasta', sql.Date, this.toDate(fechaHasta))
@@ -439,7 +468,7 @@ export class StoredProcedures {
 
     const result = await pool.request()
       .input('RFC', sql.VarChar(13), rfc)
-      .input('Empresa', sql.VarChar(10), empresa)
+      .input('Empresa', sql.VarChar(10), this.getEmpresaERP(empresa))
       .input('Estatus', sql.VarChar(20), estatus)
       .input('FechaDesde', sql.Date, this.toDate(fechaDesde))
       .input('FechaHasta', sql.Date, this.toDate(fechaHasta))
@@ -492,7 +521,7 @@ export class StoredProcedures {
 
     const result = await pool.request()
       .input('UUID', sql.VarChar(36), uuid)
-      .input('Empresa', sql.VarChar(10), empresa || null)
+      .input('Empresa', sql.VarChar(10), this.getEmpresaERP(empresa))
       .execute('sp_ValidarFacturaDuplicada');
 
     const row = result.recordset?.[0] as { Existe?: boolean | number; FacturaID?: number; Folio?: string; Estatus?: string } | undefined;
@@ -517,7 +546,7 @@ export class StoredProcedures {
 
     const result = await pool.request()
       .input('FacturaID', sql.Int, facturaId)
-      .input('Empresa', sql.VarChar(10), empresa || null)
+      .input('Empresa', sql.VarChar(10), this.getEmpresaERP(empresa))
       .execute('sp_GetFacturaConOrdenCompra');
 
     return {
@@ -548,9 +577,10 @@ export class StoredProcedures {
     } = params;
 
     try {
+      const config = getTenantConfig(empresa);
       const pool = await this.getPool(empresa);
       const request = pool.request()
-        .input('Empresa', sql.VarChar(10), empresa)
+        .input('Empresa', sql.VarChar(10), this.getEmpresaERP(empresa))
         .input('Operacion', sql.VarChar(1), operacion)
         .input('Rfc', sql.VarChar(20), rfc)
         .input('Proveedor', sql.VarChar(200), proveedor)
@@ -559,14 +589,21 @@ export class StoredProcedures {
       // Solo agregar parámetros adicionales para operaciones de Alta/Modificación
       if (operacion === 'A' || operacion === 'M') {
         const fullParams = params as ProveedorSPParams;
-        
+
+        console.log(`[SP DEBUG] Parametros para ${operacion === 'A' ? 'Alta' : 'Modificación'}:`, {
+          Nombre: fullParams.nombre,
+          RfcProv: fullParams.rfcProv,
+          Telefonos: fullParams.telefonos,
+          CveProv: cveProv
+        });
+
         request
           .input('Nombre', sql.VarChar(100), fullParams.nombre || '')
           .input('NombreC', sql.VarChar(20), fullParams.nombreC || '')
-          .input('RfcProv', sql.VarChar(15), fullParams.rfcProv || '')
+          .input('RfcProv', sql.VarChar(20), fullParams.rfcProv || '') // RFC puede ser más largo
           .input('Curp', sql.VarChar(30), fullParams.curp || '')
-          .input('Regimen', sql.VarChar(30), fullParams.regimen || '')
-          .input('Direccion', sql.VarChar(100), fullParams.direccion || '')
+          .input('Regimen', sql.VarChar(50), fullParams.regimen || '')
+          .input('Direccion', sql.VarChar(200), fullParams.direccion || '')
           .input('NumExt', sql.VarChar(20), fullParams.numExt || '')
           .input('NumInt', sql.VarChar(20), fullParams.numInt || '')
           .input('EntreCalles', sql.VarChar(100), fullParams.entreCalles || '')
@@ -574,7 +611,7 @@ export class StoredProcedures {
           .input('Poblacion', sql.VarChar(100), fullParams.poblacion || '')
           .input('Estado', sql.VarChar(30), fullParams.estado || '')
           .input('Pais', sql.VarChar(100), fullParams.pais || '')
-          .input('Codigopostal', sql.VarChar(15), fullParams.codigoPostal || '')
+          .input('CodigoPostal', sql.VarChar(15), fullParams.codigoPostal || '')
           .input('Contacto1', sql.VarChar(50), fullParams.contacto1 || '')
           .input('Contacto2', sql.VarChar(50), fullParams.contacto2 || '')
           .input('Email1', sql.VarChar(50), fullParams.email1 || '')
@@ -590,9 +627,28 @@ export class StoredProcedures {
           .input('LeyendaCheque', sql.VarChar(100), fullParams.leyendaCheque || '');
       }
 
+      console.log(`[SP EXEC] Ejecutando spDatosProveedor en BD de ${empresa} (${config.erpDatabase}) con Empresa code: ${this.getEmpresaERP(empresa)}`);
+
+      DebugStore.lastCall = {
+        empresa,
+        empresaERP: this.getEmpresaERP(empresa),
+        operacion,
+        params,
+        timestamp: new Date().toISOString()
+      };
+
       const result = await request.execute('spDatosProveedor');
 
-      console.log(`[SP] spDatosProveedor ejecutado. Operación: ${operacion}, Empresa: ${empresa}`);
+      DebugStore.lastResult = {
+        recordset: result.recordset,
+        rowsAffected: result.rowsAffected,
+        timestamp: new Date().toISOString()
+      };
+
+      console.log(`[SP RESULT] spDatosProveedor ejecutado. Recordsets: ${result.recordsets.length}`);
+      if (result.recordset && result.recordset.length > 0) {
+        console.log('[SP RESULT DATA]', result.recordset[0]);
+      }
 
       // Para consultas, devolver los datos del recordset
       if (operacion === 'C') {
@@ -605,18 +661,22 @@ export class StoredProcedures {
       }
 
       // Para Alta/Modificación, devolver confirmación
-      // El SP puede devolver un mensaje de éxito o error en el primer recordset
       const confirmacion = getFirstRecord(result, 0) as any;
-      
+
+      // En Intelisis, a veces el primer recordset contiene el mensaje de error o éxito
+      const spErrorMessage = confirmacion?.Error || confirmacion?.Mensaje || confirmacion?.error;
+      const spSuccess = !spErrorMessage || spErrorMessage.toString().toLowerCase().includes('exito') || spErrorMessage.toString().toLowerCase().includes('correcto');
+
       return {
-        success: true,
+        success: spSuccess,
         data: confirmacion ? [confirmacion] : [],
-        message: operacion === 'A' ? 'Proveedor creado exitosamente' : 'Proveedor actualizado exitosamente'
+        error: spSuccess ? undefined : spErrorMessage,
+        message: operacion === 'A' ? 'Proveedor creado' : 'Proveedor actualizado'
       };
 
     } catch (error: any) {
       console.error('[SP] Error en spDatosProveedor:', error);
-      
+
       return {
         success: false,
         data: [],
@@ -645,7 +705,7 @@ export class StoredProcedures {
     };
 
     const result = await this.spDatosProveedor(consultaParams);
-    
+
     if (result.success && Array.isArray(result.data) && result.data.length > 0) {
       return {
         ...result,

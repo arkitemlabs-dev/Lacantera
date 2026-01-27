@@ -4,9 +4,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
-import { 
+import {
   getProveedorConSP,
-  erpAFormulario 
+  erpAFormulario
 } from '@/lib/database/admin-proveedores-queries';
 
 /**
@@ -19,9 +19,10 @@ import {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await props.params;
     // Verificar autenticación
     const session = await getServerSession(authOptions);
 
@@ -43,7 +44,7 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const empresa = searchParams.get('empresa') || 'la-cantera';
     const formato = searchParams.get('formato') || 'erp'; // 'erp' o 'form'
-    
+
     const proveedorId = decodeURIComponent(params.id);
 
     console.log(`[API PROVEEDOR] Admin ${session.user.id} consultando proveedor: ${proveedorId}, empresa: ${empresa}`);
@@ -73,7 +74,7 @@ export async function GET(
 
     if (!proveedor) {
       return NextResponse.json(
-        { 
+        {
           error: 'Proveedor no encontrado',
           criterio: Object.entries(searchParams_obj)
             .filter(([key, value]) => key !== 'empresa' && value)
@@ -98,7 +99,7 @@ export async function GET(
     // Por defecto, retornar datos ERP completos
     return NextResponse.json({
       success: true,
-      data: proveedor,
+      erpDatos: proveedor,
       formato: 'erp'
     });
 
@@ -107,6 +108,87 @@ export async function GET(
     return NextResponse.json(
       {
         error: 'Error al obtener proveedor',
+        details: error.message,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST /api/admin/proveedores/[id]
+ * Actualiza los datos de un proveedor usando el SP spDatosProveedor (operación 'M')
+ */
+export async function POST(
+  request: NextRequest,
+  props: { params: Promise<{ id: string }> }
+) {
+  try {
+    const fs = await import('fs');
+    const params = await props.params;
+    const bodyData = await request.json();
+
+    fs.appendFileSync('sp-debug.log', `\n>>> API POST RECEIVED ${new Date().toISOString()} <<<\nID: ${params.id}\nBody: ${JSON.stringify(bodyData, null, 2)}\n`);
+    // Verificar autenticación
+    const session = await getServerSession(authOptions);
+
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { success: false, error: 'No autenticado' },
+        { status: 401 }
+      );
+    }
+
+    // Verificar que sea administrador
+    if (session.user.role !== 'super-admin' && session.user.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'No autorizado. Se requiere rol de administrador.' },
+        { status: 403 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const empresa = searchParams.get('empresa') || 'la-cantera';
+
+    const proveedorId = decodeURIComponent(params.id);
+
+    console.log(`[API PROVEEDOR POST] Admin ${session.user.id} actualizando proveedor: ${proveedorId}, empresa: ${empresa}`);
+
+    // Preparar datos para el SP
+    const dataToUpdate = {
+      ...bodyData,
+      empresa,
+      operacion: 'M' as const,
+      cveProv: proveedorId // Siempre usar el ID de la URL como identificador
+    };
+
+    // Si el ID de la URL parece un RFC, también asignarlo como criterio de búsqueda adicional
+    if (/^[A-Z]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(proveedorId)) {
+      dataToUpdate.rfc = proveedorId;
+    }
+
+    const { actualizarProveedorConSP } = await import('@/lib/database/admin-proveedores-queries');
+    const result = await actualizarProveedorConSP(dataToUpdate);
+
+    if (result.success) {
+      return NextResponse.json({
+        success: true,
+        message: 'Proveedor actualizado exitosamente en el ERP',
+        data: result.data
+      });
+    } else {
+      return NextResponse.json({
+        success: false,
+        error: result.error || 'Error al actualizar proveedor en el ERP',
+      }, { status: 400 });
+    }
+
+  } catch (error: any) {
+    console.error('[API PROVEEDOR POST] Error:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Error al procesar la actualización',
         details: error.message,
       },
       { status: 500 }

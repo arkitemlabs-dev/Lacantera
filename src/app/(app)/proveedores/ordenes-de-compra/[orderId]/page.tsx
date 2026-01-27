@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useSession } from 'next-auth/react';
 import { ChevronLeft, Loader2, AlertCircle, Package } from 'lucide-react';
 import Link from 'next/link';
@@ -58,16 +58,17 @@ const statusStyles: Record<string, { variant: 'default' | 'destructive' | 'secon
 export default function OrderProfilePage({
   params,
 }: {
-  params: { orderId: string };
+  params: Promise<{ orderId: string }>;
 }) {
+  const { orderId } = use(params);
   const { data: session } = useSession();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    cargarOrden();
-  }, [session, params.orderId]);
+    if (orderId) cargarOrden();
+  }, [session, orderId]);
 
   const cargarOrden = async () => {
     if (!session) return;
@@ -75,10 +76,10 @@ export default function OrderProfilePage({
     setLoading(true);
     setError(null);
     try {
-      console.log('🔍 Cargando detalle de orden:', params.orderId);
+      console.log('🔍 Cargando detalle de orden:', orderId);
 
       // Llamar al endpoint de detalle específico
-      const response = await fetch(`/api/proveedor/ordenes/${params.orderId}`);
+      const response = await fetch(`/api/proveedor/ordenes/${orderId}`);
       const result = await response.json();
 
       if (result.success) {
@@ -142,12 +143,12 @@ export default function OrderProfilePage({
             <h1 className="text-3xl font-semibold">Orden de Compra: {order.movID || order.id}</h1>
             <p className='text-muted-foreground'>{order.concepto || 'Sin concepto'}</p>
           </div>
-           <Badge
-             variant={statusStyle.variant}
-             className={cn('font-normal', statusStyle.className)}
-           >
-             {order.estatus}
-           </Badge>
+          <Badge
+            variant={statusStyle.variant}
+            className={cn('font-normal', statusStyle.className)}
+          >
+            {order.estatus}
+          </Badge>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6">
@@ -291,12 +292,12 @@ export default function OrderProfilePage({
             <Card>
               <CardHeader>
                 <CardTitle>Información General</CardTitle>
-                 <CardDescription>
-                    Detalles de la orden de compra
-                  </CardDescription>
+                <CardDescription>
+                  Detalles de la orden de compra
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                 <div>
+                <div>
                   <h3 className="text-md font-semibold mb-2">Orden</h3>
                   <div className="space-y-1">
                     <InfoRow label="Folio" value={order.movID || order.id} />
@@ -306,7 +307,7 @@ export default function OrderProfilePage({
                   </div>
                 </div>
                 <Separator />
-                 <div>
+                <div>
                   <h3 className="text-md font-semibold mb-2">Estado</h3>
                   <div className="space-y-1">
                     <InfoRow label="Estatus" value={order.estatus} />
@@ -328,10 +329,10 @@ export default function OrderProfilePage({
                       value={
                         order.fechaEmision
                           ? new Date(order.fechaEmision).toLocaleDateString('es-MX', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                            })
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })
                           : 'N/A'
                       }
                     />
@@ -340,10 +341,10 @@ export default function OrderProfilePage({
                       value={
                         order.fechaRequerida
                           ? new Date(order.fechaRequerida).toLocaleDateString('es-MX', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                            })
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })
                           : 'N/A'
                       }
                     />
@@ -352,10 +353,10 @@ export default function OrderProfilePage({
                       value={
                         order.fechaEntrega
                           ? new Date(order.fechaEntrega).toLocaleDateString('es-MX', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                            })
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })
                           : 'N/A'
                       }
                     />

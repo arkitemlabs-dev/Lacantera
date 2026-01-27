@@ -9,31 +9,36 @@ export const TENANT_CONFIGS_TEST = {
     id: 'la-cantera',
     nombre: 'La Cantera Desarrollos Mineros [TEST]',
     erpDatabase: 'Cantera_Ajustes',  // ✅ BD de PRUEBA
-    codigoEmpresa: 'LCDM',
+    codigoEmpresa: 'la-cantera',
+    erpEmpresa: '06',
   },
   'peralillo': {
     id: 'peralillo',
     nombre: 'Peralillo S.A de C.V [TEST]',
     erpDatabase: 'Peralillo_Ajustes',  // ✅ BD de PRUEBA
-    codigoEmpresa: 'PERA',
+    codigoEmpresa: 'peralillo',
+    erpEmpresa: '07',
   },
   'plaza-galerena': {
     id: 'plaza-galerena',
     nombre: 'Plaza Galereña [TEST]',
     erpDatabase: 'GALBD_PRUEBAS',  // ✅ BD de PRUEBA
-    codigoEmpresa: 'PLAZ',
+    codigoEmpresa: 'plaza-galerena',
+    erpEmpresa: '03',
   },
   'icrear': {
     id: 'icrear',
     nombre: 'Icrear [TEST]',
     erpDatabase: 'ICREAR_PRUEBAS',  // ✅ BD de PRUEBA
-    codigoEmpresa: 'ICRE',
+    codigoEmpresa: 'icrear',
+    erpEmpresa: '05',
   },
   'inmobiliaria-galerena': {
     id: 'inmobiliaria-galerena',
     nombre: 'Inmobiliaria Galereña [TEST]',
     erpDatabase: 'GALBD_PRUEBAS',  // ✅ BD de PRUEBA
-    codigoEmpresa: 'INMO',
+    codigoEmpresa: 'inmobiliaria-galerena',
+    erpEmpresa: '04',
   },
 };
 
@@ -45,31 +50,36 @@ export const TENANT_CONFIGS_PROD = {
     id: 'la-cantera',
     nombre: 'La Cantera Desarrollos Mineros [PROD]',
     erpDatabase: 'Cantera',  // BD PROD
-    codigoEmpresa: 'LCDM',
+    codigoEmpresa: 'la-cantera',
+    erpEmpresa: '01',
   },
   'peralillo': {
     id: 'peralillo',
     nombre: 'Peralillo S.A de C.V [PROD]',
     erpDatabase: 'Peralillo_Ajustes',  // BD PROD
-    codigoEmpresa: 'PERA',
+    codigoEmpresa: 'peralillo',
+    erpEmpresa: '02',
   },
   'plaza-galerena': {
     id: 'plaza-galerena',
     nombre: 'Plaza Galereña [PROD]',
     erpDatabase: 'GALBD_PRUEBAS',  // BD PROD
-    codigoEmpresa: 'PLAZ',
+    codigoEmpresa: 'plaza-galerena',
+    erpEmpresa: '03',
   },
   'icrear': {
     id: 'icrear',
     nombre: 'Icrear [PROD]',
     erpDatabase: 'ICREAR_PRUEBAS',  // BD PROD
-    codigoEmpresa: 'ICRE',
+    codigoEmpresa: 'icrear',
+    erpEmpresa: '05',
   },
   'inmobiliaria-galerena': {
     id: 'inmobiliaria-galerena',
     nombre: 'Inmobiliaria Galereña [PROD]',
     erpDatabase: 'GALBD_PRUEBAS',  // BD PROD
-    codigoEmpresa: 'INMO',
+    codigoEmpresa: 'inmobiliaria-galerena',
+    erpEmpresa: '04',
   },
 };
 
@@ -78,9 +88,9 @@ export const TENANT_CONFIGS_PROD = {
  * Por defecto: TEST
  * Para cambiar a PROD: establecer USE_PROD_DB=true en .env
  */
-export const ACTIVE_TENANT_CONFIGS = 
-  process.env.USE_PROD_DB === 'true' 
-    ? TENANT_CONFIGS_PROD 
+export const ACTIVE_TENANT_CONFIGS =
+  process.env.USE_PROD_DB === 'true'
+    ? TENANT_CONFIGS_PROD
     : TENANT_CONFIGS_TEST;
 
 console.log(`[TENANT-CONFIG] Usando: ${process.env.USE_PROD_DB === 'true' ? 'PRODUCCIÓN ⚠️' : 'PRUEBA ✅'}`);

@@ -112,19 +112,20 @@ export async function validateTenantContext(request: NextRequest) {
  *   return NextResponse.json({ ordenes });
  * });
  */
-export function withTenantContext(
+export function withTenantContext<TArgs = any>(
   handler: (
     request: NextRequest,
     context: {
       tenant: NonNullable<TenantRequest['tenant']>;
       user: NonNullable<TenantRequest['user']>;
-    }
+    },
+    additionalArgs?: TArgs
   ) => Promise<NextResponse>
 ) {
-  return async (request: NextRequest) => {
+  return async (request: NextRequest, additionalArgs?: TArgs) => {
     try {
       const context = await validateTenantContext(request);
-      return await handler(request, context);
+      return await handler(request, context, additionalArgs);
     } catch (error) {
       if (error instanceof TenantError) {
         return NextResponse.json(

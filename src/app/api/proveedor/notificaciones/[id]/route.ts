@@ -13,9 +13,10 @@ import sql from 'mssql';
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await props.params;
     const session = await getServerSession(authOptions);
 
     if (!session || !session.user) {
@@ -99,9 +100,10 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await props.params;
     const session = await getServerSession(authOptions);
 
     if (!session || !session.user) {

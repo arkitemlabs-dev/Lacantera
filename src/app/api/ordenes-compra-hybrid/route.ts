@@ -17,22 +17,22 @@ function convertirFecha(fechaStr: string): string {
   if (fechaStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
     return fechaStr;
   }
-  
+
   // Si está en formato DD-MM-YY o DD-MM-YYYY
   const partes = fechaStr.split('-');
   if (partes.length === 3) {
     let [dia, mes, año] = partes;
-    
+
     // Si el año es de 2 dígitos, convertir a 4 dígitos
     if (año.length === 2) {
       const añoNum = parseInt(año);
       // Asumir que años 00-30 son 2000-2030, y 31-99 son 1931-1999
       año = añoNum <= 30 ? `20${año}` : `19${año}`;
     }
-    
+
     return `${año}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
   }
-  
+
   // Si no se puede convertir, devolver tal como está
   return fechaStr;
 }
@@ -147,11 +147,13 @@ export const GET = withTenantContext(async (request, { tenant, user }) => {
  */
 export async function GET_BY_ID(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
-  return withTenantContext(async (req, { tenant, user }) => {
+  const params = await props.params;
+  return withTenantContext(async (req, { tenant, user }, _) => {
     try {
       const ordenId = parseInt(params.id);
+      //... same logic
 
       if (isNaN(ordenId)) {
         return NextResponse.json(
@@ -218,9 +220,10 @@ export async function GET_BY_ID(
  */
 export async function POST_RESPOND(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
-  return withTenantContext(async (req, { tenant, user }) => {
+  const params = await props.params;
+  return withTenantContext(async (req, { tenant, user }, _) => {
     try {
       const ordenId = parseInt(params.id);
 

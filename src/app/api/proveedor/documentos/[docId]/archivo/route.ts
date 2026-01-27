@@ -15,9 +15,10 @@ import path from 'path';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ docId: string }> }
+  props: { params: Promise<{ docId: string }> }
 ) {
   try {
+    const params = await props.params;
     // Verificar autenticación
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {

@@ -5,9 +5,10 @@ import { getEmpresasByUsuario } from '@/app/actions/empresas';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  props: { params: Promise<{ userId: string }> }
 ) {
   try {
+    const params = await props.params;
     const userId = params.userId;
 
     if (!userId) {
@@ -18,9 +19,9 @@ export async function GET(
     }
 
     const result = await getEmpresasByUsuario(userId);
-    
+
     return NextResponse.json(result);
-    
+
   } catch (error: any) {
     console.error('Error en API de empresas:', error);
     return NextResponse.json(

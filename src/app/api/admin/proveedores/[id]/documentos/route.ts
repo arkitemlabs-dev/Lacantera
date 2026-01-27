@@ -14,9 +14,10 @@ import sql from 'mssql';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await props.params;
     // Verificar autenticación
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
@@ -39,7 +40,7 @@ export async function GET(
 
     // Conectar al ERP
     const erpPool = await getERPConnection('la-cantera');
-    
+
     // Buscar el proveedor para obtener su código correcto
     const provResult = await erpPool.request()
       .input('searchId', sql.VarChar(20), id)
@@ -48,14 +49,14 @@ export async function GET(
         FROM Prov 
         WHERE Proveedor = @searchId
       `);
-    
+
     if (provResult.recordset.length === 0) {
       return NextResponse.json(
         { error: `Proveedor ${id} no encontrado` },
         { status: 404 }
       );
     }
-    
+
     const codigoProveedor = provResult.recordset[0].Proveedor;
 
     console.log(`[ADMIN DOCUMENTOS] Proveedor encontrado: ${codigoProveedor} - ${provResult.recordset[0].Nombre}`);
@@ -83,9 +84,9 @@ export async function GET(
     const testAnexos = await erpPool.request()
       .input('proveedorCode', sql.VarChar(20), codigoProveedor)
       .query(`SELECT COUNT(*) as total FROM AnexoCta WHERE Cuenta = @proveedorCode`);
-    
+
     console.log(`[ADMIN DOCUMENTOS] Total anexos en AnexoCta para ${codigoProveedor}: ${testAnexos.recordset[0].total}`);
-    
+
     // Obtener archivos adjuntos del proveedor desde AnexoCta
     const anexosResult = await erpPool.request()
       .input('proveedorCode', sql.VarChar(20), codigoProveedor)
@@ -299,9 +300,10 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await props.params;
     // Verificar autenticación
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {

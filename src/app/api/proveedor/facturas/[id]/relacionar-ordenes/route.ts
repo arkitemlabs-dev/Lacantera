@@ -19,10 +19,12 @@ import sql from 'mssql';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
+  let facturaId = 'unknown';
   try {
-    const facturaId = params.id;
+    const params = await props.params;
+    facturaId = params.id;
     console.log(`🔍 [POST /api/proveedor/facturas/${facturaId}/relacionar-ordenes] Iniciando...`);
 
     // 1. Autenticación
@@ -181,7 +183,7 @@ export async function POST(
     // 9. Insertar nuevas relaciones
     for (const orden of ordenesValidas) {
       await portalPool.request()
-        .input('id', sql.UniqueIdentifier, sql.UniqueIdentifier.NULL) // Auto-genera
+        .input('id', sql.UniqueIdentifier, null) // Auto-genera
         .input('facturaId', sql.UniqueIdentifier, facturaId)
         .input('empresaCode', sql.VarChar(50), factura.empresa_code)
         .input('ordenErpId', sql.Int, orden.ID)
@@ -244,7 +246,7 @@ export async function POST(
     });
 
   } catch (error: any) {
-    console.error(`❌ [POST /api/proveedor/facturas/${params.id}/relacionar-ordenes] Error:`, error);
+    console.error(`❌ [POST /api/proveedor/facturas/${facturaId}/relacionar-ordenes] Error:`, error);
     return NextResponse.json({
       success: false,
       error: 'Error al relacionar órdenes',

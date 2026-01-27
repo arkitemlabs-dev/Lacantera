@@ -17,10 +17,12 @@ import sql from 'mssql';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
+  let facturaId = 'unknown';
   try {
-    const facturaId = params.id;
+    const params = await props.params;
+    facturaId = params.id;
     console.log(`🔍 [GET /api/proveedor/facturas/${facturaId}] Iniciando...`);
 
     // 1. Autenticación
@@ -212,10 +214,10 @@ export async function GET(
         ...factura,
         EmpresaCodigo: empresa,
         EmpresaNombre: empresa === 'la-cantera' ? 'La Cantera' :
-                       empresa === 'peralillo' ? 'Peralillo' :
-                       empresa === 'plaza-galerena' ? 'Plaza Galereña' :
-                       empresa === 'inmobiliaria-galerena' ? 'Inmobiliaria Galereña' :
-                       empresa === 'icrear' ? 'Icrear' : empresa,
+          empresa === 'peralillo' ? 'Peralillo' :
+            empresa === 'plaza-galerena' ? 'Plaza Galereña' :
+              empresa === 'inmobiliaria-galerena' ? 'Inmobiliaria Galereña' :
+                empresa === 'icrear' ? 'Icrear' : empresa,
         CodigoProveedor: erp_proveedor_code
       },
       xml: xmlData,
@@ -234,7 +236,7 @@ export async function GET(
     });
 
   } catch (error: any) {
-    console.error(`❌ [GET /api/proveedor/facturas/${params.id}] Error:`, error);
+    console.error(`❌ [GET /api/proveedor/facturas/${facturaId}] Error:`, error);
     return NextResponse.json({
       success: false,
       error: 'Error al obtener detalle de factura',

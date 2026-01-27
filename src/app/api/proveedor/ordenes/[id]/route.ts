@@ -36,7 +36,7 @@ const getCurrencyCode = (moneda: string | null | undefined): string => {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -48,6 +48,7 @@ export async function GET(
       );
     }
 
+    const params = await props.params;
     const ordenId = params.id;
     const userId = session.user.id;
     const empresaActual = session.user.empresaActual;

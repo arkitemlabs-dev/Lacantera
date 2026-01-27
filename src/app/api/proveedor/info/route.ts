@@ -141,3 +141,78 @@ export async function GET(request: NextRequest) {
     }, { status: 500 });
   }
 }
+/**
+ * POST /api/proveedor/info
+ *
+ * Actualiza información del proveedor en el ERP de la empresa actual
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const fs = await import('fs');
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
+      return NextResponse.json({ success: false, error: 'No autenticado' }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+    const empresaActual = session.user.empresaActual;
+    const body = await request.json();
+
+    fs.appendFileSync('sp-debug.log', `\n>>> PROVEEDOR POST RECEIVED ${new Date().toISOString()} <<<\nUser: ${userId}\nBody: ${JSON.stringify(body, null, 2)}\n`);
+
+    if (!empresaActual) {
+      return NextResponse.json({ success: false, error: 'No hay empresa seleccionada' }, { status: 400 });
+    }
+
+    // 1. Obtener el mapping para saber qué código de proveedor usar
+    const portalPool = await getPortalConnection();
+    const mappingResult = await portalPool.request()
+      .input('userId', sql.NVarChar(50), userId)
+      .input('empresaCode', sql.VarChar(50), empresaActual)
+      .query(`
+        SELECT erp_proveedor_code FROM portal_proveedor_mapping
+        WHERE portal_user_id = @userId AND empresa_code = @empresaCode AND activo = 1
+      `);
+
+    if (mappingResult.recordset.length === 0) {
+      return NextResponse.json({ success: false, error: 'No se encontró mapping' }, { status: 404 });
+    }
+
+    const erp_proveedor_code = mappingResult.recordset[0].erp_proveedor_code;
+
+    // 2. Preparar datos para el SP
+    const { actualizarProveedorConSP } = await import('@/lib/database/admin-proveedores-queries');
+
+    // Solo permitir campos que el proveedor tiene autorizado (fiscal, direccion, contacto)
+    const dataToUpdate = {
+      ...body,
+      empresa: empresaActual,
+      operacion: 'M' as const,
+      cveProv: erp_proveedor_code,
+      proveedor: erp_proveedor_code // Identificador para el WHERE del SP
+    };
+
+    const result = await actualizarProveedorConSP(dataToUpdate);
+
+    if (result.success) {
+      return NextResponse.json({
+        success: true,
+        message: 'Información actualizada correctamente en el ERP',
+        data: result.data
+      });
+    } else {
+      return NextResponse.json({
+        success: false,
+        error: result.error || 'Error al actualizar información en el ERP',
+      }, { status: 400 });
+    }
+
+  } catch (error: any) {
+    console.error('❌ [POST /api/proveedor/info] Error:', error);
+    return NextResponse.json({
+      success: false,
+      error: 'Error actualizando información del proveedor',
+      details: error.message
+    }, { status: 500 });
+  }
+}

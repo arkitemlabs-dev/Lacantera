@@ -8,7 +8,7 @@
 /**
  * Operaciones disponibles en el SP spDatosProveedor
  */
-export type OperacionProveedor = 'C' | 'A' | 'M'; // Consulta, Alta, Modificar
+export type OperacionProveedor = 'C' | 'A' | 'M'; // Consulta, Alta, Modificar (No existe Baja/Eliminar)
 
 /**
  * Parámetros para consultar un proveedor específico
@@ -28,19 +28,19 @@ export interface ProveedorSPParams {
   // Obligatorios
   empresa: string;          // VARCHAR(10)
   operacion: OperacionProveedor; // 'C', 'A', 'M'
-  
+
   // Para búsqueda (solo en consultas)
   rfc?: string;             // VARCHAR(20)
   proveedor?: string;       // VARCHAR(200) - Nombre para búsqueda
   cveProv?: string;         // VARCHAR(10) - Clave para búsqueda
-  
+
   // Datos del proveedor (obligatorios para Alta/Modificación)
   nombre?: string;          // VARCHAR(100)
   nombreC?: string;         // VARCHAR(20) - Nombre corto
   rfcProv?: string;         // VARCHAR(15) - RFC del proveedor
   curp?: string;            // VARCHAR(30)
   regimen?: string;         // VARCHAR(30)
-  
+
   // Dirección
   direccion?: string;       // VARCHAR(100)
   numExt?: string;          // VARCHAR(20)
@@ -51,7 +51,7 @@ export interface ProveedorSPParams {
   estado?: string;          // VARCHAR(30)
   pais?: string;            // VARCHAR(100)
   codigoPostal?: string;    // VARCHAR(15)
-  
+
   // Contactos
   contacto1?: string;       // VARCHAR(50)
   contacto2?: string;       // VARCHAR(50)
@@ -61,7 +61,7 @@ export interface ProveedorSPParams {
   fax?: string;             // VARCHAR(50)
   extension1?: string;      // VARCHAR(10)
   extension2?: string;      // VARCHAR(10)
-  
+
   // Información bancaria
   bancoSucursal?: string;   // VARCHAR(50)
   cuenta?: string;          // VARCHAR(20)
@@ -81,7 +81,7 @@ export interface ProveedorERP {
   RFC?: string;
   CURP?: string;
   FiscalRegimen?: string;
-  
+
   // Dirección
   Direccion?: string;
   DireccionNumero?: string;
@@ -92,7 +92,7 @@ export interface ProveedorERP {
   Estado?: string;
   Pais?: string;
   CodigoPostal?: string;
-  
+
   // Contacto
   Contacto1?: string;
   Contacto2?: string;
@@ -102,7 +102,7 @@ export interface ProveedorERP {
   Extencion2?: string;
   eMail1?: string;
   eMail2?: string;
-  
+
   // Comercial
   Categoria?: string;
   Familia?: string;
@@ -114,14 +114,14 @@ export interface ProveedorERP {
   DiaRevision2?: string;
   DiaPago1?: string;
   DiaPago2?: string;
-  
+
   // Bancario
   ProvBancoSucursal?: string;
   ProvCuenta?: string;
   Beneficiario?: number;
   BeneficiarioNombre?: string;
   LeyendaCheque?: string;
-  
+
   // Control
   Agente?: string;
   Situacion?: string;
@@ -197,7 +197,7 @@ export interface FormProveedorAdmin {
   rfc: string;
   curp?: string;
   regimen?: string;
-  
+
   // Dirección
   direccion?: string;
   numeroExterior?: string;
@@ -208,7 +208,7 @@ export interface FormProveedorAdmin {
   estado?: string;
   pais?: string;
   codigoPostal?: string;
-  
+
   // Contacto
   contactoPrincipal?: string;
   contactoSecundario?: string;
@@ -218,23 +218,24 @@ export interface FormProveedorAdmin {
   extension2?: string;
   email1?: string;
   email2?: string;
-  
+
   // Información bancaria
   banco?: string;
   cuentaBancaria?: string;
   beneficiario?: number;
   nombreBeneficiario?: string;
   leyendaCheque?: string;
-  
+
   // Comercial
   categoria?: string;
   condicionPago?: string;
   formaPago?: string;
   descuento?: number;
-  
+
   // Sistema
   empresa: string;
   activo: boolean;
+  cveProv?: string; // Código de proveedor como identificador
 }
 
 /**
@@ -249,7 +250,7 @@ export interface ValidacionProveedor {
 /**
  * Tipos de error en operaciones de proveedores
  */
-export type ErrorTipoProveedor = 
+export type ErrorTipoProveedor =
   | 'PROVEEDOR_NO_ENCONTRADO'
   | 'RFC_DUPLICADO'
   | 'DATOS_INCOMPLETOS'

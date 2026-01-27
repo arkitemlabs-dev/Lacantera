@@ -12,9 +12,10 @@ import { getOrdenCompraPorID } from '@/lib/database/ordenes-compra-queries';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await props.params;
     // Verificar autenticación
     const session = await getServerSession(authOptions);
 
@@ -60,7 +61,7 @@ export async function GET(
 
   } catch (error: any) {
     console.error('[API ORDEN DETALLE] Error:', error);
-    
+
     if (error.message.includes('no encontrada')) {
       return NextResponse.json(
         {

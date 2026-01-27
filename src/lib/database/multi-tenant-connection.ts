@@ -11,7 +11,8 @@ export interface TenantERPConfig {
   id: string;
   nombre: string;
   erpDatabase: string;  // BD del ERP Intelisis (solo lectura)
-  codigoEmpresa: string; // Código en tabla Empresa del ERP
+  codigoEmpresa: string; // Código usado para mapeos en el Portal (ej: la-cantera o LCDM)
+  erpEmpresa: string;    // Código numérico usado por los Stored Procedures (ej: 01, 06)
 }
 
 const TENANT_CONFIGS: Record<string, TenantERPConfig> = ACTIVE_TENANT_CONFIGS as Record<string, TenantERPConfig> || {
@@ -19,31 +20,50 @@ const TENANT_CONFIGS: Record<string, TenantERPConfig> = ACTIVE_TENANT_CONFIGS as
     id: 'la-cantera',
     nombre: 'La Cantera Desarrollos Mineros',
     erpDatabase: 'Cantera', // Base de datos donde están los SPs
-    codigoEmpresa: 'LCDM',
+    codigoEmpresa: 'la-cantera',
+    erpEmpresa: '01',
   },
   'peralillo': {
     id: 'peralillo',
     nombre: 'Peralillo S.A de C.V',
     erpDatabase: 'Peralillo_Ajustes', // Base real (con A mayúscula)
-    codigoEmpresa: 'PERA',
+    codigoEmpresa: 'peralillo',
+    erpEmpresa: '02',
   },
   'plaza-galerena': {
     id: 'plaza-galerena',
     nombre: 'Plaza Galereña',
     erpDatabase: 'GALBD_PRUEBAS', // Base real
-    codigoEmpresa: 'PLAZ',
+    codigoEmpresa: 'plaza-galerena',
+    erpEmpresa: '03',
   },
   'icrear': {
     id: 'icrear',
     nombre: 'Icrear',
     erpDatabase: 'ICREAR_PRUEBAS', // Base real
-    codigoEmpresa: 'ICRE',
+    codigoEmpresa: 'icrear',
+    erpEmpresa: '05',
   },
   'inmobiliaria-galerena': {
     id: 'inmobiliaria-galerena',
     nombre: 'Inmobiliaria Galereña',
     erpDatabase: 'GALBD_PRUEBAS', // Comparte BD con Plaza Galereña
-    codigoEmpresa: 'INMO',
+    codigoEmpresa: 'inmobiliaria-galerena',
+    erpEmpresa: '04',
+  },
+  'la-cantera-test': {
+    id: 'la-cantera-test',
+    nombre: 'La Cantera (Ajustes)',
+    erpDatabase: 'Cantera_Ajustes',
+    codigoEmpresa: 'la-cantera-test',
+    erpEmpresa: '06',
+  },
+  'peralillo-test': {
+    id: 'peralillo-test',
+    nombre: 'Peralillo (Ajustes)',
+    erpDatabase: 'Peralillo_Ajustes',
+    codigoEmpresa: 'peralillo-test',
+    erpEmpresa: '07',
   },
 };
 
@@ -97,7 +117,7 @@ export async function getPortalConnection(): Promise<sql.ConnectionPool> {
         console.log('[PORTAL] Error cerrando pool anterior:', error);
       }
     }
-    
+
     const config: sql.config = {
       ...portalConfig,
       database: 'PP', // Tu BD del portal
@@ -142,7 +162,7 @@ export async function getERPConnection(
       }
       erpPools.delete(erpDatabase);
     }
-    
+
     const config: sql.config = {
       ...erpConfig,
       database: erpDatabase,

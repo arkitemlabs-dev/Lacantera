@@ -28,7 +28,7 @@ const ADMIN_ROLES = ['super-admin', 'admin', 'compras', 'contabilidad', 'solo-le
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -41,7 +41,7 @@ export async function GET(
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
-    const { id } = params;
+    const { id } = await props.params;
     const pool = await sql.connect(sqlConfig);
 
     const result = await pool.request()
@@ -92,7 +92,7 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -105,7 +105,7 @@ export async function PUT(
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
-    const { id } = params;
+    const { id } = await props.params;
     const body = await request.json();
     const { nombre, email, rol, estatus, contrasena } = body;
 
@@ -215,10 +215,11 @@ export async function PUT(
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   // Reutiliza la lógica de PUT
-  return PUT(request, { params });
+  // Necesitamos pasar props tal cual, pero PUT espera props.params como Promise
+  return PUT(request, props);
 }
 
 /**
@@ -227,7 +228,7 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -240,7 +241,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
-    const { id } = params;
+    const { id } = await props.params;
 
     // No permitir que el usuario se desactive a sí mismo
     if (session.user.id === id) {

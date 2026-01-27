@@ -3,9 +3,9 @@
 
 import { hybridDB, getTenantConfig } from './multi-tenant-connection';
 import { getStoredProcedures } from './stored-procedures';
-import type { 
-  ProveedorSPParams, 
-  ConsultaProveedorParams, 
+import type {
+  ProveedorSPParams,
+  ConsultaProveedorParams,
   ProveedorERP,
   SPProveedorResult,
   FormProveedorAdmin,
@@ -153,12 +153,12 @@ export async function getProveedoresConDatosERP(
         p.CentroCostos,
         p.DefMoneda
       FROM Prov p`;
-    
+
     // SOLO permitir proveedores con estatus ALTA
     erpQuery += ` WHERE UPPER(p.Estatus) = 'ALTA'`;
-    
+
     erpQuery += ` ORDER BY p.Nombre`;
-    
+
     const erpResult = await hybridDB.queryERP('la-cantera', erpQuery);
 
     console.log(`[getProveedoresConDatosERP] Encontrados ${erpResult.recordset.length} proveedores en ERP`);
@@ -181,7 +181,7 @@ export async function getProveedoresConDatosERP(
     const portalMapByCodigo = new Map();
     const portalMapByRFC = new Map();
     const portalMapByNombre = new Map();
-    
+
     portalResult.recordset.forEach(u => {
       // Mapear por código de proveedor
       if (u.Usuario) {
@@ -196,7 +196,7 @@ export async function getProveedoresConDatosERP(
 
     // 4. Procesar SOLO los proveedores del ERP con estatus ALTA
     const proveedores: ProveedorCompleto[] = [];
-    
+
     for (const erpProv of erpResult.recordset) {
       // Filtro adicional: SOLO procesar proveedores con estatus ALTA
       if (!erpProv.Estatus || erpProv.Estatus.toUpperCase() !== 'ALTA') {
@@ -204,18 +204,18 @@ export async function getProveedoresConDatosERP(
       }
       // Buscar usuario del portal por múltiples criterios
       let portalUser = null;
-      
+
       // 1. Intentar por código de proveedor
       if (erpProv.Proveedor) {
         portalUser = portalMapByCodigo.get(erpProv.Proveedor.trim().toUpperCase());
       }
-      
+
       // 2. Si no se encontró, intentar por nombre
       if (!portalUser && erpProv.Nombre) {
         const nombreErpNorm = erpProv.Nombre.trim().toUpperCase();
         portalUser = portalMapByNombre.get(nombreErpNorm);
       }
-      
+
       // Construir días de revisión y pago
       const diasRevision: string[] = [];
       if (erpProv.DiaRevision1) diasRevision.push(erpProv.DiaRevision1);
@@ -407,7 +407,7 @@ export async function getProveedorPorId(
         erpProveedorCode: portalUser.Usuario || '',
         mappingActivo: !!erpDatos,
       }],
-     
+
     };
 
   } catch (error: any) {
@@ -699,10 +699,10 @@ export async function getProveedorConSP(params: {
   codigo?: string;
 }): Promise<ProveedorERP | null> {
   const sp = getStoredProcedures();
-  
+
   try {
     console.log('[getProveedorConSP] Consultando proveedor con SP:', params);
-    
+
     const result = await sp.consultarProveedor({
       empresa: params.empresa,
       rfc: params.rfc,
@@ -734,21 +734,21 @@ export async function listarProveedoresConSP(params: {
   limite?: number;
 }): Promise<ProveedorERP[]> {
   const sp = getStoredProcedures();
-  
+
   try {
     console.log('[listarProveedoresConSP] Listando proveedores:', params);
-    
+
     // Si hay búsqueda, intentar diferentes criterios
     if (params.busqueda) {
       const busqueda = params.busqueda.trim();
-      
+
       // Intentar por nombre primero
       let result = await sp.spDatosProveedor({
         empresa: params.empresa,
         operacion: 'C',
         proveedor: busqueda
       });
-      
+
       // Si no encontró por nombre y parece un RFC, intentar por RFC
       if ((!result.success || result.data.length === 0) && /^[A-Z]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(busqueda)) {
         result = await sp.spDatosProveedor({
@@ -757,7 +757,7 @@ export async function listarProveedoresConSP(params: {
           rfc: busqueda
         });
       }
-      
+
       // Si no encontró y parece un código, intentar por código
       if ((!result.success || result.data.length === 0) && /^[A-Z0-9]+$/.test(busqueda) && busqueda.length <= 10) {
         result = await sp.spDatosProveedor({
@@ -766,22 +766,22 @@ export async function listarProveedoresConSP(params: {
           cveProv: busqueda
         });
       }
-      
+
       if (result.success && Array.isArray(result.data)) {
         return result.data.slice(0, params.limite || 50);
       }
     }
-    
+
     // Si no hay búsqueda específica, consultar todos (esto puede requerir ajustar el SP)
     const result = await sp.spDatosProveedor({
       empresa: params.empresa,
       operacion: 'C'
     });
-    
+
     if (result.success && Array.isArray(result.data)) {
       return result.data.slice(0, params.limite || 100);
     }
-    
+
     return [];
 
   } catch (error: any) {
@@ -795,10 +795,10 @@ export async function listarProveedoresConSP(params: {
  */
 export async function crearProveedorConSP(data: FormProveedorAdmin): Promise<SPProveedorResult> {
   const sp = getStoredProcedures();
-  
+
   try {
     console.log('[crearProveedorConSP] Creando proveedor:', data.nombre);
-    
+
     // Mapear datos del formulario a parámetros del SP
     const params: ProveedorSPParams = {
       empresa: data.empresa,
@@ -831,15 +831,15 @@ export async function crearProveedorConSP(data: FormProveedorAdmin): Promise<SPP
       beneficiarioNombre: data.nombreBeneficiario,
       leyendaCheque: data.leyendaCheque
     };
-    
+
     const result = await sp.crearProveedor(params);
-    
+
     if (result.success) {
       console.log('[crearProveedorConSP] Proveedor creado exitosamente');
     } else {
       console.error('[crearProveedorConSP] Error al crear proveedor:', result.error);
     }
-    
+
     return result;
 
   } catch (error: any) {
@@ -857,16 +857,17 @@ export async function crearProveedorConSP(data: FormProveedorAdmin): Promise<SPP
  */
 export async function actualizarProveedorConSP(data: FormProveedorAdmin): Promise<SPProveedorResult> {
   const sp = getStoredProcedures();
-  
+
   try {
     console.log('[actualizarProveedorConSP] Actualizando proveedor:', data.nombre);
-    
+
     // Mapear datos del formulario a parámetros del SP
     const params: ProveedorSPParams = {
       empresa: data.empresa,
       operacion: 'M',
       // Para modificar, necesitamos al menos uno de estos criterios de búsqueda
       rfc: data.rfc, // Usar RFC como criterio principal de búsqueda
+      proveedor: data.cveProv, // Muy importante: Intelisis suele usar @Proveedor como llave en el SP
       nombre: data.nombre,
       nombreC: data.nombreCorto,
       rfcProv: data.rfc,
@@ -893,17 +894,18 @@ export async function actualizarProveedorConSP(data: FormProveedorAdmin): Promis
       cuenta: data.cuentaBancaria,
       beneficiario: data.beneficiario,
       beneficiarioNombre: data.nombreBeneficiario,
-      leyendaCheque: data.leyendaCheque
+      leyendaCheque: data.leyendaCheque,
+      cveProv: data.cveProv // Identificador para la modificación
     };
-    
+
     const result = await sp.actualizarProveedor(params);
-    
+
     if (result.success) {
       console.log('[actualizarProveedorConSP] Proveedor actualizado exitosamente');
     } else {
       console.error('[actualizarProveedorConSP] Error al actualizar proveedor:', result.error);
     }
-    
+
     return result;
 
   } catch (error: any) {
@@ -921,35 +923,35 @@ export async function actualizarProveedorConSP(data: FormProveedorAdmin): Promis
  */
 export function validarDatosProveedor(data: FormProveedorAdmin): { valido: boolean; errores: string[] } {
   const errores: string[] = [];
-  
+
   // Validaciones obligatorias
   if (!data.nombre?.trim()) {
     errores.push('El nombre del proveedor es obligatorio');
   }
-  
+
   if (!data.rfc?.trim()) {
     errores.push('El RFC es obligatorio');
   } else if (!/^[A-Z]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(data.rfc)) {
     errores.push('El RFC no tiene el formato válido');
   }
-  
+
   if (!data.empresa?.trim()) {
     errores.push('La empresa es obligatoria');
   }
-  
+
   // Validaciones opcionales pero con formato
   if (data.email1 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email1)) {
     errores.push('El email principal no tiene formato válido');
   }
-  
+
   if (data.email2 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email2)) {
     errores.push('El email secundario no tiene formato válido');
   }
-  
+
   if (data.codigoPostal && !/^[0-9]{5}$/.test(data.codigoPostal)) {
     errores.push('El código postal debe tener 5 dígitos');
   }
-  
+
   return {
     valido: errores.length === 0,
     errores

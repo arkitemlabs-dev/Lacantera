@@ -14,9 +14,10 @@ import sql from 'mssql';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; docId: string }> }
+  props: { params: Promise<{ id: string; docId: string }> }
 ) {
   try {
+    const params = await props.params;
     // Verificar autenticación
     const session = await getServerSession(authOptions);
 
