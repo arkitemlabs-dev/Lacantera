@@ -148,7 +148,11 @@ export async function POST(
     };
 
     const { actualizarProveedorConSP } = await import('@/lib/database/admin-proveedores-queries');
+    const startTime = Date.now();
     const result = await actualizarProveedorConSP(dataToUpdate);
+    const duration = Date.now() - startTime;
+
+    console.log(`[API PROVEEDOR POST] Resultado tras ${duration}ms:`, JSON.stringify(result, null, 2));
 
     if (result.success) {
       return NextResponse.json({
@@ -157,6 +161,7 @@ export async function POST(
         data: result.data
       });
     } else {
+      console.error('[API PROVEEDOR POST] Error devuelto por el query:', result.error);
       return NextResponse.json({
         success: false,
         error: result.error || 'Error al actualizar proveedor en el ERP',

@@ -3,6 +3,7 @@
 
 import { hybridDB, getTenantConfig } from './multi-tenant-connection';
 import { getStoredProcedures } from './stored-procedures';
+import { actualizarProveedorDirecto } from './direct-update';
 import type {
   ProveedorSPParams,
   ConsultaProveedorParams,
@@ -838,67 +839,61 @@ export async function actualizarProveedorConSP(data: FormProveedorAdmin): Promis
   const sp = getStoredProcedures();
 
   try {
-    console.log('[actualizarProveedorConSP] Actualizando proveedor:', data.nombre);
+    console.log('[actualizarProveedorConSP] Iniciando actualización para:', data.nombre);
 
-    // Helper: Convertir null/undefined a cadena vacía para el SP
-    const cleanValue = (value: any): string => {
-      if (value === null || value === undefined) return '';
-      if (typeof value === 'string') return value.trim();
-      return String(value);
-    };
+    // USAR ACTUALIZACIÓN DIRECTA (Bypass del SP defectuoso)
+    // Se ha identificado que spDatosProveedor con Operacion='M' no persiste los cambios
+    console.log('[actualizarProveedorConSP] 🔄 Usando actualización DIRECTA (bypass del SP)');
 
-    // Mapear datos del formulario a parámetros del SP
-    // IMPORTANTE: Enviar cadena vacía '' en lugar de null/undefined para campos sin valor
-    const params: ProveedorSPParams = {
-      empresa: data.empresa,
-      operacion: 'M',
-      // REGLA: Solo buscar por clave de proveedor
-      cveProv: data.cveProv,
-      rfc: '',        // Limpiar búsqueda por RFC
-      proveedor: '',  // Limpiar búsqueda por Nombre
-      nombre: cleanValue(data.nombre) || data.nombre, // Nombre es obligatorio
-      nombreC: cleanValue(data.nombreCorto),
-      rfcProv: cleanValue(data.rfc),
-      curp: cleanValue(data.curp),
-      regimen: cleanValue(data.regimen),
-      direccion: cleanValue(data.direccion),
-      numExt: cleanValue(data.numeroExterior),
-      numInt: cleanValue(data.numeroInterior),
-      entreCalles: cleanValue(data.entreCalles),
-      colonia: cleanValue(data.colonia),
-      poblacion: cleanValue(data.ciudad),
-      estado: cleanValue(data.estado),
-      pais: cleanValue(data.pais),
-      codigoPostal: cleanValue(data.codigoPostal),
-      contacto1: cleanValue(data.contactoPrincipal),
-      contacto2: cleanValue(data.contactoSecundario),
-      email1: cleanValue(data.email1),
-      email2: cleanValue(data.email2),
-      telefonos: cleanValue(data.telefonos),
-      fax: cleanValue(data.fax),
-      extension1: cleanValue(data.extension1),
-      extension2: cleanValue(data.extension2),
-      bancoSucursal: cleanValue(data.banco),
-      cuenta: cleanValue(data.cuentaBancaria),
-      beneficiario: data.beneficiario ?? 0,
-      beneficiarioNombre: cleanValue(data.nombreBeneficiario),
-      leyendaCheque: cleanValue(data.leyendaCheque)
-    };
+    const directResult = await actualizarProveedorDirecto(
+      data.empresa,
+      data.cveProv || '',
+      data
+    );
 
-    console.log('[actualizarProveedorConSP] Params (cleaned):', JSON.stringify(params, null, 2));
+    if (directResult.success) {
+      console.log('[actualizarProveedorConSP] ✅ Éxito con actualización directa');
 
-    const result = await sp.actualizarProveedor(params);
+      // Opcional: Llamar al SP de todos modos para que quede registro en bitácora de Intelisis si existe
+      // Pero no dependemos de su resultado para el éxito de la operación
+      try {
+        const cleanValue = (value: any): string => {
+          if (value === null || value === undefined) return '';
+          if (typeof value === 'string') return value.trim();
+          return String(value);
+        };
 
-    if (result.success) {
-      console.log('[actualizarProveedorConSP] ✅ Proveedor actualizado exitosamente');
+        const spParams: ProveedorSPParams = {
+          empresa: data.empresa,
+          operacion: 'M',
+          cveProv: data.cveProv,
+          rfc: '',
+          proveedor: '',
+          nombre: cleanValue(data.nombre),
+          rfcProv: cleanValue(data.rfc),
+          telefonos: cleanValue(data.telefonos),
+        };
+        await sp.actualizarProveedor(spParams);
+      } catch (spError) {
+        console.warn('[actualizarProveedorConSP] Error silencioso al llamar al SP de auditoría:', spError);
+      }
+
+      return {
+        success: true,
+        data: [],
+        message: directResult.message || 'Proveedor actualizado exitosamente'
+      };
     } else {
-      console.error('[actualizarProveedorConSP] ❌ Error al actualizar proveedor:', result.error);
+      console.error('[actualizarProveedorConSP] ❌ Falló la actualización directa:', directResult.error);
+      return {
+        success: false,
+        data: [],
+        error: directResult.error || 'Error en la actualización directa'
+      };
     }
 
-    return result;
-
   } catch (error: any) {
-    console.error('[actualizarProveedorConSP] ❌ Error:', error);
+    console.error('[actualizarProveedorConSP] ❌ Error crítico:', error);
     return {
       success: false,
       data: [],

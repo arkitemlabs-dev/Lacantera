@@ -641,6 +641,17 @@ export class StoredProcedures {
         CveProv: cveProv
       });
 
+      if (operacion === 'M' || operacion === 'A') {
+        const fullParams = params as ProveedorSPParams;
+        console.log('[SP EXEC] Data Parameters:', {
+          Nombre: fullParams.nombre,
+          RfcProv: fullParams.rfcProv,
+          Telefonos: fullParams.telefonos,
+          Direccion: fullParams.direccion,
+          Email1: fullParams.email1
+        });
+      }
+
       const result = await request.execute('spDatosProveedor');
 
       DebugStore.lastResult = {
@@ -650,8 +661,14 @@ export class StoredProcedures {
       };
 
       console.log(`[SP RESULT] spDatosProveedor ejecutado. Recordsets: ${result.recordsets.length}`);
+      console.log(`[SP RESULT] Rows Affected:`, result.rowsAffected);
+
       if (result.recordset && result.recordset.length > 0) {
-        console.log('[SP RESULT DATA]', result.recordset[0]);
+        console.log('[SP RESULT DATA (Record 0)]', result.recordset[0]);
+      }
+
+      if (result.recordsets && result.recordsets.length > 1 && result.recordsets[1].length > 0) {
+        console.log('[SP RESULT DATA (Recordset 1, Record 0)]', result.recordsets[1][0]);
       }
 
       // Para consultas, devolver los datos del recordset
