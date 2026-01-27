@@ -705,9 +705,7 @@ export async function getProveedorConSP(params: {
 
     const result = await sp.consultarProveedor({
       empresa: params.empresa,
-      rfc: params.rfc,
-      nombre: params.nombre,
-      codigo: params.codigo
+      codigo: params.codigo || ''
     });
 
     if (result.success && result.data) {
@@ -738,34 +736,15 @@ export async function listarProveedoresConSP(params: {
   try {
     console.log('[listarProveedoresConSP] Listando proveedores:', params);
 
-    // Si hay búsqueda, intentar diferentes criterios
+    // REGLA: Solo buscar por clave de proveedor
     if (params.busqueda) {
       const busqueda = params.busqueda.trim();
 
-      // Intentar por nombre primero
-      let result = await sp.spDatosProveedor({
+      const result = await sp.spDatosProveedor({
         empresa: params.empresa,
         operacion: 'C',
-        proveedor: busqueda
+        cveProv: busqueda
       });
-
-      // Si no encontró por nombre y parece un RFC, intentar por RFC
-      if ((!result.success || result.data.length === 0) && /^[A-Z]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(busqueda)) {
-        result = await sp.spDatosProveedor({
-          empresa: params.empresa,
-          operacion: 'C',
-          rfc: busqueda
-        });
-      }
-
-      // Si no encontró y parece un código, intentar por código
-      if ((!result.success || result.data.length === 0) && /^[A-Z0-9]+$/.test(busqueda) && busqueda.length <= 10) {
-        result = await sp.spDatosProveedor({
-          empresa: params.empresa,
-          operacion: 'C',
-          cveProv: busqueda
-        });
-      }
 
       if (result.success && Array.isArray(result.data)) {
         return result.data.slice(0, params.limite || 50);
@@ -861,55 +840,65 @@ export async function actualizarProveedorConSP(data: FormProveedorAdmin): Promis
   try {
     console.log('[actualizarProveedorConSP] Actualizando proveedor:', data.nombre);
 
+    // Helper: Convertir null/undefined a cadena vacía para el SP
+    const cleanValue = (value: any): string => {
+      if (value === null || value === undefined) return '';
+      if (typeof value === 'string') return value.trim();
+      return String(value);
+    };
+
     // Mapear datos del formulario a parámetros del SP
+    // IMPORTANTE: Enviar cadena vacía '' en lugar de null/undefined para campos sin valor
     const params: ProveedorSPParams = {
       empresa: data.empresa,
       operacion: 'M',
-      // Para modificar, necesitamos al menos uno de estos criterios de búsqueda
-      rfc: data.rfc, // Usar RFC como criterio principal de búsqueda
-      proveedor: data.cveProv, // Muy importante: Intelisis suele usar @Proveedor como llave en el SP
-      nombre: data.nombre,
-      nombreC: data.nombreCorto,
-      rfcProv: data.rfc,
-      curp: data.curp,
-      regimen: data.regimen,
-      direccion: data.direccion,
-      numExt: data.numeroExterior,
-      numInt: data.numeroInterior,
-      entreCalles: data.entreCalles,
-      colonia: data.colonia,
-      poblacion: data.ciudad,
-      estado: data.estado,
-      pais: data.pais,
-      codigoPostal: data.codigoPostal,
-      contacto1: data.contactoPrincipal,
-      contacto2: data.contactoSecundario,
-      email1: data.email1,
-      email2: data.email2,
-      telefonos: data.telefonos,
-      fax: data.fax,
-      extension1: data.extension1,
-      extension2: data.extension2,
-      bancoSucursal: data.banco,
-      cuenta: data.cuentaBancaria,
-      beneficiario: data.beneficiario,
-      beneficiarioNombre: data.nombreBeneficiario,
-      leyendaCheque: data.leyendaCheque,
-      cveProv: data.cveProv // Identificador para la modificación
+      // REGLA: Solo buscar por clave de proveedor
+      cveProv: data.cveProv,
+      rfc: '',        // Limpiar búsqueda por RFC
+      proveedor: '',  // Limpiar búsqueda por Nombre
+      nombre: cleanValue(data.nombre) || data.nombre, // Nombre es obligatorio
+      nombreC: cleanValue(data.nombreCorto),
+      rfcProv: cleanValue(data.rfc),
+      curp: cleanValue(data.curp),
+      regimen: cleanValue(data.regimen),
+      direccion: cleanValue(data.direccion),
+      numExt: cleanValue(data.numeroExterior),
+      numInt: cleanValue(data.numeroInterior),
+      entreCalles: cleanValue(data.entreCalles),
+      colonia: cleanValue(data.colonia),
+      poblacion: cleanValue(data.ciudad),
+      estado: cleanValue(data.estado),
+      pais: cleanValue(data.pais),
+      codigoPostal: cleanValue(data.codigoPostal),
+      contacto1: cleanValue(data.contactoPrincipal),
+      contacto2: cleanValue(data.contactoSecundario),
+      email1: cleanValue(data.email1),
+      email2: cleanValue(data.email2),
+      telefonos: cleanValue(data.telefonos),
+      fax: cleanValue(data.fax),
+      extension1: cleanValue(data.extension1),
+      extension2: cleanValue(data.extension2),
+      bancoSucursal: cleanValue(data.banco),
+      cuenta: cleanValue(data.cuentaBancaria),
+      beneficiario: data.beneficiario ?? 0,
+      beneficiarioNombre: cleanValue(data.nombreBeneficiario),
+      leyendaCheque: cleanValue(data.leyendaCheque)
     };
+
+    console.log('[actualizarProveedorConSP] Params (cleaned):', JSON.stringify(params, null, 2));
 
     const result = await sp.actualizarProveedor(params);
 
     if (result.success) {
-      console.log('[actualizarProveedorConSP] Proveedor actualizado exitosamente');
+      console.log('[actualizarProveedorConSP] ✅ Proveedor actualizado exitosamente');
     } else {
-      console.error('[actualizarProveedorConSP] Error al actualizar proveedor:', result.error);
+      console.error('[actualizarProveedorConSP] ❌ Error al actualizar proveedor:', result.error);
     }
 
     return result;
 
   } catch (error: any) {
-    console.error('[actualizarProveedorConSP] Error:', error);
+    console.error('[actualizarProveedorConSP] ❌ Error:', error);
     return {
       success: false,
       data: [],
@@ -995,6 +984,7 @@ export function erpAFormulario(erp: ProveedorERP, empresa: string): FormProveedo
     formaPago: erp.FormaPago || '',
     descuento: erp.Descuento || 0,
     empresa: empresa,
-    activo: erp.Estatus === 'ALTA'
+    activo: erp.Estatus === 'ALTA',
+    cveProv: erp.Proveedor // Identificador para la actualización
   };
 }

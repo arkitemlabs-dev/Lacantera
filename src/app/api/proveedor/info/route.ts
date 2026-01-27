@@ -141,11 +141,6 @@ export async function GET(request: NextRequest) {
     }, { status: 500 });
   }
 }
-/**
- * POST /api/proveedor/info
- *
- * Actualiza información del proveedor en el ERP de la empresa actual
- */
 export async function POST(request: NextRequest) {
   try {
     const fs = await import('fs');
@@ -157,6 +152,10 @@ export async function POST(request: NextRequest) {
     const userId = session.user.id;
     const empresaActual = session.user.empresaActual;
     const body = await request.json();
+
+    console.log('📥 [POST /api/proveedor/info] Recibida petición de actualización');
+    console.log('📍 Usuario:', userId, 'Empresa:', empresaActual);
+    console.log('📦 Datos recibidos:', JSON.stringify(body, null, 2));
 
     fs.appendFileSync('sp-debug.log', `\n>>> PROVEEDOR POST RECEIVED ${new Date().toISOString()} <<<\nUser: ${userId}\nBody: ${JSON.stringify(body, null, 2)}\n`);
 
@@ -179,6 +178,7 @@ export async function POST(request: NextRequest) {
     }
 
     const erp_proveedor_code = mappingResult.recordset[0].erp_proveedor_code;
+    console.log('📍 Código proveedor ERP:', erp_proveedor_code);
 
     // 2. Preparar datos para el SP
     const { actualizarProveedorConSP } = await import('@/lib/database/admin-proveedores-queries');
@@ -192,15 +192,24 @@ export async function POST(request: NextRequest) {
       proveedor: erp_proveedor_code // Identificador para el WHERE del SP
     };
 
+    console.log('📤 [POST /api/proveedor/info] Llamando a actualizarProveedorConSP');
+    console.log('📦 Datos para SP:', JSON.stringify(dataToUpdate, null, 2));
+
     const result = await actualizarProveedorConSP(dataToUpdate);
 
+    console.log('📥 [POST /api/proveedor/info] Resultado del SP:', JSON.stringify(result, null, 2));
+
+    fs.appendFileSync('sp-debug.log', `\n>>> SP RESULT ${new Date().toISOString()} <<<\nSuccess: ${result.success}\nData: ${JSON.stringify(result.data, null, 2)}\nError: ${result.error}\n`);
+
     if (result.success) {
+      console.log('✅ [POST /api/proveedor/info] Actualización exitosa');
       return NextResponse.json({
         success: true,
-        message: 'Información actualizada correctamente en el ERP',
+        message: result.message || 'Información actualizada correctamente en el ERP',
         data: result.data
       });
     } else {
+      console.error('❌ [POST /api/proveedor/info] Error en SP:', result.error);
       return NextResponse.json({
         success: false,
         error: result.error || 'Error al actualizar información en el ERP',

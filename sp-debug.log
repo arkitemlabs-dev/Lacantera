@@ -208,3 +208,827 @@ Body: {
   "formaPago": null,
   "descuento": null
 }
+
+>>> API POST RECEIVED 2026-01-27T15:42:41.844Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "",
+  "curp": "ACE140813E29",
+  "regimen": "",
+  "direccion": "Av",
+  "numeroExterior": "523",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5582537177",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T15:53:36.537Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "Av",
+  "numeroExterior": "523",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5582537177",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T15:53:44.852Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "Av",
+  "numeroExterior": "523",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5582537177",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T16:13:16.124Z <<<
+ID: P00443
+Body: {
+  "cveProv": "P00443",
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "rfc": "ACE140813E29",
+  "empresa": "la-cantera",
+  "activo": true
+}
+
+>>> API POST RECEIVED 2026-01-27T16:14:16.840Z <<<
+ID: P00443
+Body: {
+  "cveProv": "P00443",
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "rfc": "ACE140813E29",
+  "empresa": "la-cantera",
+  "activo": true
+}
+
+>>> API POST RECEIVED 2026-01-27T16:14:31.673Z <<<
+ID: P00443
+Body: {
+  "cveProv": "P00443",
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "rfc": "ACE140813E29",
+  "empresa": "la-cantera",
+  "activo": true
+}
+
+>>> API POST RECEIVED 2026-01-27T16:14:45.469Z <<<
+ID: P00443
+Body: {
+  "cveProv": "P00443",
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "rfc": "ACE140813E29",
+  "empresa": "la-cantera",
+  "activo": true
+}
+
+>>> API POST RECEIVED 2026-01-27T16:15:10.699Z <<<
+ID: P00443
+Body: {
+  "cveProv": "P00443",
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "rfc": "ACE140813E29",
+  "empresa": "la-cantera",
+  "activo": true
+}
+
+>>> API POST RECEIVED 2026-01-27T16:15:32.761Z <<<
+ID: P00443
+Body: {
+  "cveProv": "P00443",
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "rfc": "ACE140813E29",
+  "empresa": "la-cantera",
+  "activo": true
+}
+
+>>> API POST RECEIVED 2026-01-27T16:15:48.698Z <<<
+ID: P00443
+Body: {
+  "cveProv": "P00443",
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "rfc": "ACE140813E29",
+  "empresa": "la-cantera",
+  "activo": true
+}
+
+>>> API POST RECEIVED 2026-01-27T17:21:49.714Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "Av",
+  "numeroExterior": "523",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5582537177",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T17:26:10.961Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "Av",
+  "numeroExterior": "523",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5582537177",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T17:27:16.223Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "",
+  "numeroExterior": "",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5537342478",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T17:28:14.914Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "",
+  "numeroExterior": "",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5537342478",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T17:30:38.034Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "",
+  "numeroExterior": "10",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5537342478",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T17:31:03.612Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "",
+  "numeroExterior": "10",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5537342478",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T17:32:27.960Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "",
+  "numeroExterior": "20",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5537342478",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T17:33:24.099Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "",
+  "numeroExterior": "20",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5537342478",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T17:51:03.179Z <<<
+ID: P00443
+Body: {
+  "cveProv": "P00443",
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "empresa": "la-cantera",
+  "direccion": "A",
+  "numeroExterior": "20",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "telefonos": "5537342478",
+  "email1": ""
+}
+
+>>> API POST RECEIVED 2026-01-27T17:54:08.481Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "",
+  "numeroExterior": "20",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5537342478",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T18:04:09.589Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "",
+  "numeroExterior": "20",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5537342478",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T18:35:34.214Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "",
+  "numeroExterior": "20",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5557864282",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T18:35:44.595Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "",
+  "numeroExterior": "20",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5557864282",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T18:35:59.968Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "",
+  "numeroExterior": "20",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5557864282",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T18:36:34.530Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "",
+  "numeroExterior": "20",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5557864282",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T18:36:54.756Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "",
+  "numeroExterior": "20",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5557864282",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T18:37:41.559Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "",
+  "numeroExterior": "20",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5557864282",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T18:38:41.527Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "",
+  "numeroExterior": "20",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5557864282",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}
+
+>>> API POST RECEIVED 2026-01-27T19:27:47.596Z <<<
+ID: P00443
+Body: {
+  "nombre": "ARQUITECTURA Y CONSULTORIA EMPRESARIAL SA DE CV",
+  "nombreCorto": "ARKITEM",
+  "rfc": "ACE140813E29",
+  "curp": "",
+  "regimen": "",
+  "direccion": "",
+  "numeroExterior": "20",
+  "numeroInterior": "",
+  "entreCalles": "",
+  "colonia": "Cuauhtémoc",
+  "ciudad": "Ciudad de México",
+  "estado": "Ciudad de México",
+  "pais": "México",
+  "codigoPostal": "06500",
+  "contactoPrincipal": "",
+  "contactoSecundario": "",
+  "email2": "",
+  "telefonos": "5557864282",
+  "fax": "",
+  "extension1": "",
+  "extension2": "",
+  "banco": "",
+  "cuentaBancaria": "",
+  "beneficiario": 0,
+  "nombreBeneficiario": "",
+  "leyendaCheque": "",
+  "categoria": "PROVEEDORES COMPRA",
+  "condicionPago": "30 DIAS",
+  "formaPago": null,
+  "descuento": null
+}

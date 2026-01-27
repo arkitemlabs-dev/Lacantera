@@ -49,26 +49,11 @@ export async function GET(
 
     console.log(`[API PROVEEDOR] Admin ${session.user.id} consultando proveedor: ${proveedorId}, empresa: ${empresa}`);
 
-    // Determinar el tipo de búsqueda basado en el formato del ID
-    let searchParams_obj: {
-      empresa: string;
-      rfc?: string;
-      nombre?: string;
-      codigo?: string;
-    } = { empresa };
-
-    // RFC: formato estándar mexicano
-    if (/^[A-Z]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(proveedorId)) {
-      searchParams_obj.rfc = proveedorId;
-    }
-    // Código numérico/alfanumérico corto
-    else if (/^[A-Z0-9]+$/.test(proveedorId) && proveedorId.length <= 10) {
-      searchParams_obj.codigo = proveedorId;
-    }
-    // Por defecto, buscar por nombre
-    else {
-      searchParams_obj.nombre = proveedorId;
-    }
+    // REGLA: Siempre buscar por clave de proveedor (codigo)
+    const searchParams_obj = {
+      empresa,
+      codigo: proveedorId
+    };
 
     const proveedor = await getProveedorConSP(searchParams_obj);
 
@@ -159,13 +144,8 @@ export async function POST(
       ...bodyData,
       empresa,
       operacion: 'M' as const,
-      cveProv: proveedorId // Siempre usar el ID de la URL como identificador
+      cveProv: proveedorId // REGLA: Usar siempre el ID de la URL como identificador (Clave de proveedor)
     };
-
-    // Si el ID de la URL parece un RFC, también asignarlo como criterio de búsqueda adicional
-    if (/^[A-Z]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(proveedorId)) {
-      dataToUpdate.rfc = proveedorId;
-    }
 
     const { actualizarProveedorConSP } = await import('@/lib/database/admin-proveedores-queries');
     const result = await actualizarProveedorConSP(dataToUpdate);

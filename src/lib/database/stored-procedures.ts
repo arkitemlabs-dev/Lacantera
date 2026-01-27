@@ -582,8 +582,10 @@ export class StoredProcedures {
       const request = pool.request()
         .input('Empresa', sql.VarChar(10), this.getEmpresaERP(empresa))
         .input('Operacion', sql.VarChar(1), operacion)
-        .input('Rfc', sql.VarChar(20), rfc)
-        .input('Proveedor', sql.VarChar(200), proveedor)
+        // REGLA: Solo buscar por clave de proveedor (CveProv)
+        // Por seguridad, vaciamos Rfc y Proveedor (que son campos de búsqueda) en consultas
+        .input('Rfc', sql.VarChar(20), operacion === 'C' ? '' : rfc)
+        .input('Proveedor', sql.VarChar(200), operacion === 'C' ? '' : proveedor)
         .input('CveProv', sql.VarChar(10), cveProv);
 
       // Solo agregar parámetros adicionales para operaciones de Alta/Modificación
@@ -597,45 +599,47 @@ export class StoredProcedures {
           CveProv: cveProv
         });
 
+        // Helper: enviar cadena vacía '' en lugar de null para campos sin valor
+        const str = (val: string | undefined | null): string =>
+          (val != null ? val.trim() : '');
+
         request
-          .input('Nombre', sql.VarChar(100), fullParams.nombre || '')
-          .input('NombreC', sql.VarChar(20), fullParams.nombreC || '')
-          .input('RfcProv', sql.VarChar(20), fullParams.rfcProv || '') // RFC puede ser más largo
-          .input('Curp', sql.VarChar(30), fullParams.curp || '')
-          .input('Regimen', sql.VarChar(50), fullParams.regimen || '')
-          .input('Direccion', sql.VarChar(200), fullParams.direccion || '')
-          .input('NumExt', sql.VarChar(20), fullParams.numExt || '')
-          .input('NumInt', sql.VarChar(20), fullParams.numInt || '')
-          .input('EntreCalles', sql.VarChar(100), fullParams.entreCalles || '')
-          .input('Colonia', sql.VarChar(100), fullParams.colonia || '')
-          .input('Poblacion', sql.VarChar(100), fullParams.poblacion || '')
-          .input('Estado', sql.VarChar(30), fullParams.estado || '')
-          .input('Pais', sql.VarChar(100), fullParams.pais || '')
-          .input('CodigoPostal', sql.VarChar(15), fullParams.codigoPostal || '')
-          .input('Contacto1', sql.VarChar(50), fullParams.contacto1 || '')
-          .input('Contacto2', sql.VarChar(50), fullParams.contacto2 || '')
-          .input('Email1', sql.VarChar(50), fullParams.email1 || '')
-          .input('Email2', sql.VarChar(50), fullParams.email2 || '')
-          .input('Telefonos', sql.VarChar(100), fullParams.telefonos || '')
-          .input('Fax', sql.VarChar(50), fullParams.fax || '')
-          .input('Extension1', sql.VarChar(10), fullParams.extension1 || '')
-          .input('Extension2', sql.VarChar(10), fullParams.extension2 || '')
-          .input('BancoSucursal', sql.VarChar(50), fullParams.bancoSucursal || '')
-          .input('Cuenta', sql.VarChar(20), fullParams.cuenta || '')
-          .input('Beneficiario', sql.Int, fullParams.beneficiario || 0)
-          .input('BeneficiarioNombre', sql.VarChar(100), fullParams.beneficiarioNombre || '')
-          .input('LeyendaCheque', sql.VarChar(100), fullParams.leyendaCheque || '');
+          .input('Nombre', sql.VarChar(100), str(fullParams.nombre))
+          .input('NombreC', sql.VarChar(20), str(fullParams.nombreC))
+          .input('RfcProv', sql.VarChar(15), str(fullParams.rfcProv))
+          .input('Curp', sql.VarChar(30), str(fullParams.curp))
+          .input('Regimen', sql.VarChar(30), str(fullParams.regimen))
+          .input('Direccion', sql.VarChar(100), str(fullParams.direccion))
+          .input('NumExt', sql.VarChar(20), str(fullParams.numExt))
+          .input('NumInt', sql.VarChar(20), str(fullParams.numInt))
+          .input('EntreCalles', sql.VarChar(100), str(fullParams.entreCalles))
+          .input('Colonia', sql.VarChar(100), str(fullParams.colonia))
+          .input('Poblacion', sql.VarChar(100), str(fullParams.poblacion))
+          .input('Estado', sql.VarChar(30), str(fullParams.estado))
+          .input('Pais', sql.VarChar(100), str(fullParams.pais))
+          .input('Codigopostal', sql.VarChar(15), str(fullParams.codigoPostal))
+          .input('Contacto1', sql.VarChar(50), str(fullParams.contacto1))
+          .input('Contacto2', sql.VarChar(50), str(fullParams.contacto2))
+          .input('Email1', sql.VarChar(50), str(fullParams.email1))
+          .input('Email2', sql.VarChar(50), str(fullParams.email2))
+          .input('Telefonos', sql.VarChar(100), str(fullParams.telefonos))
+          .input('Fax', sql.VarChar(50), str(fullParams.fax))
+          .input('Extension1', sql.VarChar(10), str(fullParams.extension1))
+          .input('Extension2', sql.VarChar(10), str(fullParams.extension2))
+          .input('BancoSucursal', sql.VarChar(50), str(fullParams.bancoSucursal))
+          .input('Cuenta', sql.VarChar(20), str(fullParams.cuenta))
+          .input('Beneficiario', sql.Int, fullParams.beneficiario ?? 0)
+          .input('BeneficiarioNombre', sql.VarChar(100), str(fullParams.beneficiarioNombre))
+          .input('LeyendaCheque', sql.VarChar(100), str(fullParams.leyendaCheque));
       }
 
-      console.log(`[SP EXEC] Ejecutando spDatosProveedor en BD de ${empresa} (${config.erpDatabase}) con Empresa code: ${this.getEmpresaERP(empresa)}`);
-
-      DebugStore.lastCall = {
-        empresa,
-        empresaERP: this.getEmpresaERP(empresa),
-        operacion,
-        params,
-        timestamp: new Date().toISOString()
-      };
+      console.log(`[SP EXEC] Parameters for ${operacion}:`, {
+        Empresa: this.getEmpresaERP(empresa),
+        Operacion: operacion,
+        Rfc: operacion === 'C' ? '' : rfc,
+        Proveedor: operacion === 'C' ? '' : proveedor,
+        CveProv: cveProv
+      });
 
       const result = await request.execute('spDatosProveedor');
 
@@ -660,18 +664,41 @@ export class StoredProcedures {
         };
       }
 
-      // Para Alta/Modificación, devolver confirmación
+      // Para Alta/Modificación, validar el resultado
       const confirmacion = getFirstRecord(result, 0) as any;
 
-      // En Intelisis, a veces el primer recordset contiene el mensaje de error o éxito
-      const spErrorMessage = confirmacion?.Error || confirmacion?.Mensaje || confirmacion?.error;
-      const spSuccess = !spErrorMessage || spErrorMessage.toString().toLowerCase().includes('exito') || spErrorMessage.toString().toLowerCase().includes('correcto');
+      // Verificar si hay mensaje de error del SP
+      const spErrorMessage = confirmacion?.Error || confirmacion?.Mensaje || confirmacion?.error || confirmacion?.ErrorMessage;
+
+      // Determinar si fue exitoso
+      let spSuccess = true;
+
+      if (spErrorMessage) {
+        const errorLower = spErrorMessage.toString().toLowerCase();
+        // Si contiene palabras de error, marcar como fallido
+        if (errorLower.includes('error') && !errorLower.includes('exito') && !errorLower.includes('correcto')) {
+          spSuccess = false;
+        }
+        // Si contiene palabras de éxito, marcar como exitoso
+        if (errorLower.includes('exito') || errorLower.includes('correcto') || errorLower.includes('actualizado') || errorLower.includes('guardado')) {
+          spSuccess = true;
+        }
+      }
+
+      // Si rowsAffected es 0, puede indicar que no se actualizó nada
+      if (result.rowsAffected && result.rowsAffected[0] === 0 && operacion === 'M') {
+        console.warn('[SP WARNING] rowsAffected es 0, puede que no se haya actualizado nada');
+      }
+
+      const successMessage = operacion === 'A'
+        ? 'Proveedor creado exitosamente'
+        : 'Proveedor actualizado exitosamente';
 
       return {
         success: spSuccess,
         data: confirmacion ? [confirmacion] : [],
-        error: spSuccess ? undefined : spErrorMessage,
-        message: operacion === 'A' ? 'Proveedor creado' : 'Proveedor actualizado'
+        error: spSuccess ? undefined : (spErrorMessage || 'Error desconocido en el stored procedure'),
+        message: spSuccess ? successMessage : spErrorMessage
       };
 
     } catch (error: any) {
@@ -692,15 +719,11 @@ export class StoredProcedures {
    */
   async consultarProveedor(params: {
     empresa: string;
-    rfc?: string;
-    nombre?: string;
-    codigo?: string;
+    codigo: string;
   }): Promise<SPProveedorResult<ProveedorERP | null>> {
     const consultaParams: ConsultaProveedorParams = {
       empresa: params.empresa,
       operacion: 'C',
-      rfc: params.rfc,
-      proveedor: params.nombre,
       cveProv: params.codigo
     };
 

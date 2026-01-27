@@ -15,12 +15,12 @@ interface Props {
   onCancelar?: () => void;
 }
 
-export function FormularioProveedor({ 
-  modo, 
-  proveedorId, 
+export function FormularioProveedor({
+  modo,
+  proveedorId,
   empresa = 'la-cantera',
   onGuardado,
-  onCancelar 
+  onCancelar
 }: Props) {
   const {
     formData,
@@ -42,12 +42,14 @@ export function FormularioProveedor({
     // ... otros campos opcionales
   });
 
+  const [showSuccess, setShowSuccess] = useState(false);
+
   // Cargar datos para edición
   useEffect(() => {
     if (modo === 'editar' && proveedorId) {
       consultarParaEdicion(proveedorId, empresa);
     }
-    
+
     return () => {
       limpiarEstado();
     };
@@ -71,14 +73,20 @@ export function FormularioProveedor({
   // Manejar envío del formulario
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     let success = false;
     if (modo === 'crear') {
       success = await crearProveedor(datos);
     } else {
       success = await actualizarProveedor(datos);
     }
-    
+
+    if (success) {
+      setShowSuccess(true);
+      // Ocultar mensaje después de 3 segundos
+      setTimeout(() => setShowSuccess(false), 3000);
+    }
+
     if (onGuardado) {
       onGuardado(success);
     }
@@ -110,6 +118,14 @@ export function FormularioProveedor({
         {error && (
           <div className="p-4 bg-red-50 border-l-4 border-red-400">
             <p className="text-red-700">{error}</p>
+          </div>
+        )}
+
+        {showSuccess && (
+          <div className="p-4 bg-green-50 border-l-4 border-green-400">
+            <p className="text-green-700 font-medium">
+              ✅ {modo === 'crear' ? 'Proveedor creado' : 'Cambios guardados'} exitosamente
+            </p>
           </div>
         )}
 
@@ -321,7 +337,7 @@ export function FormularioProveedor({
             >
               Cancelar
             </button>
-            
+
             <button
               type="submit"
               disabled={saving}

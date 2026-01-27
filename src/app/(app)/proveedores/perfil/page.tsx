@@ -32,13 +32,14 @@ import {
 } from '@/components/ui/dialog';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { cn } from '@/lib/utils';
-import { Eye, Upload, Camera, FileCheck, FileClock, FileX, AlertCircle, Loader2, Download, ArrowLeft, Mail } from 'lucide-react';
+import { Eye, Upload, Camera, FileCheck, FileClock, FileX, AlertCircle, Loader2, Download, ArrowLeft, Mail, CheckCircle2, XCircle } from 'lucide-react';
 import Image from 'next/image';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUpload } from '@/components/upload/file-upload';
 import { uploadDocumentoProveedor } from '@/app/actions/archivos';
 import { getDocumentosByProveedor } from '@/app/actions/proveedores';
+import { toast } from 'sonner';
 
 const InfoField = ({
   label,
@@ -481,6 +482,12 @@ export default function PerfilProveedorPage() {
     if (!editedInfo || !proveedorId) return;
 
     setLoadingInfo(true);
+
+    // Toast de inicio
+    const loadingToast = toast.loading('Guardando cambios en el ERP...', {
+      description: 'Por favor espera mientras actualizamos la información'
+    });
+
     try {
       // 1. Mapear datos del frontend al formato que espera el SP de Intelisis
       const dataToSave = {
@@ -517,6 +524,8 @@ export default function PerfilProveedorPage() {
         descuento: typeof editedInfo.descuento === 'string' ? parseFloat(editedInfo.descuento) : editedInfo.descuento,
       };
 
+      console.log('📤 [handleSave] Datos a enviar:', dataToSave);
+
       // 2. Determinar endpoint según el rol/vista
       const urlParams = new URLSearchParams(window.location.search);
       const idFromQuery = urlParams.get('id');
@@ -526,35 +535,138 @@ export default function PerfilProveedorPage() {
         ? `/api/admin/proveedores/${proveedorId}?empresa=${empresaParaAPI}`
         : '/api/proveedor/info';
 
-      // 3. Realizar la petición
+      console.log('📍 [handleSave] Endpoint:', endpoint);
+
+      // 3. Realizar la petición de guardado
       const response = await fetch(endpoint, {
-        method: 'POST', // Usamos POST para la actualización según definimos en el servidor
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dataToSave)
       });
 
       const result = await response.json();
+      console.log('📥 [handleSave] Respuesta del servidor:', result);
 
       if (!response.ok || !result.success) {
         throw new Error(result.error || result.details || 'Error al guardar los cambios en el ERP');
       }
 
-      // 4. Actualizar estado local y salir del modo edición
-      setProveedorInfo(editedInfo);
+      // 4. VALIDACIÓN POST-GUARDADO: Re-consultar datos para confirmar persistencia
+      toast.loading('Validando cambios guardados...', {
+        id: loadingToast,
+        description: 'Verificando que los datos se guardaron correctamente'
+      });
+
+      console.log('🔄 [handleSave] Re-consultando datos para validar...');
+
+      // Esperar un momento para que el ERP procese
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const validateEndpoint = idFromQuery
+        ? `/api/admin/proveedores/${proveedorId}?empresa=${empresaParaAPI}`
+        : '/api/proveedor/info';
+
+      const validateResponse = await fetch(validateEndpoint);
+      const validateResult = await validateResponse.json();
+
+      console.log('📥 [handleSave] Datos re-consultados:', validateResult);
+
+      if (!validateResponse.ok || !validateResult.success) {
+        console.warn('⚠️ [handleSave] No se pudo validar, pero el guardado fue exitoso');
+        // No lanzar error, solo advertir
+      }
+
+      // 5. Actualizar estado local con los datos confirmados del servidor
+      if (validateResult.erpDatos || validateResult.data) {
+        const confirmedData = validateResult.erpDatos ? {
+          // Mapear igual que en cargarInfoProveedor
+          razonSocial: validateResult.erpDatos.Nombre,
+          nombreCorto: validateResult.erpDatos.NombreCorto,
+          rfc: validateResult.erpDatos.RFC,
+          curp: validateResult.erpDatos.CURP,
+          codigo: validateResult.erpDatos.Proveedor,
+          direccionFiscal: validateResult.erpDatos.Direccion,
+          direccionNumero: validateResult.erpDatos.DireccionNumero,
+          direccionNumeroInt: validateResult.erpDatos.DireccionNumeroInt,
+          entreCalles: validateResult.erpDatos.EntreCalles,
+          colonia: validateResult.erpDatos.Colonia,
+          poblacion: validateResult.erpDatos.Poblacion,
+          estado: validateResult.erpDatos.Estado,
+          pais: validateResult.erpDatos.Pais,
+          codigoPostal: validateResult.erpDatos.CodigoPostal,
+          nombreContacto: validateResult.erpDatos.Contacto1,
+          contacto2: validateResult.erpDatos.Contacto2,
+          email: validateResult.erpDatos.eMail1 || validateResult.portalEmail,
+          email2: validateResult.erpDatos.eMail2,
+          telefono: validateResult.erpDatos.Telefonos || validateResult.portalTelefono,
+          fax: validateResult.erpDatos.Fax,
+          extension1: validateResult.erpDatos.Extencion1,
+          extension2: validateResult.erpDatos.Extencion2,
+          numeroCuenta: validateResult.erpDatos.ProvCuenta,
+          banco: validateResult.erpDatos.ProvBancoSucursal,
+          beneficiario: validateResult.erpDatos.Beneficiario,
+          beneficiarioNombre: validateResult.erpDatos.BeneficiarioNombre,
+          leyendaCheque: validateResult.erpDatos.LeyendaCheque,
+          condicionPago: validateResult.erpDatos.Condicion,
+          formaPago: validateResult.erpDatos.FormaPago,
+          categoria: validateResult.erpDatos.Categoria,
+          familia: validateResult.erpDatos.Familia,
+          descuento: validateResult.erpDatos.Descuento,
+          moneda: validateResult.erpDatos.DefMoneda,
+          comision: validateResult.erpDatos.Comision,
+          diasRevision: [validateResult.erpDatos.DiaRevision1, validateResult.erpDatos.DiaRevision2].filter(Boolean).join(', '),
+          diasPago: [validateResult.erpDatos.DiaPago1, validateResult.erpDatos.DiaPago2].filter(Boolean).join(', '),
+          comprador: validateResult.erpDatos.Comprador,
+          agente: validateResult.erpDatos.Agente,
+          centroCostos: validateResult.erpDatos.CentroCostos,
+          cuentaContable: validateResult.erpDatos.Cuenta,
+          cuentaRetencion: validateResult.erpDatos.CuentaRetencion,
+          fiscalRegimen: validateResult.erpDatos.FiscalRegimen,
+          importe1: validateResult.erpDatos.Importe1,
+          importe2: validateResult.erpDatos.Importe2,
+          estatus: validateResult.erpDatos.Estatus,
+          situacion: validateResult.erpDatos.Situacion,
+          situacionFecha: validateResult.erpDatos.SituacionFecha,
+          situacionNota: validateResult.erpDatos.SituacionNota,
+          situacionUsuario: validateResult.erpDatos.SituacionUsuario,
+          alta: validateResult.erpDatos.Alta,
+          ultimoCambio: validateResult.erpDatos.UltimoCambio,
+          tieneMovimientos: validateResult.erpDatos.TieneMovimientos,
+          tipo: validateResult.erpDatos.Tipo,
+          codigoProveedorERP: validateResult.erpDatos.Proveedor,
+          portalEstatus: validateResult.portalEstatus,
+          portalFechaRegistro: validateResult.portalFechaRegistro
+        } : validateResult.data;
+
+        console.log('✅ [handleSave] Datos confirmados del servidor:', confirmedData);
+        setProveedorInfo(confirmedData);
+      } else {
+        // Si no hay datos de validación, usar los editados
+        setProveedorInfo(editedInfo);
+      }
+
+      // 6. Salir del modo edición
       setIsEditing(false);
       setEditedInfo(null);
 
-      toast({
-        title: "Cambios guardados",
-        description: "La información se ha actualizado correctamente en el ERP.",
+      // 7. Toast de éxito
+      toast.success('¡Cambios guardados exitosamente!', {
+        id: loadingToast,
+        description: 'La información se ha actualizado correctamente en el ERP',
+        icon: <CheckCircle2 className="h-5 w-5" />,
+        duration: 4000,
       });
 
+      console.log('✅ [handleSave] Guardado completado exitosamente');
+
     } catch (error: any) {
-      console.error('Error al guardar:', error);
-      toast({
-        title: "Error al guardar",
-        description: error.message,
-        variant: "destructive",
+      console.error('❌ [handleSave] Error:', error);
+
+      toast.error('Error al guardar los cambios', {
+        id: loadingToast,
+        description: error.message || 'No se pudieron guardar los cambios. Por favor intenta nuevamente.',
+        icon: <XCircle className="h-5 w-5" />,
+        duration: 6000,
       });
     } finally {
       setLoadingInfo(false);
