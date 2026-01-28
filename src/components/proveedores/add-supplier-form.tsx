@@ -28,13 +28,6 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -73,16 +66,10 @@ const formSchema = z.object({
   bankAccount: z.string().min(10, 'La cuenta bancaria es requerida'),
   bankClabe: z.string().length(18, 'La CLABE debe tener 18 dígitos'),
 
-  // Categorías
-  supplierType: z.enum(['supplies', 'services', 'leasing', 'transport'], {
-    required_error: 'Debe seleccionar un tipo de proveedor',
-  }),
-
   // Descripción
   description: z.string().optional(),
 });
 
-type SupplierType = z.infer<typeof formSchema>['supplierType'];
 
 const complementaryDocsConfig = [
     { id: 'poderNotarial', label: 'Poder notarial del representante legal', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
@@ -117,7 +104,6 @@ export function AddSupplierForm() {
     },
   });
 
-  const supplierType = form.watch('supplierType');
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
@@ -314,30 +300,6 @@ export function AddSupplierForm() {
                 <CardTitle>Categoría y Documentos</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                 <FormField
-                  control={form.control}
-                  name="supplierType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tipo de Proveedor</FormLabel>
-                       <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccione un tipo" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="supplies">Suministros</SelectItem>
-                          <SelectItem value="services">Servicios</SelectItem>
-                          <SelectItem value="leasing">Arrendamiento</SelectItem>
-                          <SelectItem value="transport">Transporte</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <div>
                     <h3 className="text-sm font-medium mb-4">Documentos Iniciales</h3>
                     <div className="space-y-4">
@@ -365,9 +327,7 @@ export function AddSupplierForm() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {complementaryDocsConfig
-                                .filter(doc => !supplierType || doc.types.includes(supplierType))
-                                .map(doc => (
+                            {complementaryDocsConfig.map(doc => (
                                 <TableRow key={doc.id}>
                                     <TableCell className="font-medium text-xs py-2">{doc.label}</TableCell>
                                     <TableCell className="text-right py-2">
@@ -380,11 +340,6 @@ export function AddSupplierForm() {
                             ))}
                         </TableBody>
                     </Table>
-                     {!supplierType && (
-                        <div className="text-center py-4 text-sm text-muted-foreground">
-                            Selecciona un tipo de proveedor para ver los documentos requeridos.
-                        </div>
-                    )}
                 </CardContent>
             </Card>
           </div>
