@@ -1,22 +1,12 @@
 
 'use client';
 
-import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import {
-  Badge,
-  CheckCircle2,
-  File as FileIcon,
-  Loader2,
-  Upload,
-  XCircle,
-  FileText,
-  Building,
-  Truck,
-  Sparkles
-} from 'lucide-react';
+import { Loader2, Upload } from 'lucide-react';
+import { useProveedorAdmin } from '@/hooks/useProveedorAdmin';
+import type { FormProveedorAdmin } from '@/types/admin-proveedores';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -29,7 +19,6 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import {
   Card,
@@ -46,28 +35,36 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { cn } from '@/lib/utils';
-// TODO: Implementar addSupplier usando SQL Server
-// import { addSupplier } from '@/lib/firebase/firestore';
 
 const formSchema = z.object({
   // Datos fiscales
   name: z.string().min(2, 'El nombre es requerido'),
-  taxId: z.string().min(10, 'El RFC/Tax ID es requerido'),
-  address: z.string().min(5, 'La dirección es requerida'),
-  
+  taxId: z.string()
+    .min(12, 'El RFC debe tener al menos 12 caracteres')
+    .max(13, 'El RFC debe tener máximo 13 caracteres')
+    .regex(
+      /^[A-Za-z]{3,4}[0-9]{6}[A-Za-z0-9]{3}$/,
+      'RFC inválido. Formato: 3-4 letras + 6 dígitos + 3 caracteres (ej: ABC123456XY9)'
+    ),
+
+  // Dirección fiscal
+  street: z.string().min(3, 'La calle es requerida'),
+  numExt: z.string().min(1, 'El número exterior es requerido'),
+  numInt: z.string().optional(),
+  colonia: z.string().min(2, 'La colonia es requerida'),
+  city: z.string().min(2, 'La ciudad es requerida'),
+  state: z.string().min(2, 'El estado es requerido'),
+  country: z.string().optional(),
+  postalCode: z.string().min(5, 'El código postal debe tener 5 dígitos').max(5, 'El código postal debe tener 5 dígitos'),
+
   // Datos de contacto
   contactName: z.string().min(2, 'El nombre del contacto es requerido'),
   contactEmail: z.string().email('Email inválido'),
   contactPhone: z.string().min(10, 'El teléfono debe tener al menos 10 dígitos'),
-  
+
   // Información bancaria
   bankName: z.string().min(2, 'El nombre del banco es requerido'),
   bankAccount: z.string().min(10, 'La cuenta bancaria es requerida'),
-  bankClabe: z.string().length(18, 'La CLABE debe tener 18 dígitos'),
-
-  // Descripción
-  description: z.string().optional(),
 });
 
 
@@ -87,41 +84,75 @@ const complementaryDocsConfig = [
 
 export function AddSupplierForm() {
   const { toast } = useToast();
-  
+  const { crearProveedor, saving, error } = useProveedorAdmin();
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
       taxId: '',
-      address: '',
+      street: '',
+      numExt: '',
+      numInt: '',
+      colonia: '',
+      city: '',
+      state: '',
+      country: 'México',
+      postalCode: '',
       contactName: '',
       contactEmail: '',
       contactPhone: '',
       bankName: '',
       bankAccount: '',
-      bankClabe: '',
-      description: '',
     },
   });
 
-
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      // TODO: Implementar con SQL Server
-      console.log('Datos del proveedor:', values);
-      toast({
-        title: 'Función no disponible',
-        description: 'La creación de proveedores desde el portal aún no está implementada.',
-        variant: 'destructive',
-      });
-      // await addSupplier(values);
-      // toast({
-      //   title: 'Proveedor Guardado',
-      //   description: `El proveedor ${values.name} ha sido guardado exitosamente.`,
-      // });
-      // form.reset();
-    } catch (error) {
-      console.error('Error al guardar el proveedor:', error);
+      // Mapear los datos del formulario al formato esperado por la API
+      const proveedorData: FormProveedorAdmin = {
+        nombre: values.name.trim(),
+        nombreCorto: values.name.substring(0, 20).trim(),
+        rfc: values.taxId.toUpperCase().trim(), // RFC debe ser mayúsculas
+        // Dirección
+        direccion: values.street.trim(),
+        numeroExterior: values.numExt.trim(),
+        numeroInterior: values.numInt?.trim() || '',
+        colonia: values.colonia.trim(),
+        ciudad: values.city.trim(),
+        estado: values.state.trim(),
+        pais: values.country?.trim() || 'México',
+        codigoPostal: values.postalCode.trim(),
+        // Contacto
+        contactoPrincipal: values.contactName.trim(),
+        email1: values.contactEmail.toLowerCase().trim(), // Email en minúsculas
+        telefonos: values.contactPhone.trim(),
+        // Bancario
+        banco: values.bankName.trim(),
+        cuentaBancaria: values.bankAccount.trim(),
+        empresa: 'peralillo', // Empresa para pruebas
+        activo: true,
+      };
+
+      console.log('Creando proveedor:', proveedorData);
+
+      const success = await crearProveedor(proveedorData);
+
+      if (success) {
+        toast({
+          title: 'Proveedor Guardado',
+          description: `El proveedor ${values.name} ha sido guardado exitosamente.`,
+        });
+        form.reset();
+      } else {
+        toast({
+          title: 'Error',
+          description: error || 'Hubo un problema al guardar el proveedor.',
+          variant: 'destructive',
+        });
+      }
+    } catch (err) {
+      console.error('Error al guardar el proveedor:', err);
       toast({
         title: 'Error',
         description: 'Hubo un problema al guardar el proveedor. Por favor, intenta de nuevo.',
@@ -182,19 +213,124 @@ export function AddSupplierForm() {
                     </FormItem>
                   )}
                 />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Dirección Fiscal</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <FormField
                   control={form.control}
-                  name="address"
+                  name="street"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Dirección Fiscal</FormLabel>
+                      <FormLabel>Calle</FormLabel>
                       <FormControl>
-                        <Input placeholder="Av. Siempre Viva 123, Springfield" {...field} />
+                        <Input placeholder="Av. Reforma" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="numExt"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Número Exterior</FormLabel>
+                        <FormControl>
+                          <Input placeholder="123" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="numInt"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Número Interior</FormLabel>
+                        <FormControl>
+                          <Input placeholder="4-A (opcional)" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="colonia"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Colonia</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Centro" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="city"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Ciudad / Población</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ciudad de México" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="state"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Estado</FormLabel>
+                        <FormControl>
+                          <Input placeholder="CDMX" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="postalCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Código Postal</FormLabel>
+                        <FormControl>
+                          <Input placeholder="06600" maxLength={5} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="country"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>País</FormLabel>
+                        <FormControl>
+                          <Input placeholder="México" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </CardContent>
             </Card>
 
@@ -268,22 +404,9 @@ export function AddSupplierForm() {
                   name="bankAccount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Número de Cuenta</FormLabel>
+                      <FormLabel>Número de Cuenta o CLABE</FormLabel>
                       <FormControl>
                         <Input placeholder="0123456789" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="bankClabe"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>CLABE Interbancaria</FormLabel>
-                      <FormControl>
-                        <Input placeholder="012345678901234567" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -346,8 +469,17 @@ export function AddSupplierForm() {
         </div>
 
         <div className="flex justify-end gap-2 mt-8">
-          <Button type="button" variant="outline">Cancelar</Button>
-          <Button type="submit">Guardar Proveedor</Button>
+          <Button type="button" variant="outline" disabled={saving}>Cancelar</Button>
+          <Button type="submit" disabled={saving}>
+            {saving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Guardando...
+              </>
+            ) : (
+              'Guardar Proveedor'
+            )}
+          </Button>
         </div>
       </form>
     </Form>

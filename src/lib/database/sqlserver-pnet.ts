@@ -549,8 +549,8 @@ export class SqlServerPNetDatabase implements Database {
 
   async getProveedores(filters?: ProveedorFilters): Promise<ProveedorUser[]> {
     try {
-      // 1. Obtener proveedores del ERP de La Cantera
-      const erpPool = await getERPConnection('la-cantera');
+      // 1. Obtener proveedores del ERP
+      const erpPool = await getERPConnection('peralillo'); // Pruebas con Peralillo_Ajustes
       const erpRequest = erpPool.request();
 
       // SIEMPRE filtrar solo proveedores con estatus ALTA (excluir BAJA y BLOQUEADO)
