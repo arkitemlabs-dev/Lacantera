@@ -157,7 +157,8 @@ export default function OrdenesDeCompraPage() {
   const cargarProveedores = async () => {
     setLoadingProveedores(true);
     try {
-      const response = await fetch('/api/admin/ordenes-sp/proveedores?empresa=01');
+      const empresaId = session?.user?.empresaActual || '01';
+      const response = await fetch(`/api/admin/ordenes-sp/proveedores?empresa=${empresaId}`);
       const result = await response.json();
 
       if (result.success) {
@@ -184,7 +185,8 @@ export default function OrdenesDeCompraPage() {
     try {
       // Construir query params para el SP
       const params = new URLSearchParams();
-      params.append('empresa', '01'); // Por ahora fijo, se puede hacer dinámico
+      const empresaId = session?.user?.empresaActual || '01';
+      params.append('empresa', empresaId);
       params.append('page', currentPage.toString());
       params.append('limit', '10');
 

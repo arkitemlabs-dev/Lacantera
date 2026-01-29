@@ -288,27 +288,26 @@ export class StoredProcedures {
     // Calcular cantidad de páginas para que el SP devuelve el total
     const cuantasPaginas = 1;
 
-    // Convertir fechas de YYYY-MM-DD a DD/MM/YYYY (formato que espera el SP)
-    const formatDateForSP = (dateStr: string | null | undefined): string | null => {
+    // Convertir fechas de string YYYY-MM-DD a objeto Date para sql.Date
+    const parseDateForSP = (dateStr: string | null | undefined): Date | null => {
       if (!dateStr) return null;
-      // Si viene en formato YYYY-MM-DD, convertir a DD/MM/YYYY
       if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
         const [year, month, day] = dateStr.split('-');
-        return `${day}/${month}/${year}`;
+        return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
       }
-      return dateStr;
+      return new Date(dateStr);
     };
 
-    const fechaDesdeStr = formatDateForSP(fechaDesde as string);
-    const fechaHastaStr = formatDateForSP(fechaHasta as string);
+    const fechaDesdeDate = parseDateForSP(fechaDesde as string);
+    const fechaHastaDate = parseDateForSP(fechaHasta as string);
 
-    console.log('[SP] Fechas enviadas:', { fechaDesdeStr, fechaHastaStr });
+    console.log('[SP] Fechas enviadas:', { fechaDesdeDate, fechaHastaDate });
 
     const result = await pool.request()
       .input('Rfc', sql.VarChar(20), rfc)
       .input('Empresa', sql.VarChar(10), this.getEmpresaERP(empresa))
-      .input('FechaDesde', sql.VarChar(10), fechaDesdeStr)
-      .input('FechaHasta', sql.VarChar(10), fechaHastaStr)
+      .input('FechaDesde', sql.Date, fechaDesdeDate)
+      .input('FechaHasta', sql.Date, fechaHastaDate)
       .input('Page', sql.Int, page)
       .input('Limit', sql.Int, limit)
       .input('CuantasPaginas', sql.Int, cuantasPaginas)
