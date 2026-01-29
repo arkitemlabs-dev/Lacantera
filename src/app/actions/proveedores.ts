@@ -5,6 +5,8 @@ import { database } from '@/lib/database';
 import type { ProveedorUser, DocumentoProveedor, StatusDocumento } from '@/types/backend';
 import type { ProveedorFilters } from '@/lib/database';
 import { revalidatePath } from 'next/cache';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth.config';
 
 // ==================== OBTENER PROVEEDORES ====================
 
@@ -23,8 +25,15 @@ export async function getProveedor(uid: string) {
 
 export async function getProveedores(filters?: ProveedorFilters) {
   try {
-    console.log('[ACTION] getProveedores - iniciando con filtros:', filters);
-    const proveedores = await database.getProveedores(filters);
+    // Obtener empresa de la sesión
+    const session = await getServerSession(authOptions);
+    const empresaActual = session?.user?.empresaActual as string | undefined;
+    const filtersConEmpresa: ProveedorFilters = {
+      ...filters,
+      empresa: filters?.empresa || empresaActual || 'la-cantera-test',
+    };
+    console.log('[ACTION] getProveedores - iniciando con filtros:', filtersConEmpresa);
+    const proveedores = await database.getProveedores(filtersConEmpresa);
 
     // Log de resumen
     const registrados = proveedores.filter(p => p.registradoEnPortal === true).length;
@@ -308,7 +317,9 @@ export async function getEstadisticasProveedor(proveedorId: string) {
 
 export async function getEstadisticasGenerales() {
   try {
-    const proveedores = await database.getProveedores();
+    const session = await getServerSession(authOptions);
+    const empresaActual = session?.user?.empresaActual as string | undefined;
+    const proveedores = await database.getProveedores({ empresa: empresaActual || 'la-cantera-test' });
     const totalProveedores = proveedores.length;
     const activos = proveedores.filter((p) => p.status === 'activo').length;
     const pendientes = proveedores.filter(

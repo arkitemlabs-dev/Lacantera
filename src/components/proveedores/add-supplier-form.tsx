@@ -130,7 +130,7 @@ export function AddSupplierForm() {
         // Bancario
         banco: values.bankName.trim(),
         cuentaBancaria: values.bankAccount.trim(),
-        empresa: 'peralillo', // Empresa para pruebas
+        empresa: 'la-cantera',
         activo: true,
       };
 

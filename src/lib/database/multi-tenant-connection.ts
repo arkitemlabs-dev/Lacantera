@@ -15,57 +15,9 @@ export interface TenantERPConfig {
   erpEmpresa: string;    // Código numérico usado por los Stored Procedures (ej: 01, 06)
 }
 
-const TENANT_CONFIGS: Record<string, TenantERPConfig> = ACTIVE_TENANT_CONFIGS as Record<string, TenantERPConfig> || {
-  'la-cantera': {
-    id: 'la-cantera',
-    nombre: 'La Cantera Desarrollos Mineros',
-    erpDatabase: 'Cantera', // Base de datos donde están los SPs
-    codigoEmpresa: 'la-cantera',
-    erpEmpresa: '01',
-  },
-  'peralillo': {
-    id: 'peralillo',
-    nombre: 'Peralillo S.A de C.V',
-    erpDatabase: 'Peralillo_Ajustes', // Base real (con A mayúscula)
-    codigoEmpresa: 'peralillo',
-    erpEmpresa: '02',
-  },
-  'plaza-galerena': {
-    id: 'plaza-galerena',
-    nombre: 'Plaza Galereña',
-    erpDatabase: 'GALBD_PRUEBAS', // Base real
-    codigoEmpresa: 'plaza-galerena',
-    erpEmpresa: '03',
-  },
-  'icrear': {
-    id: 'icrear',
-    nombre: 'Icrear',
-    erpDatabase: 'ICREAR_PRUEBAS', // Base real
-    codigoEmpresa: 'icrear',
-    erpEmpresa: '05',
-  },
-  'inmobiliaria-galerena': {
-    id: 'inmobiliaria-galerena',
-    nombre: 'Inmobiliaria Galereña',
-    erpDatabase: 'GALBD_PRUEBAS', // Comparte BD con Plaza Galereña
-    codigoEmpresa: 'inmobiliaria-galerena',
-    erpEmpresa: '04',
-  },
-  'la-cantera-test': {
-    id: 'la-cantera-test',
-    nombre: 'La Cantera (Ajustes)',
-    erpDatabase: 'Cantera_Ajustes',
-    codigoEmpresa: 'la-cantera-test',
-    erpEmpresa: '06',
-  },
-  'peralillo-test': {
-    id: 'peralillo-test',
-    nombre: 'Peralillo (Ajustes)',
-    erpDatabase: 'Peralillo_Ajustes',
-    codigoEmpresa: 'peralillo-test',
-    erpEmpresa: '07',
-  },
-};
+// Todas las configuraciones vienen de tenant-configs.ts
+// Una sola conexión a BD Cantera, los SPs redirigen según @Empresa
+const TENANT_CONFIGS: Record<string, TenantERPConfig> = ACTIVE_TENANT_CONFIGS as Record<string, TenantERPConfig>;
 
 /**
  * Pool de conexiones compartido para el Portal (PP)
@@ -143,11 +95,8 @@ export async function getPortalConnection(): Promise<sql.ConnectionPool> {
 export async function getERPConnection(
   tenantId: string
 ): Promise<sql.ConnectionPool> {
-  const tenantConfig = TENANT_CONFIGS[tenantId];
-
-  if (!tenantConfig) {
-    throw new Error(`Tenant no encontrado: ${tenantId}`);
-  }
+  // Usar getTenantConfig para soportar fallback de IDs legacy
+  const tenantConfig = getTenantConfig(tenantId);
 
   const erpDatabase = tenantConfig.erpDatabase;
 
@@ -186,11 +135,20 @@ export async function getERPConnection(
  * Obtiene la configuración de un tenant
  */
 export function getTenantConfig(tenantId: string): TenantERPConfig {
-  const config = TENANT_CONFIGS[tenantId];
-  if (!config) {
-    throw new Error(`Configuración de tenant no encontrada: ${tenantId}`);
+  // Buscar directamente (nuevo formato: 'la-cantera-test', 'peralillo-prod', etc.)
+  let config = TENANT_CONFIGS[tenantId];
+  if (config) return config;
+
+  // Fallback: IDs antiguos sin sufijo (ej: 'la-cantera') → intentar con '-test'
+  if (!tenantId.endsWith('-test') && !tenantId.endsWith('-prod')) {
+    config = TENANT_CONFIGS[`${tenantId}-test`];
+    if (config) {
+      console.warn(`[TENANT] ID legacy '${tenantId}' resuelto a '${tenantId}-test'`);
+      return config;
+    }
   }
-  return config;
+
+  throw new Error(`Configuración de tenant no encontrada: ${tenantId}`);
 }
 
 /**

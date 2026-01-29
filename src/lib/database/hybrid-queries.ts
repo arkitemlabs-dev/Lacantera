@@ -432,36 +432,42 @@ export async function validateUserTenantAccess(
  * - Proveedores: acceso según portal_proveedor_mapping
  */
 export async function getUserTenants(userId: string, userRole?: string) {
-  // Mapear códigos de empresa a nombres amigables
+  // Mapear tenantIds a nombres amigables
   const empresaToNameMap: Record<string, string> = {
-    'la-cantera': 'La Cantera',
-    'peralillo': 'Peralillo',
-    'plaza-galerena': 'Plaza Galereña',
-    'inmobiliaria-galerena': 'Inmobiliaria Galereña',
-    'icrear': 'Icrear',
-    // Códigos legacy (por compatibilidad)
-    'LCDM': 'La Cantera',
-    'PERA': 'Peralillo',
-    'PLAZ': 'Plaza Galereña',
-    'ICRE': 'Icrear',
-    'INMO': 'Inmobiliaria Galereña',
+    // Producción
+    'la-cantera-prod': 'La Cantera Desarrollos Mineros',
+    'peralillo-prod': 'El Peralillo SA de CV',
+    'plaza-galerena-prod': 'Plaza Galereña',
+    'inmobiliaria-galerena-prod': 'Inmobiliaria Galereña',
+    'icrear-prod': 'Icrear',
+    // Pruebas
+    'la-cantera-test': 'La Cantera Desarrollos Mineros [TEST]',
+    'peralillo-test': 'El Peralillo SA de CV [TEST]',
+    'plaza-galerena-test': 'Plaza Galereña [TEST]',
+    'inmobiliaria-galerena-test': 'Inmobiliaria Galereña [TEST]',
+    'icrear-test': 'Icrear [TEST]',
   };
 
-  // Si es administrador, dar acceso a todas las empresas
+  // Si es administrador, dar acceso a todas las empresas (prod + test)
   if (userRole === 'super-admin' || userRole === 'admin') {
     const todasLasEmpresas = [
-      'la-cantera',
-      'peralillo',
-      'plaza-galerena',
-      'inmobiliaria-galerena',
-      'icrear',
+      'la-cantera-prod',
+      'peralillo-prod',
+      'plaza-galerena-prod',
+      'inmobiliaria-galerena-prod',
+      'icrear-prod',
+      'la-cantera-test',
+      'peralillo-test',
+      'plaza-galerena-test',
+      'inmobiliaria-galerena-test',
+      'icrear-test',
     ];
 
     return todasLasEmpresas.map(empresaCode => ({
       tenantId: empresaCode,
       empresaCodigo: empresaCode,
-      proveedorCodigo: null, // Los admins no tienen código de proveedor
-      permisos: ['admin'], // Permisos completos
+      proveedorCodigo: null,
+      permisos: ['admin'],
       tenantName: empresaToNameMap[empresaCode] || empresaCode,
     }));
   }

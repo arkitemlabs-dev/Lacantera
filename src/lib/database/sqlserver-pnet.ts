@@ -4,7 +4,8 @@
 import sql from 'mssql';
 import bcrypt from 'bcrypt';
 import { getConnection } from '@/lib/sql-connection';
-import { getERPConnection } from './multi-tenant-connection';
+import { getERPConnection, getTenantConfig } from './multi-tenant-connection';
+import { getStoredProcedures } from './stored-procedures';
 import type {
   Database,
   ProveedorFilters,
@@ -549,58 +550,62 @@ export class SqlServerPNetDatabase implements Database {
 
   async getProveedores(filters?: ProveedorFilters): Promise<ProveedorUser[]> {
     try {
-      // 1. Obtener proveedores del ERP
-      const erpPool = await getERPConnection('peralillo'); // Pruebas con Peralillo_Ajustes
-      const erpRequest = erpPool.request();
+      // 1. Obtener proveedores del ERP usando SP (soporta todas las empresas)
+      const empresa = filters?.empresa || 'la-cantera-test';
+      console.log(`[ERP-SP] Obteniendo proveedores via spDatosProveedor para empresa: ${empresa}`);
 
-      // SIEMPRE filtrar solo proveedores con estatus ALTA (excluir BAJA y BLOQUEADO)
-      const erpConditions: string[] = ["UPPER(p.Estatus) = 'ALTA'"];
+      const sp = getStoredProcedures();
+      const spResult = await sp.spDatosProveedor({
+        empresa,
+        operacion: 'C',
+        cveProv: '', // vacío = todos los proveedores
+      });
 
-      const erpWhereClause = erpConditions.length > 0 ? `WHERE ${erpConditions.join(' AND ')}` : '';
+      if (!spResult.success || !Array.isArray(spResult.data)) {
+        console.error('[ERP-SP] Error al obtener proveedores:', spResult.error);
+        throw new Error(spResult.error || 'Error al obtener proveedores del SP');
+      }
 
-      // Query al ERP - Solo columnas necesarias para el portal
-      const erpQuery = `
-        SELECT
-          p.Proveedor,
-          p.Nombre as ProveedorNombre,
-          p.NombreCorto,
-          p.RFC,
-          p.Direccion,
-          p.DireccionNumero,
-          p.Colonia,
-          p.Poblacion,
-          p.Estado,
-          p.Pais,
-          p.CodigoPostal,
-          p.Telefonos as ProveedorTelefono,
-          p.eMail1 as ProveedorEmail,
-          p.eMail2 as ProveedorEmail2,
-          p.Contacto1,
-          p.Contacto2,
-          p.Categoria,
-          p.Condicion as CondicionPago,
-          p.Estatus as ProveedorEstatus,
-          p.Situacion,
-          p.SituacionFecha,
-          p.SituacionNota,
-          p.Alta as FechaAltaERP,
-          p.UltimoCambio,
-          p.Tipo,
-          p.ProvBancoSucursal as Banco,
-          p.ProvCuenta as CuentaBancaria,
-          p.FormaPago,
-          p.DiaRevision1,
-          p.DiaRevision2,
-          p.DiaPago1,
-          p.DiaPago2
-        FROM Prov p
-        ${erpWhereClause}
-        ORDER BY p.Nombre ASC
-      `;
+      // Mapear columnas del SP a los alias esperados por mapRowToProveedorUserFromERP
+      const erpRecords = spResult.data.map((row: any) => ({
+        Proveedor: row.Proveedor,
+        ProveedorNombre: row.Nombre || row.ProveedorNombre,
+        NombreCorto: row.NombreCorto,
+        RFC: row.RFC,
+        Direccion: row.Direccion,
+        DireccionNumero: row.DireccionNumero,
+        Colonia: row.Colonia,
+        Poblacion: row.Poblacion,
+        Estado: row.Estado,
+        Pais: row.Pais,
+        CodigoPostal: row.CodigoPostal,
+        ProveedorTelefono: row.Telefonos || row.ProveedorTelefono,
+        ProveedorEmail: row.eMail1 || row.ProveedorEmail,
+        ProveedorEmail2: row.eMail2 || row.ProveedorEmail2,
+        Contacto1: row.Contacto1,
+        Contacto2: row.Contacto2,
+        Categoria: row.Categoria,
+        CondicionPago: row.Condicion || row.CondicionPago,
+        ProveedorEstatus: row.Estatus || row.ProveedorEstatus,
+        Situacion: row.Situacion,
+        SituacionFecha: row.SituacionFecha,
+        SituacionNota: row.SituacionNota,
+        FechaAltaERP: row.Alta || row.FechaAltaERP,
+        Banco: row.ProvBancoSucursal || row.Banco || row.BancoSucursal,
+        CuentaBancaria: row.ProvCuenta || row.CuentaBancaria || row.Cuenta,
+        FormaPago: row.FormaPago,
+        DiaRevision1: row.DiaRevision1,
+        DiaRevision2: row.DiaRevision2,
+        DiaPago1: row.DiaPago1,
+        DiaPago2: row.DiaPago2,
+      }));
 
-      console.log('[ERP-QUERY] Obteniendo proveedores de Cantera_ajustes...');
-      const erpResult = await erpRequest.query(erpQuery);
-      console.log(`[ERP-QUERY] Encontrados ${erpResult.recordset.length} proveedores en ERP`);
+      // Filtrar solo estatus ALTA
+      const erpFiltered = erpRecords.filter((r: any) =>
+        r.ProveedorEstatus && String(r.ProveedorEstatus).toUpperCase() === 'ALTA'
+      );
+
+      console.log(`[ERP-SP] Encontrados ${spResult.data.length} proveedores, ${erpFiltered.length} con estatus ALTA`);
 
       // 2. Obtener usuarios registrados en el portal con sus RFCs
       // El cruce se hace por RFC porque los códigos de proveedor del portal (PROV001)
@@ -667,13 +672,13 @@ export class SqlServerPNetDatabase implements Database {
       console.log(`[PORTAL-MAP] Total RFCs mapeados: ${portalUsuariosPorRFC.size}`);
 
       // Debug: mostrar algunos RFCs del ERP
-      if (erpResult.recordset.length > 0) {
-        const primeros5 = erpResult.recordset.slice(0, 5).map(p => `"${p.RFC || 'SIN RFC'}"`);
-        console.log('[ERP-QUERY] Primeros 5 RFCs del ERP:', primeros5.join(', '));
+      if (erpFiltered.length > 0) {
+        const primeros5 = erpFiltered.slice(0, 5).map((p: any) => `"${p.RFC || 'SIN RFC'}"`);
+        console.log('[ERP-SP] Primeros 5 RFCs del ERP:', primeros5.join(', '));
       }
 
       // 4. Combinar datos: ERP + Portal (cruce por múltiples criterios)
-      let proveedores: ProveedorUser[] = erpResult.recordset.map(erpRow => {
+      let proveedores: ProveedorUser[] = erpFiltered.map((erpRow: any) => {
         let portalUsuario = null;
         
         // 1. Intentar por RFC
@@ -695,12 +700,13 @@ export class SqlServerPNetDatabase implements Database {
         }
 
         // Debug para primeros registros
-        if (erpResult.recordset.indexOf(erpRow) < 10) {
+        if (erpFiltered.indexOf(erpRow) < 10) {
           console.log(`[MATCH] Proveedor ERP: "${erpRow.Proveedor}" - "${erpRow.ProveedorNombre}", Match: ${portalUsuario ? 'SÍ (' + portalUsuario.eMail + ')' : 'NO'}`);
         }
 
         return this.mapRowToProveedorUserFromERP({
           ...erpRow,
+          _empresa: empresa,
           // Datos del portal si existe (cruzado por RFC)
           IDUsuario: portalUsuario?.IDUsuario || null,
           eMail: portalUsuario?.eMail || null,
@@ -931,7 +937,7 @@ export class SqlServerPNetDatabase implements Database {
       displayName: row.ProveedorNombre || row.UsuarioNombre || '',
       role: 'proveedor',
       userType: 'Proveedor',
-      empresa: 'la-cantera', // Por ahora solo La Cantera
+      empresa: row._empresa || 'la-cantera',
       isActive: registradoEnPortal ? (row.UsuarioEstatus === 'ACTIVO') : (row.ProveedorEstatus === 'ALTA'),
       rfc: row.RFC || '',
       razonSocial: row.ProveedorNombre || '',

@@ -4,6 +4,7 @@ import bcrypt from 'bcrypt';
 import sql from 'mssql';
 import { getPortalConnection } from '@/lib/database/multi-tenant-connection';
 import { getUserTenants } from '@/lib/database/hybrid-queries';
+import { TENANT_CONFIGS } from '@/lib/database/tenant-configs';
 
 
 
@@ -206,7 +207,23 @@ export const authOptions: NextAuthOptions = {
               const hasAccess = tenants.some(t => t.tenantId === user.empresaId);
               if (hasAccess) {
                 token.empresaActual = user.empresaId;
-                console.log(`[AUTH] Usuario ${user.id} seleccionó empresa: ${user.empresaId}`);
+                const tenantInfo = tenants.find(t => t.tenantId === user.empresaId);
+                const tenantConfig = (TENANT_CONFIGS as any)[user.empresaId];
+                // Mapeo de código empresa a BD destino
+                const BD_MAP: Record<string, string> = {
+                  '01': 'Cantera', '02': 'Peralillo', '03': 'Galbd', '04': 'Galbd', '05': 'Icrear',
+                  '06': 'Cantera_Ajustes', '07': 'Peralillo_Ajustes', '08': 'Galbd_Pruebas', '09': 'Galbd_Pruebas', '10': 'Icrear_Pruebas',
+                };
+                const erpCode = tenantConfig?.erpEmpresa || '?';
+                const bdDestino = BD_MAP[erpCode] || 'Desconocida';
+                console.log(`\n========================================`);
+                console.log(`[AUTH] LOGIN EXITOSO`);
+                console.log(`  Usuario: ${user.id} (${user.role})`);
+                console.log(`  Empresa: ${tenantInfo?.tenantName || user.empresaId}`);
+                console.log(`  Tenant ID: ${user.empresaId}`);
+                console.log(`  Codigo ERP: ${erpCode}`);
+                console.log(`  BD destino: ${bdDestino}`);
+                console.log(`========================================\n`);
               } else {
                 console.warn(`[AUTH] Usuario ${user.id} intentó seleccionar empresa sin acceso: ${user.empresaId}`);
                 token.empresaActual = tenants[0].tenantId;
@@ -225,21 +242,7 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      // 🔥 CAMBIO DE EMPRESA: Actualizar empresa actual
-      if (trigger === 'update' && session?.empresaActual) {
-        // Validar que el usuario tiene acceso a la empresa
-        const empresasDisponibles = token.empresasDisponibles as any[] || [];
-        const hasAccess = empresasDisponibles.some(
-          (e: any) => e.tenantId === session.empresaActual
-        );
-
-        if (hasAccess) {
-          token.empresaActual = session.empresaActual;
-          console.log(`[AUTH] Empresa cambiada a: ${session.empresaActual}`);
-        } else {
-          console.warn(`[AUTH] Intento de acceso no autorizado a empresa: ${session.empresaActual}`);
-        }
-      }
+      // Empresa se fija en el login. Para cambiar de empresa, hacer logout.
 
       return token;
     },

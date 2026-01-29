@@ -4,9 +4,10 @@ import { useEffect } from 'react';
 import { Nav as AdminNav } from '@/components/nav';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { UserNav } from '@/components/user-nav';
-import { EmpresaSelector } from '@/components/ui/empresa-selector';
 import { NotificacionesDropdown } from '@/components/notificaciones-dropdown';
 import { Nav as SupplierNav } from '@/components/proveedores/nav';
+import { Building2 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 import { useAuth } from '../providers';
 import { useEmpresa } from '@/contexts/EmpresaContext';
 
@@ -15,6 +16,13 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { userRole, isLoggingOut, user } = useAuth();
   const { empresaSeleccionada, loading: empresaLoading } = useEmpresa();
+  const { data: session } = useSession();
+
+  // Obtener nombre de la empresa actual desde la sesión
+  const empresaActualId = session?.user?.empresaActual;
+  const empresasDisponibles = session?.user?.empresasDisponibles as any[] || [];
+  const empresaActualInfo = empresasDisponibles.find((e: any) => e.tenantId === empresaActualId);
+  const nombreEmpresa = empresaActualInfo?.tenantName || empresaSeleccionada?.nombreComercial || 'Sin empresa';
   
   useEffect(() => {
     // No redirigir si está en proceso de logout
@@ -66,7 +74,10 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
            <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6 justify-between">
-            <EmpresaSelector />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Building2 className="h-4 w-4" />
+              <span className="font-medium">{nombreEmpresa}</span>
+            </div>
             <div className="flex items-center gap-2">
               {empresaSeleccionada && (
                 <NotificacionesDropdown empresa={empresaSeleccionada.codigo} />

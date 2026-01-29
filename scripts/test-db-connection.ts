@@ -1,9 +1,16 @@
 
 import dotenv from 'dotenv';
-import { hybridDB, getAllTenants } from '../src/lib/database/multi-tenant-connection';
 import sql from 'mssql';
 
 dotenv.config({ path: '.env.local' });
+
+// @ts-ignore
+const {
+    getPortalConnection,
+    getERPConnection,
+    getAllTenants,
+    closeAllConnections
+} = require('../src/lib/database/multi-tenant-connection');
 
 async function testConnections() {
     console.log('Testing connectivity...');
@@ -14,9 +21,8 @@ async function testConnections() {
         // 1. Test Portal Connection
         console.log('\n--- Testing Portal Connection ---');
         try {
-            const portalPool = await hybridDB.getPortalConnection();
+            const portalPool = await getPortalConnection();
             console.log('✅ Portal connection successful');
-            await portalPool.close();
         } catch (e: any) {
             console.error('❌ Portal connection failed:', e.message);
         }
@@ -30,17 +36,17 @@ async function testConnections() {
             console.log(`Database: ${tenant.erpDatabase}, Company Code: ${tenant.codigoEmpresa}`);
 
             try {
-                const pool = await hybridDB.getERPConnection(tenant.id);
+                const pool = await getERPConnection(tenant.id);
                 const result = await pool.request().query('SELECT DB_NAME() as dbName');
                 console.log(`✅ Connection successful. Connected to: ${result.recordset[0].dbName}`);
 
                 // Optional: Check if SP exists
                 try {
                     const spCheck = await pool.request().query(`
-                SELECT name 
-                FROM sys.procedures 
-                WHERE name = 'spDatosProveedor'
-            `);
+                        SELECT name 
+                        FROM sys.procedures 
+                        WHERE name = 'spDatosProveedor'
+                    `);
                     if (spCheck.recordset.length > 0) {
                         console.log('✅ spDatosProveedor exists');
                     } else {
@@ -58,7 +64,7 @@ async function testConnections() {
     } catch (error) {
         console.error('Test failed:', error);
     } finally {
-        await hybridDB.closeAllConnections();
+        await closeAllConnections();
         process.exit(0);
     }
 }

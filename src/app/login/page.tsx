@@ -37,11 +37,18 @@ interface EmpresaDisponible {
 
 // Lista de empresas disponibles en el sistema
 const EMPRESAS_SISTEMA = [
-  { tenantId: 'la-cantera', tenantName: 'La Cantera Desarrollos Mineros', empresaCodigo: 'LCDM' },
-  { tenantId: 'peralillo', tenantName: 'Peralillo S.A de C.V', empresaCodigo: 'PERA' },
-  { tenantId: 'plaza-galerena', tenantName: 'Plaza Galereña', empresaCodigo: 'PLAZ' },
-  { tenantId: 'icrear', tenantName: 'Icrear', empresaCodigo: 'ICRE' },
-  { tenantId: 'inmobiliaria-galerena', tenantName: 'Inmobiliaria Galereña', empresaCodigo: 'INMO' },
+  // Producción (01-05)
+  { tenantId: 'la-cantera-prod', tenantName: 'La Cantera Desarrollos Mineros', empresaCodigo: 'LCDM' },
+  { tenantId: 'peralillo-prod', tenantName: 'El Peralillo SA de CV', empresaCodigo: 'PERA' },
+  { tenantId: 'plaza-galerena-prod', tenantName: 'Plaza Galereña', empresaCodigo: 'PLAZ' },
+  { tenantId: 'inmobiliaria-galerena-prod', tenantName: 'Inmobiliaria Galereña', empresaCodigo: 'INMO' },
+  { tenantId: 'icrear-prod', tenantName: 'Icrear', empresaCodigo: 'ICRE' },
+  // Pruebas (06-10)
+  { tenantId: 'la-cantera-test', tenantName: 'La Cantera Desarrollos Mineros [TEST]', empresaCodigo: 'LCDM' },
+  { tenantId: 'peralillo-test', tenantName: 'El Peralillo SA de CV [TEST]', empresaCodigo: 'PERA' },
+  { tenantId: 'plaza-galerena-test', tenantName: 'Plaza Galereña [TEST]', empresaCodigo: 'PLAZ' },
+  { tenantId: 'inmobiliaria-galerena-test', tenantName: 'Inmobiliaria Galereña [TEST]', empresaCodigo: 'INMO' },
+  { tenantId: 'icrear-test', tenantName: 'Icrear [TEST]', empresaCodigo: 'ICRE' },
 ];
 
 export default function LoginPage() {
