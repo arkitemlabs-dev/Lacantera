@@ -594,6 +594,11 @@ export class StoredProcedures {
     try {
       const config = getTenantConfig(empresa);
       const pool = await this.getPool(empresa);
+
+      // Debug: verificar conexión exacta
+      const dbCheck = await pool.request().query("SELECT DB_NAME() AS db, SUSER_NAME() AS usuario, @@SERVERNAME AS servidor");
+      console.log('[SP CONNECTION]', dbCheck.recordset[0]);
+
       const request = pool.request()
         .input('Empresa', sql.VarChar(10), this.getEmpresaERP(empresa))
         .input('Operacion', sql.VarChar(1), operacion)
@@ -619,33 +624,33 @@ export class StoredProcedures {
           (val != null ? val.trim() : '');
 
         request
-          .input('Nombre', sql.VarChar(100), str(fullParams.nombre))
-          .input('NombreC', sql.VarChar(20), str(fullParams.nombreC))
+          .input('Nombre', sql.NVarChar(100), str(fullParams.nombre))
+          .input('NombreC', sql.NVarChar(20), str(fullParams.nombreC))
           .input('RfcProv', sql.VarChar(15), str(fullParams.rfcProv))
           .input('Curp', sql.VarChar(30), str(fullParams.curp))
-          .input('Regimen', sql.VarChar(30), str(fullParams.regimen))
-          .input('Direccion', sql.VarChar(100), str(fullParams.direccion))
+          .input('Regimen', sql.NVarChar(30), str(fullParams.regimen))
+          .input('Direccion', sql.NVarChar(100), str(fullParams.direccion))
           .input('NumExt', sql.VarChar(20), str(fullParams.numExt))
           .input('NumInt', sql.VarChar(20), str(fullParams.numInt))
-          .input('EntreCalles', sql.VarChar(100), str(fullParams.entreCalles))
-          .input('Colonia', sql.VarChar(100), str(fullParams.colonia))
-          .input('Poblacion', sql.VarChar(100), str(fullParams.poblacion))
-          .input('Estado', sql.VarChar(30), str(fullParams.estado))
-          .input('Pais', sql.VarChar(100), str(fullParams.pais))
+          .input('EntreCalles', sql.NVarChar(100), str(fullParams.entreCalles))
+          .input('Colonia', sql.NVarChar(100), str(fullParams.colonia))
+          .input('Poblacion', sql.NVarChar(100), str(fullParams.poblacion))
+          .input('Estado', sql.NVarChar(30), str(fullParams.estado))
+          .input('Pais', sql.NVarChar(100), str(fullParams.pais))
           .input('Codigopostal', sql.VarChar(15), str(fullParams.codigoPostal))
-          .input('Contacto1', sql.VarChar(50), str(fullParams.contacto1))
-          .input('Contacto2', sql.VarChar(50), str(fullParams.contacto2))
+          .input('Contacto1', sql.NVarChar(50), str(fullParams.contacto1))
+          .input('Contacto2', sql.NVarChar(50), str(fullParams.contacto2))
           .input('Email1', sql.VarChar(50), str(fullParams.email1))
           .input('Email2', sql.VarChar(50), str(fullParams.email2))
           .input('Telefonos', sql.VarChar(100), str(fullParams.telefonos))
           .input('Fax', sql.VarChar(50), str(fullParams.fax))
           .input('Extension1', sql.VarChar(10), str(fullParams.extension1))
           .input('Extension2', sql.VarChar(10), str(fullParams.extension2))
-          .input('BancoSucursal', sql.VarChar(50), str(fullParams.bancoSucursal))
+          .input('BancoSucursal', sql.NVarChar(50), str(fullParams.bancoSucursal))
           .input('Cuenta', sql.VarChar(20), str(fullParams.cuenta))
           .input('Beneficiario', sql.Int, fullParams.beneficiario ?? 0)
-          .input('BeneficiarioNombre', sql.VarChar(100), str(fullParams.beneficiarioNombre))
-          .input('LeyendaCheque', sql.VarChar(100), str(fullParams.leyendaCheque));
+          .input('BeneficiarioNombre', sql.NVarChar(100), str(fullParams.beneficiarioNombre))
+          .input('LeyendaCheque', sql.NVarChar(100), str(fullParams.leyendaCheque));
       }
 
       console.log(`[SP EXEC] Parameters for ${operacion}:`, {
@@ -658,13 +663,46 @@ export class StoredProcedures {
 
       if (operacion === 'M' || operacion === 'A') {
         const fullParams = params as ProveedorSPParams;
-        console.log('[SP EXEC] Data Parameters:', {
-          Nombre: fullParams.nombre,
-          RfcProv: fullParams.rfcProv,
-          Telefonos: fullParams.telefonos,
-          Direccion: fullParams.direccion,
-          Email1: fullParams.email1
-        });
+        const s = (val: string | undefined | null): string => (val != null ? val.trim() : '');
+        // Generar EXEC para copiar/pegar en SSMS y probar el SP directamente
+        const execSQL = `EXEC spDatosProveedor
+  @Empresa = '${this.getEmpresaERP(empresa)}',
+  @Operacion = '${operacion}',
+  @Rfc = '${operacion === 'C' ? '' : rfc}',
+  @Proveedor = '${operacion === 'C' ? '' : proveedor}',
+  @CveProv = '${cveProv}',
+  @Nombre = '${s(fullParams.nombre)}',
+  @NombreC = '${s(fullParams.nombreC)}',
+  @RfcProv = '${s(fullParams.rfcProv)}',
+  @Curp = '${s(fullParams.curp)}',
+  @Regimen = '${s(fullParams.regimen)}',
+  @Direccion = '${s(fullParams.direccion)}',
+  @NumExt = '${s(fullParams.numExt)}',
+  @NumInt = '${s(fullParams.numInt)}',
+  @EntreCalles = '${s(fullParams.entreCalles)}',
+  @Colonia = '${s(fullParams.colonia)}',
+  @Poblacion = '${s(fullParams.poblacion)}',
+  @Estado = '${s(fullParams.estado)}',
+  @Pais = '${s(fullParams.pais)}',
+  @Codigopostal = '${s(fullParams.codigoPostal)}',
+  @Contacto1 = '${s(fullParams.contacto1)}',
+  @Contacto2 = '${s(fullParams.contacto2)}',
+  @Email1 = '${s(fullParams.email1)}',
+  @Email2 = '${s(fullParams.email2)}',
+  @Telefonos = '${s(fullParams.telefonos)}',
+  @Fax = '${s(fullParams.fax)}',
+  @Extension1 = '${s(fullParams.extension1)}',
+  @Extension2 = '${s(fullParams.extension2)}',
+  @BancoSucursal = '${s(fullParams.bancoSucursal)}',
+  @Cuenta = '${s(fullParams.cuenta)}',
+  @Beneficiario = ${fullParams.beneficiario ?? 0},
+  @BeneficiarioNombre = '${s(fullParams.beneficiarioNombre)}',
+  @LeyendaCheque = '${s(fullParams.leyendaCheque)}'`;
+        console.log('\n========================================');
+        console.log('[SP TEST] COPIA ESTO EN SSMS PARA PROBAR:');
+        console.log('========================================');
+        console.log(execSQL);
+        console.log('========================================\n');
       }
 
       const result = await request.execute('spDatosProveedor');

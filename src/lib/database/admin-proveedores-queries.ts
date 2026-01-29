@@ -89,6 +89,7 @@ export interface ProveedorCompleto {
 
 interface FiltrosProveedores {
   empresaCode?: string;
+  tenantId?: string;  // Tenant completo (ej: 'la-cantera-test')
   estatusPortal?: string;
   busqueda?: string;
   page?: number;
@@ -103,6 +104,7 @@ export async function getProveedoresConDatosERP(
 ) {
   const {
     empresaCode,
+    tenantId = 'la-cantera-test',
     estatusPortal,
     busqueda,
     page = 1,
@@ -160,7 +162,7 @@ export async function getProveedoresConDatosERP(
 
     erpQuery += ` ORDER BY p.Nombre`;
 
-    const erpResult = await hybridDB.queryERP('la-cantera', erpQuery);
+    const erpResult = await hybridDB.queryERP(tenantId, erpQuery);
 
     console.log(`[getProveedoresConDatosERP] Encontrados ${erpResult.recordset.length} proveedores en ERP`);
 
@@ -263,9 +265,10 @@ export async function getProveedoresConDatosERP(
         moneda: erpProv.DefMoneda,
       };
 
+      const config = getTenantConfig(tenantId);
       const empresasAsignadas = [{
-        empresaCode: 'la-cantera',
-        empresaName: 'La Cantera',
+        empresaCode: config.codigoEmpresa,
+        empresaName: config.nombre,
         erpProveedorCode: erpProv.Proveedor,
         mappingActivo: true,
       }];
@@ -332,7 +335,7 @@ export async function getProveedorPorId(
     empresaCode?: string;
   } = {}
 ): Promise<ProveedorCompleto | null> {
-  const { incluirDatosERP = true, empresaCode = 'la-cantera' } = options;
+  const { incluirDatosERP = true, empresaCode = 'la-cantera-test' } = options;
 
   try {
     console.log(`[getProveedorPorId] Buscando proveedor: ${id}`);
@@ -340,7 +343,7 @@ export async function getProveedorPorId(
     // 1. Si el ID empieza con "erp_", es un proveedor que solo existe en ERP
     if (id.startsWith('erp_')) {
       const codigoERP = id.replace('erp_', '');
-      return await getProveedorSoloERP(codigoERP);
+      return await getProveedorSoloERP(codigoERP, empresaCode);
     }
 
     // 2. Buscar en el portal por ID
@@ -394,6 +397,7 @@ export async function getProveedorPorId(
       }
     }
 
+    const tenantConfig = getTenantConfig(empresaCode);
     return {
       portalUserId: portalUser.IDUsuario,
       portalEmail: portalUser.eMail,
@@ -403,12 +407,11 @@ export async function getProveedorPorId(
       portalRol: 'proveedor',
       portalTelefono: portalUser.Telefono,
       empresasAsignadas: [{
-        empresaCode: 'la-cantera',
-        empresaName: 'La Cantera',
+        empresaCode: tenantConfig.codigoEmpresa,
+        empresaName: tenantConfig.nombre,
         erpProveedorCode: portalUser.Usuario || '',
         mappingActivo: !!erpDatos,
       }],
-
     };
 
   } catch (error: any) {
@@ -481,8 +484,8 @@ async function mapearDatosERP(erp: any) {
 /**
  * Obtiene un proveedor que solo existe en el ERP (no registrado en portal)
  */
-async function getProveedorSoloERP(codigoERP: string): Promise<ProveedorCompleto> {
-  const erpResult = await hybridDB.queryERP('la-cantera', `
+async function getProveedorSoloERP(codigoERP: string, tenantId: string = 'la-cantera-test'): Promise<ProveedorCompleto> {
+  const erpResult = await hybridDB.queryERP(tenantId, `
     SELECT
       p.Proveedor,
       p.Nombre,
@@ -538,6 +541,7 @@ async function getProveedorSoloERP(codigoERP: string): Promise<ProveedorCompleto
   if (erp.DiaPago1) diasPago.push(erp.DiaPago1);
   if (erp.DiaPago2) diasPago.push(erp.DiaPago2);
 
+  const tenantConfig = getTenantConfig(tenantId);
   return {
     portalUserId: `erp_${codigoERP}`,
     portalEmail: erp.eMail1 || '',
@@ -547,8 +551,8 @@ async function getProveedorSoloERP(codigoERP: string): Promise<ProveedorCompleto
     portalRol: 'proveedor',
     portalTelefono: erp.Telefono || '',
     empresasAsignadas: [{
-      empresaCode: 'la-cantera',
-      empresaName: 'La Cantera',
+      empresaCode: tenantConfig.codigoEmpresa,
+      empresaName: tenantConfig.nombre,
       erpProveedorCode: erp.Proveedor,
       mappingActivo: true,
     }],

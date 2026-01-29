@@ -1,31 +1,35 @@
 // src/lib/database/tenant-configs.ts
 // Configuraciones de Tenants - Las 10 empresas (5 prod + 5 test)
-// ARQUITECTURA: Una sola conexión al servidor a través de la BD 'Cantera'.
-// Los SPs usan el código de empresa (@Empresa) para redirigir a la BD correcta.
 //
-// MAPEO DE EMPRESAS (definido por el equipo de BD):
+// ARQUITECTURA:
+// El backend SIEMPRE se conecta a UNA SOLA base de datos:
+//   - Cantera         (producción)
+//   - Cantera_Ajustes (pruebas)
 //
-// PRODUCCIÓN (01-05):
-//   01 → BD Cantera,     Empresa='01'    → La Cantera Desarrollos Mineros
-//   02 → BD Peralillo,   Empresa='01'    → El Peralillo SA de CV
-//   03 → BD Galbd,       Empresa='EMP02' → Plaza Galereña
-//   04 → BD Galbd,       Empresa='EMP01' → Inmobiliaria Galereña
-//   05 → BD Icrear,      Empresa='EMP03' → Icrear
+// Los Stored Procedures reciben @Empresa y actúan como puente interno
+// para afectar las tablas de la empresa correspondiente.
+// El código NO cambia dinámicamente la BD ni usa USE otra_base.
 //
-// PRUEBAS (06-10):
-//   06 → BD Cantera_Ajustes,    Empresa='01'    → La Cantera Desarrollos Mineros
-//   07 → BD Peralillo_Ajustes,  Empresa='01'    → El Peralillo SA de CV
-//   08 → BD Galbd_Pruebas,      Empresa='EMP02' → Plaza Galereña
-//   09 → BD Galbd_Pruebas,      Empresa='EMP01' → Inmobiliaria Galereña
-//   10 → BD Icrear_Pruebas,     Empresa='EMP03' → Icrear
+// MAPEO INTERNO DE LOS SPs (no lo maneja el backend):
+//   @Empresa='01' → La Cantera Desarrollos Mineros
+//   @Empresa='02' → El Peralillo SA de CV
+//   @Empresa='03' → Plaza Galereña
+//   @Empresa='04' → Inmobiliaria Galereña
+//   @Empresa='05' → Icrear
+//   @Empresa='06' → La Cantera (test)
+//   @Empresa='07' → Peralillo (test)
+//   @Empresa='08' → Plaza Galereña (test)
+//   @Empresa='09' → Inmobiliaria Galereña (test)
+//   @Empresa='10' → Icrear (test)
 
 /**
  * Todas las empresas disponibles (producción y pruebas).
  * La selección se hace desde el login.
- * Conexión única a BD Cantera. Los SPs redirigen según el código.
+ * Conexión única: Cantera (prod) o Cantera_Ajustes (test).
+ * Los SPs redirigen internamente según @Empresa.
  */
 export const TENANT_CONFIGS = {
-  // ── PRODUCCIÓN (01-05) ──
+  // ── PRODUCCIÓN (01-05) ── Todas conectan a BD 'Cantera'
   'la-cantera-prod': {
     id: 'la-cantera-prod',
     nombre: 'La Cantera Desarrollos Mineros',
@@ -62,39 +66,39 @@ export const TENANT_CONFIGS = {
     erpEmpresa: '05',
   },
 
-  // ── PRUEBAS (06-10) ──
+  // ── PRUEBAS (06-10) ── Todas conectan a BD 'Cantera_Ajustes'
   'la-cantera-test': {
     id: 'la-cantera-test',
     nombre: 'La Cantera Desarrollos Mineros [TEST]',
-    erpDatabase: 'Cantera',
+    erpDatabase: 'Cantera_Ajustes',
     codigoEmpresa: 'la-cantera',
     erpEmpresa: '06',
   },
   'peralillo-test': {
     id: 'peralillo-test',
     nombre: 'El Peralillo SA de CV [TEST]',
-    erpDatabase: 'Cantera',
+    erpDatabase: 'Cantera_Ajustes',
     codigoEmpresa: 'peralillo',
     erpEmpresa: '07',
   },
   'plaza-galerena-test': {
     id: 'plaza-galerena-test',
     nombre: 'Plaza Galereña [TEST]',
-    erpDatabase: 'Cantera',
+    erpDatabase: 'Cantera_Ajustes',
     codigoEmpresa: 'plaza-galerena',
     erpEmpresa: '08',
   },
   'inmobiliaria-galerena-test': {
     id: 'inmobiliaria-galerena-test',
     nombre: 'Inmobiliaria Galereña [TEST]',
-    erpDatabase: 'Cantera',
+    erpDatabase: 'Cantera_Ajustes',
     codigoEmpresa: 'inmobiliaria-galerena',
     erpEmpresa: '09',
   },
   'icrear-test': {
     id: 'icrear-test',
     nombre: 'Icrear [TEST]',
-    erpDatabase: 'Cantera',
+    erpDatabase: 'Cantera_Ajustes',
     codigoEmpresa: 'icrear',
     erpEmpresa: '10',
   },

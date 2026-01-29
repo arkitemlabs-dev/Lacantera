@@ -50,9 +50,13 @@ export async function GET(request: NextRequest) {
     console.log(`[API PROVEEDORES] Filtros: empresa=${empresaCode}, estatusPortal=${estatusPortal}, búsqueda=${busqueda}`);
     console.log(`[API PROVEEDORES] Nota: Solo se consultan proveedores con estatus ALTA (BAJA y BLOQUEADO excluidos)`);
 
+    // Usar empresa de la sesión del usuario autenticado
+    const tenantId = (session.user as any)?.empresaActual || 'la-cantera-test';
+
     // Obtener proveedores (solo estatus ALTA, excluye BAJA y BLOQUEADO)
     const result = await getProveedoresConDatosERP({
       empresaCode: empresaCode || undefined,
+      tenantId,
       estatusPortal: estatusPortal || undefined,
       busqueda: busqueda || undefined,
       page,

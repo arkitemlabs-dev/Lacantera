@@ -10,7 +10,7 @@ import { ACTIVE_TENANT_CONFIGS } from './tenant-configs';
 export interface TenantERPConfig {
   id: string;
   nombre: string;
-  erpDatabase: string;  // BD del ERP Intelisis (solo lectura)
+  erpDatabase: string;  // BD del ERP: Cantera (prod) o Cantera_Ajustes (test)
   codigoEmpresa: string; // Código usado para mapeos en el Portal (ej: la-cantera o LCDM)
   erpEmpresa: string;    // Código numérico usado por los Stored Procedures (ej: 01, 06)
 }
@@ -90,7 +90,8 @@ export async function getPortalConnection(): Promise<sql.ConnectionPool> {
 
 /**
  * Obtiene el pool de conexión para la BD ERP de un tenant
- * IMPORTANTE: Solo para lectura (SELECT)
+ * Conexión única: Cantera (prod) o Cantera_Ajustes (test)
+ * Los SPs redirigen internamente según @Empresa
  */
 export async function getERPConnection(
   tenantId: string
@@ -116,7 +117,7 @@ export async function getERPConnection(
       ...erpConfig,
       database: erpDatabase,
       pool: {
-        max: 10, // Menos conexiones para ERP (solo lectura)
+        max: 10,
         min: 2,
         idleTimeoutMillis: 30000,
       },
@@ -216,20 +217,13 @@ export class HybridDatabaseManager {
   }
 
   /**
-   * Query al ERP (solo lectura - SELECT)
+   * Query al ERP (SELECT solamente - las escrituras van por SPs)
    */
   async queryERP(
     tenantId: string,
     queryString: string,
     params: Record<string, any> = {}
   ): Promise<sql.IResult<any>> {
-    // Validar que sea solo SELECT
-    if (!this.isReadOnlyQuery(queryString)) {
-      throw new Error(
-        'SECURITY_VIOLATION: Solo queries de lectura (SELECT) permitidas en BD ERP'
-      );
-    }
-
     const pool = await getERPConnection(tenantId);
     const request = pool.request();
 

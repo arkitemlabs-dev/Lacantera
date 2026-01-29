@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Loader2, Upload } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 import { useProveedorAdmin } from '@/hooks/useProveedorAdmin';
 import type { FormProveedorAdmin } from '@/types/admin-proveedores';
 
@@ -84,6 +85,7 @@ const complementaryDocsConfig = [
 
 export function AddSupplierForm() {
   const { toast } = useToast();
+  const { data: session } = useSession();
   const { crearProveedor, saving, error } = useProveedorAdmin();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -130,7 +132,7 @@ export function AddSupplierForm() {
         // Bancario
         banco: values.bankName.trim(),
         cuentaBancaria: values.bankAccount.trim(),
-        empresa: 'la-cantera',
+        empresa: (session?.user as any)?.empresaActual || 'la-cantera-test',
         activo: true,
       };
 
