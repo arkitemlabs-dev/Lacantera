@@ -575,6 +575,35 @@ export class StoredProcedures {
   // ===========================================================================
 
   /**
+   * SP: sp_getProveedores
+   * Lista todos los proveedores de una empresa
+   * Retorna 2 recordsets: [0] datos de proveedores, [1] total
+   */
+  async getProveedoresLista(params: {
+    empresa: string;
+  }): Promise<{ proveedores: any[]; total: number }> {
+    const { empresa } = params;
+    const pool = await this.getPool(empresa);
+    const empresaERP = this.getEmpresaERP(empresa);
+
+    console.log(`[SP] sp_getProveedores - Empresa: ${empresaERP}`);
+
+    const result = await pool.request()
+      .input('Empresa', sql.VarChar(10), empresaERP)
+      .execute('sp_getProveedores');
+
+    const proveedores = getRecordset(result, 0);
+    const totalRecord = getFirstRecord<{ Total?: number }>(result, 1);
+
+    console.log(`[SP] sp_getProveedores - ${proveedores.length} proveedores, total: ${totalRecord?.Total || proveedores.length}`);
+
+    return {
+      proveedores: proveedores as any[],
+      total: totalRecord?.Total || proveedores.length,
+    };
+  }
+
+  /**
    * SP: spDatosProveedor
    * Gestiona datos de proveedores: Consulta, Alta, Modificación
    * 

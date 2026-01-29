@@ -550,51 +550,15 @@ export class SqlServerPNetDatabase implements Database {
 
   async getProveedores(filters?: ProveedorFilters): Promise<ProveedorUser[]> {
     try {
-      // 1. Obtener proveedores del ERP con consulta directa a tabla Prov
+      // 1. Obtener proveedores del ERP usando SP sp_getProveedores
       const empresa = filters?.empresa || 'la-cantera-test';
-      console.log(`[ERP-QUERY] Obteniendo proveedores via consulta directa para empresa: ${empresa}`);
+      console.log(`[SP-QUERY] Obteniendo proveedores via SP sp_getProveedores para empresa: ${empresa}`);
 
-      const erpPool = await getERPConnection(empresa);
+      const sp = getStoredProcedures();
+      const spResult = await sp.getProveedoresLista({ empresa });
+      const erpFiltered = spResult.proveedores;
 
-      const erpQuery = `
-        SELECT
-          p.Proveedor,
-          p.Nombre AS ProveedorNombre,
-          p.RFC,
-          p.Direccion,
-          p.Colonia,
-          p.Poblacion,
-          p.Estado,
-          p.Pais,
-          p.CodigoPostal,
-          p.Telefonos AS ProveedorTelefono,
-          p.eMail1 AS ProveedorEmail,
-          p.eMail2 AS ProveedorEmail2,
-          p.Contacto1,
-          p.Contacto2,
-          p.Categoria,
-          p.Condicion AS CondicionPago,
-          p.Estatus AS ProveedorEstatus,
-          p.Situacion,
-          p.SituacionFecha,
-          p.SituacionNota,
-          p.Alta AS FechaAltaERP,
-          p.ProvBancoSucursal AS Banco,
-          p.ProvCuenta AS CuentaBancaria,
-          p.FormaPago,
-          p.DiaRevision1,
-          p.DiaRevision2,
-          p.DiaPago1,
-          p.DiaPago2
-        FROM Prov p
-        WHERE UPPER(p.Estatus) = 'ALTA'
-        ORDER BY p.Nombre
-      `;
-
-      const erpResult = await erpPool.request().query(erpQuery);
-      const erpFiltered = erpResult.recordset;
-
-      console.log(`[ERP-QUERY] Encontrados ${erpFiltered.length} proveedores con estatus ALTA`);
+      console.log(`[SP-QUERY] SP retornó ${erpFiltered.length} proveedores, total: ${spResult.total}`);
 
       // 2. Obtener usuarios registrados en el portal (sin JOIN a Prov del ERP)
       const portalPool = await getConnection();
@@ -654,6 +618,16 @@ export class SqlServerPNetDatabase implements Database {
 
         return this.mapRowToProveedorUserFromERP({
           ...erpRow,
+          // Normalizar nombres de columnas del SP al formato esperado por mapRowToProveedorUserFromERP
+          ProveedorNombre: erpRow.ProveedorNombre || erpRow.Nombre,
+          ProveedorTelefono: erpRow.ProveedorTelefono || erpRow.Telefonos,
+          ProveedorEmail: erpRow.ProveedorEmail || erpRow.eMail1,
+          ProveedorEmail2: erpRow.ProveedorEmail2 || erpRow.eMail2,
+          ProveedorEstatus: erpRow.ProveedorEstatus || erpRow.Estatus,
+          FechaAltaERP: erpRow.FechaAltaERP || erpRow.Alta,
+          Banco: erpRow.Banco || erpRow.ProvBancoSucursal,
+          CuentaBancaria: erpRow.CuentaBancaria || erpRow.ProvCuenta,
+          CondicionPago: erpRow.CondicionPago || erpRow.Condicion,
           _empresa: empresa,
           IDUsuario: portalUsuario?.IDUsuario || null,
           eMail: portalUsuario?.eMail || null,

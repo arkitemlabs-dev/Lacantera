@@ -116,55 +116,11 @@ export async function getProveedoresConDatosERP(
   console.log('[getProveedoresConDatosERP] Iniciando con filtros:', filtros);
 
   try {
-    // 1. Construir consulta ERP con filtros
-    let erpQuery = `
-      SELECT
-        p.Proveedor,
-        p.Nombre,
-        p.RFC,
-        p.eMail1,
-        p.eMail2,
-        p.Telefono,
-        p.Contacto1,
-        p.Direccion,
-        p.Colonia,
-        p.Poblacion,
-        p.Estado,
-        p.Pais,
-        p.CodigoPostal,
-        p.Condicion,
-        p.FormaPago,
-        p.Categoria,
-        p.Descuento,
-        p.ProvBancoSucursal,
-        p.ProvCuenta,
-        p.Estatus,
-        p.Situacion,
-        p.SituacionFecha,
-        p.SituacionNota,
-        p.SituacionUsuario,
-        p.Alta,
-        p.UltimoCambio,
-        p.TieneMovimientos,
-        p.Tipo,
-        p.DiaRevision1,
-        p.DiaRevision2,
-        p.DiaPago1,
-        p.DiaPago2,
-        p.Comprador,
-        p.Agente,
-        p.CentroCostos,
-        p.DefMoneda
-      FROM Prov p`;
+    // 1. Obtener proveedores del ERP usando SP sp_getProveedores
+    const sp = getStoredProcedures();
+    const spResult = await sp.getProveedoresLista({ empresa: tenantId });
 
-    // SOLO permitir proveedores con estatus ALTA
-    erpQuery += ` WHERE UPPER(p.Estatus) = 'ALTA'`;
-
-    erpQuery += ` ORDER BY p.Nombre`;
-
-    const erpResult = await hybridDB.queryERP(tenantId, erpQuery);
-
-    console.log(`[getProveedoresConDatosERP] Encontrados ${erpResult.recordset.length} proveedores en ERP`);
+    console.log(`[getProveedoresConDatosERP] SP retornó ${spResult.proveedores.length} proveedores, total: ${spResult.total}`);
 
     // 2. Obtener usuarios del portal para mapear
     const portalResult = await hybridDB.queryPortal(`
@@ -182,7 +138,6 @@ export async function getProveedoresConDatosERP(
 
     // 3. Crear mapas de usuarios del portal por diferentes criterios
     const portalMapByCodigo = new Map();
-    const portalMapByRFC = new Map();
     const portalMapByNombre = new Map();
 
     portalResult.recordset.forEach(u => {
@@ -200,11 +155,7 @@ export async function getProveedoresConDatosERP(
     // 4. Procesar SOLO los proveedores del ERP con estatus ALTA
     const proveedores: ProveedorCompleto[] = [];
 
-    for (const erpProv of erpResult.recordset) {
-      // Filtro adicional: SOLO procesar proveedores con estatus ALTA
-      if (!erpProv.Estatus || erpProv.Estatus.toUpperCase() !== 'ALTA') {
-        continue;
-      }
+    for (const erpProv of spResult.proveedores) {
       // Buscar usuario del portal por múltiples criterios
       let portalUser = null;
 
