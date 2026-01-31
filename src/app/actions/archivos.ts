@@ -1,11 +1,18 @@
 'use server';
 
-import { storage } from '@/lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { database } from '@/lib/database';
 import { parseCFDI, validateCFDI, extractEssentialData } from '@/lib/cfdi-parser';
+import { getStoredProcedures } from '@/lib/database/stored-procedures';
+import { writeFile, mkdir } from 'fs/promises';
+import { existsSync } from 'fs';
+import path from 'path';
 
-// Subir archivo a Firebase Storage
+// Ruta de red para escribir archivos desde la app
+const ERP_RUTA_RED = '\\\\104.46.127.151\\PasoPruebas';
+// Ruta local del servidor ERP (la que recibe el SP)
+const ERP_RUTA_LOCAL = 'F:\\PasoPruebas';
+
+// Subir archivo al filesystem local
 export async function uploadFile(data: {
   file: string; // Base64
   fileName: string;
@@ -13,33 +20,26 @@ export async function uploadFile(data: {
   folder: string;
 }) {
   try {
-    const { file, fileName, fileType, folder } = data;
+    const { file, fileName, folder } = data;
 
-    // Convertir base64 a buffer
     const base64Data = file.split(',')[1] || file;
     const buffer = Buffer.from(base64Data, 'base64');
 
-    // Crear referencia en Storage
-    const timestamp = Date.now();
+    const destDir = path.join(ERP_RUTA_RED, folder);
+    if (!existsSync(destDir)) {
+      await mkdir(destDir, { recursive: true });
+    }
+
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const storagePath = `${folder}/${timestamp}-${sanitizedFileName}`;
-    const storageRef = ref(storage, storagePath);
+    const filePath = path.join(destDir, sanitizedFileName);
 
-    // Subir archivo
-    const metadata = {
-      contentType: fileType,
-    };
-
-    await uploadBytes(storageRef, buffer, metadata);
-
-    // Obtener URL de descarga
-    const downloadURL = await getDownloadURL(storageRef);
+    await writeFile(filePath, buffer);
 
     return {
       success: true,
       data: {
-        url: downloadURL,
-        path: storagePath,
+        url: filePath,
+        path: filePath,
         fileName: sanitizedFileName,
       },
     };
@@ -52,50 +52,21 @@ export async function uploadFile(data: {
   }
 }
 
-// Subir factura completa (XML + PDF)
+// Subir factura completa (XML + PDF opcional)
 export async function uploadFactura(data: {
   proveedorId: string;
   xmlFile: string; // Base64
   xmlFileName: string;
   pdfFile: string; // Base64
   pdfFileName: string;
-  ordenCompraId?: string;
+  ordenCompraId: string;
+  empresaCode?: string;
   observaciones?: string;
 }) {
   try {
-    const { proveedorId, xmlFile, xmlFileName, pdfFile, pdfFileName } = data;
+    const { xmlFile, xmlFileName, pdfFile, pdfFileName } = data;
 
-    // 1. Subir XML
-    const xmlResult = await uploadFile({
-      file: xmlFile,
-      fileName: xmlFileName,
-      fileType: 'text/xml',
-      folder: `facturas/${proveedorId}/xml`,
-    });
-
-    if (!xmlResult.success) {
-      return {
-        success: false,
-        error: `Error subiendo XML: ${xmlResult.error}`,
-      };
-    }
-
-    // 2. Subir PDF
-    const pdfResult = await uploadFile({
-      file: pdfFile,
-      fileName: pdfFileName,
-      fileType: 'application/pdf',
-      folder: `facturas/${proveedorId}/pdf`,
-    });
-
-    if (!pdfResult.success) {
-      return {
-        success: false,
-        error: `Error subiendo PDF: ${pdfResult.error}`,
-      };
-    }
-
-    // 3. Parsear el XML para extraer datos del CFDI
+    // 1. Parsear el XML para extraer datos del CFDI
     const xmlBase64Data = xmlFile.split(',')[1] || xmlFile;
     const xmlBuffer = Buffer.from(xmlBase64Data, 'base64');
     const parseResult = parseCFDI(xmlBuffer);
@@ -109,7 +80,6 @@ export async function uploadFactura(data: {
 
     const cfdiData = parseResult.data;
 
-    // Validar el CFDI
     const validationResult = validateCFDI(cfdiData);
     if (!validationResult.valid) {
       return {
@@ -118,7 +88,6 @@ export async function uploadFactura(data: {
       };
     }
 
-    // Verificar que el tipo de comprobante sea Ingreso (I)
     if (cfdiData.tipoDeComprobante !== 'I') {
       return {
         success: false,
@@ -126,10 +95,8 @@ export async function uploadFactura(data: {
       };
     }
 
-    // Extraer datos esenciales
     const essentialData = extractEssentialData(cfdiData);
 
-    // Verificar que el UUID no esté vacío
     if (!essentialData.uuid) {
       return {
         success: false,
@@ -137,46 +104,63 @@ export async function uploadFactura(data: {
       };
     }
 
-    // Preparar datos para almacenamiento
-    const facturaData = {
-      facturaId: `FACT-${Date.now()}`,
-      proveedorId,
-      proveedorRFC: essentialData.emisorRFC,
-      proveedorRazonSocial: essentialData.emisorNombre,
-      receptorRFC: essentialData.receptorRFC,
-      receptorRazonSocial: essentialData.receptorNombre,
-      empresaId: 'empresa-1', // TODO: Obtener empresaId real del usuario
-      uuid: essentialData.uuid,
-      serie: essentialData.serie,
-      folio: essentialData.folio,
-      fecha: essentialData.fecha,
-      subtotal: essentialData.subTotal,
-      iva: essentialData.iva,
-      total: essentialData.total,
-      moneda: essentialData.moneda as 'MXN' | 'USD',
-      tipoCambio: essentialData.tipoCambio,
-      xmlUrl: xmlResult.data!.url,
-      pdfUrl: pdfResult.data!.url,
-      validadaSAT: false,
-      pagada: false,
-      status: 'pendiente_revision' as const,
-      ordenCompraId: data.ordenCompraId,
-      observaciones: data.observaciones,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      uploadedBy: proveedorId,
-    };
+    // 2. Guardar XML en F:\pasopruebas
+    const erpArchivo = `${essentialData.uuid}.xml`;
+    const erpXmlPath = path.join(ERP_RUTA_RED, erpArchivo);
 
-    // 4. Crear factura en Firestore
-    const facturaId = await database.createFactura(facturaData);
+    try {
+      if (!existsSync(ERP_RUTA_RED)) {
+        await mkdir(ERP_RUTA_RED, { recursive: true });
+      }
+      const xmlContent = Buffer.from(xmlBase64Data, 'base64').toString('utf-8');
+      await writeFile(erpXmlPath, xmlContent);
+      console.log(`XML guardado en: ${erpXmlPath}`);
+    } catch (copyError: any) {
+      console.error('Error guardando XML:', copyError.message);
+      return {
+        success: false,
+        error: 'Error al guardar archivo XML en el servidor',
+      };
+    }
+
+    // 3. Guardar PDF si se proporcionó
+    let pdfPath: string | null = null;
+    if (pdfFile && pdfFileName) {
+      const pdfBase64Data = pdfFile.split(',')[1] || pdfFile;
+      if (pdfBase64Data) {
+        const pdfBuffer = Buffer.from(pdfBase64Data, 'base64');
+        pdfPath = path.join(ERP_RUTA_RED, `${essentialData.uuid}.pdf`);
+        await writeFile(pdfPath, pdfBuffer);
+        console.log(`PDF guardado en: ${pdfPath}`);
+      }
+    }
+
+    // 4. Ejecutar spGeneraRemisionCompra
+    const empresaCode = data.empresaCode || '01';
+    const sp = getStoredProcedures();
+    const remisionResult = await sp.generaRemisionCompra({
+      empresa: empresaCode,
+      ordenId: data.ordenCompraId.trim(),
+      rutaArchivo: ERP_RUTA_LOCAL,
+      archivo: erpArchivo
+    });
+
+    console.log('spGeneraRemisionCompra resultado:', remisionResult);
+
+    if (!remisionResult.success) {
+      return {
+        success: false,
+        error: `Error al generar remisión de compra: ${remisionResult.message}`,
+      };
+    }
 
     return {
       success: true,
       data: {
-        facturaId,
-        xmlUrl: xmlResult.data!.url,
-        pdfUrl: pdfResult.data!.url,
-        message: 'Factura subida exitosamente',
+        xmlPath: erpXmlPath,
+        pdfPath,
+        remision: remisionResult.data,
+        message: 'Factura subida y remisión generada exitosamente',
       },
     };
   } catch (error: any) {

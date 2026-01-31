@@ -38,10 +38,10 @@ export default function SubirFacturaPage() {
   };
 
   const handleSubmit = async () => {
-    if (!xmlFile || !pdfFile) {
+    if (!xmlFile || !ordenCompraId) {
       setResult({
         success: false,
-        error: 'Por favor selecciona ambos archivos (XML y PDF)',
+        error: 'Por favor selecciona el archivo XML e ingresa la orden de compra',
       });
       return;
     }
@@ -51,15 +51,15 @@ export default function SubirFacturaPage() {
 
     try {
       const xmlBase64 = await fileToBase64(xmlFile);
-      const pdfBase64 = await fileToBase64(pdfFile);
+      const pdfBase64 = pdfFile ? await fileToBase64(pdfFile) : '';
 
       const response = await uploadFactura({
         proveedorId: 'proveedor-1',
         xmlFile: xmlBase64,
         xmlFileName: xmlFile.name,
         pdfFile: pdfBase64,
-        pdfFileName: pdfFile.name,
-        ordenCompraId: ordenCompraId || undefined,
+        pdfFileName: pdfFile?.name || '',
+        ordenCompraId: ordenCompraId,
         observaciones: observaciones || undefined,
       });
 
@@ -80,7 +80,7 @@ export default function SubirFacturaPage() {
     }
   };
 
-  const canSubmit = xmlFile && pdfFile && !loading;
+  const canSubmit = xmlFile && ordenCompraId.trim() !== '' && !loading;
 
   return (
     <div className="container mx-auto p-4 md:p-8 max-w-4xl">
@@ -126,7 +126,7 @@ export default function SubirFacturaPage() {
           </div>
 
           <div className="space-y-2">
-            <Label>Archivo PDF *</Label>
+            <Label>Archivo PDF (opcional)</Label>
             <FileUpload
               accept={{ 'application/pdf': ['.pdf'] }}
               maxSize={10 * 1024 * 1024}
@@ -137,13 +137,17 @@ export default function SubirFacturaPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="ordenCompra">Orden de Compra (opcional)</Label>
+            <Label htmlFor="ordenCompra">Orden de Compra *</Label>
             <Input
               id="ordenCompra"
-              placeholder="OC-123"
+              type="text"
+              placeholder="ID de la orden de compra"
               value={ordenCompraId}
               onChange={(e) => setOrdenCompraId(e.target.value)}
             />
+            <p className="text-xs text-muted-foreground">
+              Ingresa el ID de la orden de compra asociada (consulta tus ordenes pendientes)
+            </p>
           </div>
 
           <div className="space-y-2">

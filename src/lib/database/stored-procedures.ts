@@ -811,6 +811,59 @@ export class StoredProcedures {
     }
   }
 
+  // ===========================================================================
+  // REMISIÓN DE COMPRA
+  // ===========================================================================
+
+  /**
+   * SP: spGeneraRemisionCompra
+   * Genera una remisión de compra a partir de una orden y un documento digital (XML)
+   *
+   * @param empresa - Clave de la empresa (ej. '01')
+   * @param ordenId - ID del movimiento de compra
+   * @param rutaArchivo - Path donde se guarda el documento digital
+   * @param archivo - Nombre y extensión del archivo digital
+   */
+  async generaRemisionCompra(params: {
+    empresa: string;
+    ordenId: string;
+    rutaArchivo: string;
+    archivo: string;
+  }): Promise<{ success: boolean; data: any; message: string }> {
+    const { empresa, ordenId, rutaArchivo, archivo } = params;
+
+    try {
+      const pool = await this.getPool(empresa);
+      const empresaERP = this.getEmpresaERP(empresa);
+
+      console.log(`[SP] spGeneraRemisionCompra - Empresa: ${empresaERP}, OrdenId: ${ordenId}, Ruta: ${rutaArchivo}, Archivo: ${archivo}`);
+
+      const result = await pool.request()
+        .input('Empresa', sql.VarChar(5), empresaERP)
+        .input('OrdenId', sql.VarChar(20), ordenId)
+        .input('RutaArchivo', sql.VarChar(255), rutaArchivo)
+        .input('Archivo', sql.VarChar(200), archivo)
+        .execute('spGeneraRemisionCompra');
+
+      console.log(`[SP] spGeneraRemisionCompra - Recordsets: ${result.recordsets.length}, RowsAffected: ${result.rowsAffected}`);
+
+      const firstRecord = result.recordset?.[0] as any;
+
+      return {
+        success: true,
+        data: firstRecord || null,
+        message: firstRecord?.Mensaje || 'Remisión generada correctamente'
+      };
+    } catch (error: any) {
+      console.error('[SP] Error en spGeneraRemisionCompra:', error);
+      return {
+        success: false,
+        data: null,
+        message: error.message || 'Error al generar remisión de compra'
+      };
+    }
+  }
+
   /**
    * Método helper para consultar un proveedor específico
    * Simplifica las consultas más comunes

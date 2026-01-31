@@ -9,6 +9,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { getStoredProcedures } from '@/lib/database/stored-procedures';
 
 /**
  * POST /api/proveedor/facturas/upload
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest) {
     const xmlFile = formData.get('xml') as File;
     const pdfFile = formData.get('pdf') as File | null;
     const empresaCode = formData.get('empresa_code') as string;
+    const ordenCompraId = formData.get('orden_compra_id') as string;
 
     // Validar datos requeridos
     if (!xmlFile) {
@@ -64,6 +66,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: false,
         error: 'Código de empresa es requerido'
+      }, { status: 400 });
+    }
+
+    if (!ordenCompraId || ordenCompraId.trim() === '') {
+      return NextResponse.json({
+        success: false,
+        error: 'Orden de compra es requerida'
       }, { status: 400 });
     }
 
@@ -227,6 +236,47 @@ export async function POST(request: NextRequest) {
       console.log(`✅ PDF guardado: ${pdfPath}`);
     }
 
+    // 8.5. Copiar XML a ruta del ERP y ejecutar spGeneraRemisionCompra
+    const erpRutaRed = '\\\\104.46.127.151\\PasoPruebas';
+    const erpRutaLocal = 'F:\\PasoPruebas';
+    const erpArchivo = `${cfdiData.uuid}.xml`;
+    const erpXmlPath = path.join(erpRutaRed, erpArchivo);
+
+    // Copiar XML a la ruta de red del ERP
+    try {
+      if (!existsSync(erpRutaRed)) {
+        await mkdir(erpRutaRed, { recursive: true });
+      }
+      await writeFile(erpXmlPath, xmlString);
+      console.log(`✅ XML copiado a ERP: ${erpXmlPath}`);
+    } catch (copyError: any) {
+      console.error('❌ Error copiando XML a ruta ERP:', copyError.message);
+      return NextResponse.json({
+        success: false,
+        error: 'Error al copiar archivo XML a la ruta del ERP',
+        details: process.env.NODE_ENV === 'development' ? copyError.message : undefined
+      }, { status: 500 });
+    }
+
+    // Ejecutar SP spGeneraRemisionCompra
+    const sp = getStoredProcedures();
+    const remisionResult = await sp.generaRemisionCompra({
+      empresa: empresaCode,
+      ordenId: ordenCompraId.trim(),
+      rutaArchivo: erpRutaLocal,
+      archivo: erpArchivo
+    });
+
+    console.log(`📋 spGeneraRemisionCompra resultado:`, remisionResult);
+
+    if (!remisionResult.success) {
+      return NextResponse.json({
+        success: false,
+        error: 'Error al generar remisión de compra en el ERP',
+        details: remisionResult.message
+      }, { status: 500 });
+    }
+
     // 9. Insertar en base de datos (tabla proveedor_facturas)
     const facturaId = uuidv4();
     const xmlTamano = xmlBuffer.byteLength;
@@ -365,7 +415,8 @@ export async function POST(request: NextRequest) {
         validacionEFOS: satValidacionEFOS,
         fechaConsulta: satFechaConsulta,
         mensaje: satMensaje || (satValidado ? 'CFDI válido ante el SAT' : 'Pendiente de validación')
-      }
+      },
+      remisionCompra: remisionResult.data
     }, { status: 201 });
 
   } catch (error: any) {

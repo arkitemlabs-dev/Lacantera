@@ -184,8 +184,8 @@ export class CFDIParser {
       }
 
       // Validar versión
-      const version = comprobante['@_Version'];
-      if (!version || !['3.3', '4.0'].includes(version)) {
+      const version = comprobante['@_Version']?.toString();
+      if (!version || !['3.3', '4.0', '4'].includes(version)) {
         return {
           success: false,
           error: `Versión de CFDI no soportada: ${version}. Solo se soportan versiones 3.3 y 4.0`
