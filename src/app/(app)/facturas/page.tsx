@@ -1,14 +1,13 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Calendar as CalendarIcon, ListFilter, Search, Eye, FileDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar as CalendarIcon, ListFilter, Eye, FileDown, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { DateRange } from 'react-day-picker';
 
-import { invoices, suppliers } from '@/lib/data';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -44,17 +43,36 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import type { Invoice } from '@/lib/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const ITEMS_PER_PAGE = 10;
 
-const getBadgeVariant = (status: Invoice['status']) => {
+// Tipo para las facturas del API
+interface FacturaAPI {
+  id: number;
+  numeroFactura: string;
+  proveedor: string;
+  proveedorNombre: string;
+  proveedorRFC: string;
+  ordenCompra: string;
+  fechaEntrada: string;
+  fechaEmision: string;
+  estado: string;
+  monto: number;
+  saldo: number;
+  empresa: string;
+  uuid: string;
+  serie: string;
+  urlPDF: string;
+  urlXML: string;
+}
+
+type InvoiceStatus = 'Pendiente pago' | 'En Revisión' | 'Rechazada' | 'Pagada';
+
+const getBadgeVariant = (status: string) => {
   switch (status) {
     case 'Pendiente pago':
       return 'dark:bg-blue-500/20 dark:text-blue-200 border-blue-500/30 hover:bg-blue-500/30 bg-blue-100 text-blue-800';
@@ -70,42 +88,77 @@ const getBadgeVariant = (status: Invoice['status']) => {
 };
 
 export default function FacturasPage() {
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [paymentDate, setPaymentDate] = useState<Date>();
+  // Estado para datos del API
+  const [facturas, setFacturas] = useState<FacturaAPI[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Estado para el diálogo
+  const [selectedInvoice, setSelectedInvoice] = useState<FacturaAPI | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  // Estado para filtros
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [status, setStatus] = useState('todas');
-  const [supplier, setSupplier] = useState('todos');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
-  const filteredInvoices = useMemo(() => {
-    return invoices.filter((invoice) => {
-      const invoiceDate = new Date(invoice.entryDate.split('/').reverse().join('-'));
-      
-      const dateFilter = !dateRange?.from || (invoiceDate >= dateRange.from && (!dateRange.to || invoiceDate <= dateRange.to));
-      const statusFilter = status === 'todas' || invoice.status.toLowerCase().replace(' ', '-') === status;
-      const supplierFilter = supplier === 'todos' || invoice.supplierName === suppliers.find(s => s.id === supplier)?.name;
-      const invoiceNumberFilter = invoice.invoiceNumber.toLowerCase().includes(invoiceNumber.toLowerCase());
+  // Estado para paginación del servidor
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
 
-      return dateFilter && statusFilter && supplierFilter && invoiceNumberFilter;
-    });
-  }, [dateRange, status, supplier, invoiceNumber]);
+  // Función para cargar facturas desde el API
+  const fetchFacturas = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-  // Paginación del lado del cliente
-  const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
-  const displayedInvoices = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredInvoices, currentPage]);
+    try {
+      const params = new URLSearchParams();
+      params.set('page', currentPage.toString());
+      params.set('limit', ITEMS_PER_PAGE.toString());
+
+      if (status && status !== 'todas') {
+        params.set('estatus', status);
+      }
+      if (invoiceNumber) {
+        params.set('numeroFactura', invoiceNumber);
+      }
+      if (dateRange?.from) {
+        params.set('fecha_desde', format(dateRange.from, 'yyyy-MM-dd'));
+      }
+      if (dateRange?.to) {
+        params.set('fecha_hasta', format(dateRange.to, 'yyyy-MM-dd'));
+      }
+
+      const response = await fetch(`/api/admin/facturas?${params.toString()}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setFacturas(data.data);
+        setTotalPages(data.pagination.totalPages);
+        setTotalRecords(data.pagination.total);
+      } else {
+        setError(data.error || 'Error al cargar facturas');
+      }
+    } catch (err) {
+      console.error('Error fetching facturas:', err);
+      setError('Error de conexión al cargar facturas');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, status, invoiceNumber, dateRange]);
+
+  // Cargar facturas cuando cambian los filtros o la página
+  useEffect(() => {
+    fetchFacturas();
+  }, [fetchFacturas]);
 
   // Resetear página cuando cambian los filtros
   useEffect(() => {
     setCurrentPage(1);
-  }, [dateRange, status, supplier, invoiceNumber]);
+  }, [status, invoiceNumber, dateRange]);
 
-  const handleReviewClick = (invoice: Invoice) => {
+  const handleReviewClick = (invoice: FacturaAPI) => {
     setSelectedInvoice(invoice);
     setIsDialogOpen(true);
   };
@@ -118,8 +171,19 @@ export default function FacturasPage() {
   const clearFilters = () => {
     setDateRange(undefined);
     setStatus('todas');
-    setSupplier('todos');
     setInvoiceNumber('');
+    setCurrentPage(1);
+  };
+
+  // Formatear fecha para mostrar
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '-';
+    try {
+      const date = new Date(dateStr);
+      return format(date, 'dd/MM/yyyy', { locale: es });
+    } catch {
+      return dateStr;
+    }
   };
 
   return (
@@ -137,7 +201,7 @@ export default function FacturasPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="relative">
                 <Popover>
                   <PopoverTrigger asChild>
@@ -188,19 +252,6 @@ export default function FacturasPage() {
                   <SelectItem value="rechazada">Rechazada</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={supplier} onValueChange={setSupplier}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar proveedor..." />
-                </SelectTrigger>
-                <SelectContent>
-                   <SelectItem value="todos">Todos los proveedores</SelectItem>
-                  {suppliers.map((supplier) => (
-                    <SelectItem key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <Input
                 placeholder="Número de Factura"
                 value={invoiceNumber}
@@ -218,6 +269,23 @@ export default function FacturasPage() {
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
          <TooltipProvider>
+          {loading ? (
+            <div className="flex items-center justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-muted-foreground">Cargando facturas...</span>
+            </div>
+          ) : error ? (
+            <div className="flex items-center justify-center p-8">
+              <p className="text-red-500">{error}</p>
+              <Button variant="outline" className="ml-4" onClick={fetchFacturas}>
+                Reintentar
+              </Button>
+            </div>
+          ) : facturas.length === 0 ? (
+            <div className="flex items-center justify-center p-8">
+              <p className="text-muted-foreground">No se encontraron facturas con los filtros seleccionados.</p>
+            </div>
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -231,42 +299,41 @@ export default function FacturasPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {displayedInvoices.map((invoice) => (
-                <TableRow key={invoice.id}>
-                  <TableCell>{invoice.invoiceNumber}</TableCell>
+              {facturas.map((factura) => (
+                <TableRow key={factura.id}>
+                  <TableCell>{factura.numeroFactura}</TableCell>
                   <TableCell className="font-medium">
-                    {invoice.supplierName}
+                    {factura.proveedorNombre}
                   </TableCell>
                   <TableCell>
-                     <div className="flex flex-col gap-1">
-                        {invoice.purchaseOrderIds.map(orderId => (
-                            <Link
-                                key={orderId}
-                                href={`/ordenes-de-compra/${orderId}`}
-                                className="hover:underline text-blue-400"
-                            >
-                                {orderId}
-                            </Link>
-                        ))}
-                      </div>
+                    {factura.ordenCompra && factura.ordenCompra !== '-' ? (
+                      <Link
+                        href={`/ordenes-de-compra/${factura.ordenCompra}`}
+                        className="hover:underline text-blue-400"
+                      >
+                        {factura.ordenCompra}
+                      </Link>
+                    ) : (
+                      '-'
+                    )}
                   </TableCell>
-                  <TableCell>{invoice.entryDate}</TableCell>
+                  <TableCell>{formatDate(factura.fechaEntrada)}</TableCell>
                   <TableCell>
-                    <Badge className={cn(getBadgeVariant(invoice.status))}>
-                      {invoice.status}
+                    <Badge className={cn(getBadgeVariant(factura.estado))}>
+                      {factura.estado}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     {new Intl.NumberFormat('es-MX', {
                       style: 'currency',
                       currency: 'MXN',
-                    }).format(invoice.amount)}
+                    }).format(factura.monto)}
                   </TableCell>
                   <TableCell className="text-center space-x-1">
                     <DialogTrigger asChild>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleReviewClick(invoice)}>
+                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleReviewClick(factura)}>
                               <Eye className="h-4 w-4" />
                               <span className="sr-only">Ver/Revisar Factura</span>
                             </Button>
@@ -276,45 +343,54 @@ export default function FacturasPage() {
                         </TooltipContent>
                       </Tooltip>
                     </DialogTrigger>
+                    {factura.urlPDF && (
                      <Tooltip>
                       <TooltipTrigger asChild>
-                         <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <FileDown className="h-4 w-4" />
-                            <span className="sr-only">Descargar PDF</span>
+                         <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                            <a href={factura.urlPDF} target="_blank" rel="noopener noreferrer">
+                              <FileDown className="h-4 w-4" />
+                              <span className="sr-only">Descargar PDF</span>
+                            </a>
                           </Button>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>Descargar PDF</p>
                       </TooltipContent>
                     </Tooltip>
+                    )}
+                    {factura.urlXML && (
                      <Tooltip>
                       <TooltipTrigger asChild>
-                         <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <FileDown className="h-4 w-4" />
-                            <span className="sr-only">Descargar XML</span>
+                         <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                            <a href={factura.urlXML} target="_blank" rel="noopener noreferrer">
+                              <FileDown className="h-4 w-4" />
+                              <span className="sr-only">Descargar XML</span>
+                            </a>
                           </Button>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>Descargar XML</p>
                       </TooltipContent>
                     </Tooltip>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          )}
           </TooltipProvider>
-          {filteredInvoices.length > 0 && (
+          {totalRecords > 0 && (
             <div className="flex items-center justify-between p-4 border-t">
               <div className="text-sm text-muted-foreground">
-                Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredInvoices.length)} de {filteredInvoices.length} registros
+                Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, totalRecords)} de {totalRecords} registros
               </div>
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(1)}
-                  disabled={currentPage <= 1}
+                  disabled={currentPage <= 1 || loading}
                 >
                   Primera
                 </Button>
@@ -322,7 +398,7 @@ export default function FacturasPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(prev => prev - 1)}
-                  disabled={currentPage <= 1}
+                  disabled={currentPage <= 1 || loading}
                 >
                   Anterior
                 </Button>
@@ -333,7 +409,7 @@ export default function FacturasPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(prev => prev + 1)}
-                  disabled={currentPage >= totalPages}
+                  disabled={currentPage >= totalPages || loading}
                 >
                   Siguiente
                 </Button>
@@ -341,7 +417,7 @@ export default function FacturasPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage >= totalPages}
+                  disabled={currentPage >= totalPages || loading}
                 >
                   Última
                 </Button>
@@ -352,21 +428,20 @@ export default function FacturasPage() {
             <DialogContent className="max-w-4xl grid-rows-[auto_1fr_auto]">
               <DialogHeader>
                 <DialogTitle>
-                  Revisión de Factura: {selectedInvoice.invoiceNumber}
+                  Revisión de Factura: {selectedInvoice.numeroFactura}
                 </DialogTitle>
                 <DialogDescription>
-                  Proveedor: {selectedInvoice.supplierName} | Órdenes de Compra:{' '}
-                  {selectedInvoice.purchaseOrderIds.map((orderId, index) => (
-                    <React.Fragment key={orderId}>
-                      <Link
-                        href={`/ordenes-de-compra/${orderId}`}
-                        className="hover:underline text-blue-400"
-                      >
-                        {orderId}
-                      </Link>
-                      {index < selectedInvoice.purchaseOrderIds.length - 1 && ', '}
-                    </React.Fragment>
-                  ))}
+                  Proveedor: {selectedInvoice.proveedorNombre} | Orden de Compra:{' '}
+                  {selectedInvoice.ordenCompra && selectedInvoice.ordenCompra !== '-' ? (
+                    <Link
+                      href={`/ordenes-de-compra/${selectedInvoice.ordenCompra}`}
+                      className="hover:underline text-blue-400"
+                    >
+                      {selectedInvoice.ordenCompra}
+                    </Link>
+                  ) : (
+                    'N/A'
+                  )}
                 </DialogDescription>
               </DialogHeader>
               <div className="grid md:grid-cols-2 gap-6 overflow-y-auto max-h-[60vh] p-1">
@@ -376,58 +451,55 @@ export default function FacturasPage() {
                       <CardTitle>Visualizador de PDF</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="bg-muted h-96 flex items-center justify-center rounded-md">
-                        <p className="text-muted-foreground">
-                          Vista previa del PDF no disponible.
-                        </p>
-                      </div>
+                      {selectedInvoice.urlPDF ? (
+                        <iframe
+                          src={selectedInvoice.urlPDF}
+                          className="w-full h-96 rounded-md border"
+                          title="Vista previa PDF"
+                        />
+                      ) : (
+                        <div className="bg-muted h-96 flex items-center justify-center rounded-md">
+                          <p className="text-muted-foreground">
+                            Vista previa del PDF no disponible.
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader>
-                      <CardTitle>Datos del XML</CardTitle>
+                      <CardTitle>Datos de la Factura</CardTitle>
                     </CardHeader>
                     <CardContent className="text-xs space-y-2">
                       <p>
                         <span className="font-semibold">RFC Emisor:</span>{' '}
-                        {
-                          suppliers.find(
-                            (s) => s.name === selectedInvoice.supplierName
-                          )?.taxId
-                        }
+                        {selectedInvoice.proveedorRFC || 'N/A'}
                       </p>
                       <p>
-                        <span className="font-semibold">RFC Receptor:</span>{' '}
-                        GMS850101ABC
+                        <span className="font-semibold">Folio Fiscal (UUID):</span>{' '}
+                        {selectedInvoice.uuid || 'N/A'}
                       </p>
                       <p>
-                        <span className="font-semibold">
-                          Folio Fiscal (UUID):
-                        </span>{' '}
-                        5AB7C8-1234-5678-90AB-CDEF12345678
+                        <span className="font-semibold">Serie:</span>{' '}
+                        {selectedInvoice.serie || 'N/A'}
                       </p>
                       <p>
-                        <span className="font-semibold">Subtotal:</span>{' '}
-                        {new Intl.NumberFormat('es-MX', {
-                          style: 'currency',
-                          currency: 'MXN',
-                        }).format(selectedInvoice.amount / 1.16)}
-                      </p>
-                      <p>
-                        <span className="font-semibold">IVA (16%):</span>{' '}
-                        {new Intl.NumberFormat('es-MX', {
-                          style: 'currency',
-                          currency: 'MXN',
-                        }).format(
-                          selectedInvoice.amount - selectedInvoice.amount / 1.16
-                        )}
+                        <span className="font-semibold">Fecha de Emisión:</span>{' '}
+                        {formatDate(selectedInvoice.fechaEmision)}
                       </p>
                       <p>
                         <span className="font-semibold">Total:</span>{' '}
                         {new Intl.NumberFormat('es-MX', {
                           style: 'currency',
                           currency: 'MXN',
-                        }).format(selectedInvoice.amount)}
+                        }).format(selectedInvoice.monto)}
+                      </p>
+                      <p>
+                        <span className="font-semibold">Saldo:</span>{' '}
+                        {new Intl.NumberFormat('es-MX', {
+                          style: 'currency',
+                          currency: 'MXN',
+                        }).format(selectedInvoice.saldo)}
                       </p>
                     </CardContent>
                   </Card>
@@ -435,29 +507,47 @@ export default function FacturasPage() {
                 <div className="space-y-6">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Validaciones Automáticas</CardTitle>
+                      <CardTitle>Estado de la Factura</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-md">
-                        <p className="text-sm dark:text-green-200 text-green-800">
-                          RFC del emisor coincide
-                        </p>
-                        <span className="text-green-400">✔</span>
+                      <div className="flex items-center justify-between p-3 rounded-md border">
+                        <p className="text-sm font-medium">Estado actual:</p>
+                        <Badge className={cn(getBadgeVariant(selectedInvoice.estado))}>
+                          {selectedInvoice.estado}
+                        </Badge>
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-md">
-                        <p className="text-sm dark:text-green-200 text-green-800">
-                          Monto total coincide con la OC
-                        </p>
-                        <span className="text-green-400">✔</span>
+                      <div className="flex items-center justify-between p-3 rounded-md border">
+                        <p className="text-sm font-medium">Empresa:</p>
+                        <span className="text-sm">{selectedInvoice.empresa}</span>
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-md">
-                        <p className="text-sm dark:text-red-200 text-red-800">
-                          Conceptos no coinciden
-                        </p>
-                        <span className="text-red-400">✖</span>
-                      </div>
+                      {selectedInvoice.ordenCompra && selectedInvoice.ordenCompra !== '-' && (
+                        <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-md">
+                          <p className="text-sm dark:text-green-200 text-green-800">
+                            Asociada a Orden de Compra
+                          </p>
+                          <span className="text-green-400">&#10004;</span>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
+                  <div className="flex gap-2">
+                    {selectedInvoice.urlPDF && (
+                      <Button variant="outline" className="flex-1" asChild>
+                        <a href={selectedInvoice.urlPDF} target="_blank" rel="noopener noreferrer">
+                          <FileDown className="mr-2 h-4 w-4" />
+                          Descargar PDF
+                        </a>
+                      </Button>
+                    )}
+                    {selectedInvoice.urlXML && (
+                      <Button variant="outline" className="flex-1" asChild>
+                        <a href={selectedInvoice.urlXML} target="_blank" rel="noopener noreferrer">
+                          <FileDown className="mr-2 h-4 w-4" />
+                          Descargar XML
+                        </a>
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
               <DialogFooter className="gap-2">
