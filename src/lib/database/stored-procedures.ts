@@ -201,11 +201,16 @@ export class StoredProcedures {
    * Helper para obtener el código de empresa del ERP basado en tenant o parámetro
    */
   private getEmpresaERP(empresa: string | null | undefined): string {
-    if (!empresa) return '01'; // Default general
+    if (!empresa) {
+      console.log('[SP] getEmpresaERP: empresa es null/undefined, usando default 01');
+      return '01'; // Default general
+    }
     try {
       const config = getTenantConfig(empresa);
+      console.log(`[SP] getEmpresaERP: ${empresa} -> ${config.erpEmpresa}`);
       return config.erpEmpresa;
     } catch (e) {
+      console.log(`[SP] getEmpresaERP: ${empresa} no encontrado en config, retornando como está`);
       return empresa;
     }
   }
@@ -385,12 +390,15 @@ export class StoredProcedures {
       limit = 10
     } = params;
 
+    const empresaERP = this.getEmpresaERP(empresa);
+    console.log(`[SP getFacturas] Parámetros: empresa=${empresa}, empresaERP=${empresaERP}, estatus=${estatus}, page=${page}, limit=${limit}`);
+
     const pool = await this.getPool(empresa || '01');
 
     const result = await pool.request()
       .input('Proveedor', sql.VarChar(20), proveedor)
       .input('RFC', sql.VarChar(13), rfc)
-      .input('Empresa', sql.VarChar(10), this.getEmpresaERP(empresa))
+      .input('Empresa', sql.VarChar(10), empresaERP)
       .input('Estatus', sql.VarChar(20), estatus)
       .input('FechaDesde', sql.Date, this.toDate(fechaDesde))
       .input('FechaHasta', sql.Date, this.toDate(fechaHasta))
@@ -401,6 +409,11 @@ export class StoredProcedures {
 
     const facturas = getRecordset<Factura>(result, 0);
     const totalRecord = getFirstRecord<{ Total: number }>(result, 1);
+
+    console.log(`[SP getFacturas] Resultados: ${facturas.length} facturas, total=${totalRecord?.Total || 0}`);
+    if (facturas.length > 0) {
+      console.log('[SP getFacturas] Campos disponibles:', Object.keys(facturas[0]));
+    }
 
     return {
       facturas,

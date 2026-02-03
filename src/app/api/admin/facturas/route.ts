@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Obtener datos del SP
+    console.log('[facturas-sp] Llamando SP con empresa:', params.empresa);
     const result = await storedProcedures.getFacturas({
       empresa: params.empresa,
       proveedor: params.proveedor,
@@ -96,18 +97,31 @@ export async function GET(request: NextRequest) {
       limit: params.limit,
     });
 
+    // Log para debug: ver estructura de datos del SP
+    if (result.facturas.length > 0) {
+      console.log('[facturas-sp] Campos disponibles en primera factura:', Object.keys(result.facturas[0]));
+      console.log('[facturas-sp] Primera factura raw:', JSON.stringify(result.facturas[0], null, 2));
+    }
+
     // Mapear las facturas al formato esperado por el frontend
+    // El SP retorna: Factura, NombreProveedor, Compra, FechEstado, Estado, Importe
     const facturasFormateadas = result.facturas.map((factura: any) => ({
       id: factura.ID,
-      numeroFactura: factura.Folio || factura.NumeroFactura || `${factura.Serie || ''}-${factura.Folio || factura.ID}`,
+      // El SP retorna 'Factura' como número de factura
+      numeroFactura: factura.Factura || factura.Folio || factura.NumeroFactura || `${factura.Serie || ''}-${factura.Folio || factura.ID}`,
       proveedor: factura.Proveedor,
-      proveedorNombre: factura.ProveedorNombre || factura.Proveedor,
-      proveedorRFC: factura.ProveedorRFC,
-      ordenCompra: factura.OrdenCompraMovID || factura.OrdenCompra || '-',
-      fechaEntrada: factura.FechaEntrada || factura.FechaEmision,
-      fechaEmision: factura.FechaEmision,
-      estado: mapEstadoToFrontend(factura.Estatus),
-      monto: factura.Total || 0,
+      // El SP retorna 'NombreProveedor'
+      proveedorNombre: factura.NombreProveedor || factura.ProveedorNombre || factura.Proveedor,
+      proveedorRFC: factura.ProveedorRFC || factura.RFC,
+      // El SP retorna 'Compra' como la orden de compra asociada
+      ordenCompra: factura.Compra || factura.OrdenCompraMovID || factura.OrdenCompra || '-',
+      // El SP retorna 'FechEstado' como fecha del estado
+      fechaEntrada: factura.FechEstado || factura.FechaEntrada || factura.FechaEmision,
+      fechaEmision: factura.FechaEmision || factura.FechEstado,
+      // El SP retorna 'Estado' (no 'Estatus')
+      estado: factura.Estado || mapEstadoToFrontend(factura.Estatus),
+      // El SP retorna 'Importe' (no 'Total')
+      monto: factura.Importe || factura.Total || 0,
       saldo: factura.Saldo || 0,
       empresa: factura.Empresa,
       uuid: factura.UUID,
