@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
 import { getPortalConnection, getERPConnection } from '@/lib/database/multi-tenant-connection';
+import { getNombreEmpresa } from '@/lib/database/tenant-configs';
 import sql from 'mssql';
 
 /**
@@ -158,11 +159,7 @@ export async function GET(request: NextRequest) {
         const complementos = complementosResult.recordset.map(comp => ({
           ...comp,
           EmpresaCodigo: empresa_code,
-          EmpresaNombre: empresa_code === 'la-cantera' ? 'La Cantera' :
-                         empresa_code === 'peralillo' ? 'Peralillo' :
-                         empresa_code === 'plaza-galerena' ? 'Plaza Galereña' :
-                         empresa_code === 'inmobiliaria-galerena' ? 'Inmobiliaria Galereña' :
-                         empresa_code === 'icrear' ? 'Icrear' : empresa_code,
+          EmpresaNombre: getNombreEmpresa(empresa_code),
           CodigoProveedor: erp_proveedor_code
         }));
 

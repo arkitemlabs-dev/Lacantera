@@ -47,9 +47,17 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
 
+    // Validar que hay empresa en la sesión
+    if (!empresaActual) {
+      return NextResponse.json(
+        { success: false, error: 'No hay empresa seleccionada en la sesión' },
+        { status: 400 }
+      );
+    }
+
     // Usar la empresa de la sesión si no se especifica en los parámetros
     const params = {
-      empresa: searchParams.get('empresa') || empresaActual || 'la-cantera-test',
+      empresa: searchParams.get('empresa') || empresaActual,
       proveedor: searchParams.get('proveedor') || null,
       rfc: searchParams.get('rfc') || null,
       estatus: searchParams.get('estatus') || null,

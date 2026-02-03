@@ -40,8 +40,17 @@ export async function GET(
       );
     }
 
-    // Conectar al ERP
-    const erpPool = await getERPConnection('la-cantera');
+    // Obtener empresa de la sesión
+    const empresaActual = session.user.empresaActual;
+    if (!empresaActual) {
+      return NextResponse.json(
+        { success: false, error: 'No hay empresa seleccionada en la sesión' },
+        { status: 400 }
+      );
+    }
+
+    // Conectar al ERP usando la empresa de la sesión
+    const erpPool = await getERPConnection(empresaActual);
 
     // Obtener información del documento desde AnexoCta
     // Verificar que el documento pertenezca al proveedor autenticado

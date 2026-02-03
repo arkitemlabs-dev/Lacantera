@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
 import { getPortalConnection } from '@/lib/database/multi-tenant-connection';
 import { storedProcedures } from '@/lib/database/stored-procedures';
+import { getEmpresaERPFromTenant } from '@/lib/database/tenant-configs';
 import sql from 'mssql';
 
 /**
@@ -80,15 +81,14 @@ export async function GET(request: NextRequest) {
 
     // 3. Determinar el código de empresa según el mapping
     // El ERP usa códigos numéricos: '01', '02', etc.
-    const empresaCodes: { [key: string]: string } = {
-      'la-cantera': '01',
-      'peralillo': '02',
-      'plaza-galerena': '03',
-      'inmobiliaria-galerena': '04',
-      'icrear': '05'
-    };
+    const empresaCode = getEmpresaERPFromTenant(empresaActual);
 
-    const empresaCode = empresaCodes[empresaActual] || '01';
+    if (!empresaCode) {
+      return NextResponse.json({
+        success: false,
+        error: 'No se pudo determinar el código de empresa'
+      }, { status: 400 });
+    }
 
     console.log(`📍 Código empresa ERP: ${empresaCode}`);
 

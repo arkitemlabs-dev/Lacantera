@@ -38,8 +38,17 @@ export async function GET(
     const { id } = await params;
     console.log(`[ADMIN DOCUMENTOS] ID recibido: ${id}`);
 
-    // Conectar al ERP
-    const erpPool = await getERPConnection('la-cantera');
+    // Obtener empresa de la sesión
+    const empresaActual = session.user.empresaActual;
+    if (!empresaActual) {
+      return NextResponse.json(
+        { error: 'No hay empresa seleccionada en la sesión' },
+        { status: 400 }
+      );
+    }
+
+    // Conectar al ERP usando la empresa de la sesión
+    const erpPool = await getERPConnection(empresaActual);
 
     // Buscar el proveedor para obtener su código correcto
     const provResult = await erpPool.request()
@@ -335,8 +344,17 @@ export async function POST(
       );
     }
 
-    // Conectar al ERP
-    const erpPool = await getERPConnection('la-cantera');
+    // Obtener empresa de la sesión
+    const empresaActual = session.user.empresaActual;
+    if (!empresaActual) {
+      return NextResponse.json(
+        { success: false, error: 'No hay empresa seleccionada en la sesión' },
+        { status: 400 }
+      );
+    }
+
+    // Conectar al ERP usando la empresa de la sesión
+    const erpPool = await getERPConnection(empresaActual);
 
     // Verificar que el proveedor existe
     const provResult = await erpPool.request()

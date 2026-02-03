@@ -65,8 +65,14 @@ export async function GET(
       );
     }
 
-    // Obtener empresa de la sesión o usar default
-    const empresaActual = session.user.empresaActual || 'la-cantera';
+    // Obtener empresa de la sesión
+    const empresaActual = session.user.empresaActual;
+    if (!empresaActual) {
+      return NextResponse.json(
+        { success: false, error: 'No hay empresa seleccionada en la sesión' },
+        { status: 400 }
+      );
+    }
 
     console.log(`🔍 [GET /api/admin/ordenes-sp/${ordenId}] Cargando detalle...`);
 

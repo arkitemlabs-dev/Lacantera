@@ -114,3 +114,109 @@ export const TENANT_CONFIGS_TEST = Object.fromEntries(
 export const TENANT_CONFIGS_PROD = Object.fromEntries(
   Object.entries(TENANT_CONFIGS).filter(([key]) => key.endsWith('-prod'))
 );
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FUNCIONES HELPER CENTRALIZADAS (para evitar hardcoding en APIs)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Obtiene el código de empresa ERP ('01', '02', etc.) desde un tenantId
+ * @param tenantId - ID del tenant (ej: 'la-cantera-prod', 'la-cantera', 'peralillo-test')
+ * @returns Código ERP ('01', '02', etc.) o null si no se encuentra
+ */
+export function getEmpresaERPFromTenant(tenantId: string | null | undefined): string | null {
+  if (!tenantId) return null;
+
+  // Buscar directamente en TENANT_CONFIGS
+  const config = TENANT_CONFIGS[tenantId as keyof typeof TENANT_CONFIGS];
+  if (config) {
+    return config.erpEmpresa;
+  }
+
+  // Intentar buscar por codigoEmpresa (sin sufijo -prod/-test)
+  // Esto permite usar 'la-cantera', 'peralillo', etc. directamente
+  for (const tenant of Object.values(TENANT_CONFIGS)) {
+    if (tenant.codigoEmpresa === tenantId) {
+      return tenant.erpEmpresa;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Obtiene el nombre de la empresa desde un tenantId o codigoEmpresa
+ * @param empresaCode - Código de empresa (ej: 'la-cantera', 'peralillo', 'la-cantera-prod')
+ * @returns Nombre de la empresa o el código original si no se encuentra
+ */
+export function getNombreEmpresa(empresaCode: string | null | undefined): string {
+  if (!empresaCode) return 'Desconocida';
+
+  // Buscar directamente en TENANT_CONFIGS
+  const config = TENANT_CONFIGS[empresaCode as keyof typeof TENANT_CONFIGS];
+  if (config) {
+    return config.nombre;
+  }
+
+  // Buscar por codigoEmpresa (sin sufijo)
+  for (const tenant of Object.values(TENANT_CONFIGS)) {
+    if (tenant.codigoEmpresa === empresaCode) {
+      // Retornar versión limpia (sin [TEST])
+      return tenant.nombre.replace(' [TEST]', '');
+    }
+  }
+
+  // Mapeo directo para códigos simples (compatibilidad)
+  const nombresSimples: Record<string, string> = {
+    'la-cantera': 'La Cantera Desarrollos Mineros',
+    'peralillo': 'El Peralillo SA de CV',
+    'plaza-galerena': 'Plaza Galereña',
+    'inmobiliaria-galerena': 'Inmobiliaria Galereña',
+    'icrear': 'Icrear'
+  };
+
+  return nombresSimples[empresaCode] || empresaCode;
+}
+
+/**
+ * Mapeo de código de empresa del portal a código del ERP
+ * Soporta tanto tenantId completo como codigoEmpresa
+ * @param empresaCode - Código del portal ('la-cantera', 'la-cantera-prod', etc.)
+ * @returns Código ERP ('01', '02', etc.) o null si no hay mapeo
+ */
+export function getEmpresaCodeMapping(empresaCode: string | null | undefined): string | null {
+  return getEmpresaERPFromTenant(empresaCode);
+}
+
+/**
+ * Verifica si una empresa está configurada
+ * @param empresaCode - Código de empresa a verificar
+ * @returns true si la empresa existe en la configuración
+ */
+export function isValidEmpresa(empresaCode: string | null | undefined): boolean {
+  if (!empresaCode) return false;
+
+  // Verificar si existe como tenantId
+  if (TENANT_CONFIGS[empresaCode as keyof typeof TENANT_CONFIGS]) {
+    return true;
+  }
+
+  // Verificar si existe como codigoEmpresa
+  for (const tenant of Object.values(TENANT_CONFIGS)) {
+    if (tenant.codigoEmpresa === empresaCode) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Obtiene la configuración completa de un tenant
+ * @param tenantId - ID del tenant
+ * @returns Configuración del tenant o null si no existe
+ */
+export function getTenantConfig(tenantId: string | null | undefined) {
+  if (!tenantId) return null;
+  return TENANT_CONFIGS[tenantId as keyof typeof TENANT_CONFIGS] || null;
+}

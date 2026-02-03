@@ -6,16 +6,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
 import { getPortalConnection } from '@/lib/database/multi-tenant-connection';
 import { storedProcedures } from '@/lib/database/stored-procedures';
+import { getEmpresaERPFromTenant, getNombreEmpresa } from '@/lib/database/tenant-configs';
 import sql from 'mssql';
-
-// Mapeo de códigos de empresa del portal a códigos del ERP
-const empresaCodes: Record<string, string> = {
-  'la-cantera': '01',
-  'peralillo': '02',
-  'plaza-galerena': '03',
-  'inmobiliaria-galerena': '04',
-  'icrear': '05'
-};
 
 // Mapeo de estatus del portal a estatus del SP
 // El frontend usa: 'en-revision', 'aprobada', 'pagada', 'rechazada', 'todas'
@@ -114,7 +106,14 @@ export async function GET(request: NextRequest) {
     console.log(`📍 Proveedor ERP: ${erp_proveedor_code}, RFC: ${rfcProveedor}`);
 
     // 4. Convertir código de empresa del portal al código del ERP
-    const empresaCode = empresaCodes[empresaFiltro] || '01';
+    const empresaCode = getEmpresaERPFromTenant(empresaFiltro);
+
+    if (!empresaCode) {
+      return NextResponse.json({
+        success: false,
+        error: 'No se pudo determinar el código de empresa'
+      }, { status: 400 });
+    }
 
     // 5. Mapear estatus del frontend al formato del SP
     const estatusSP = estatusMap[estatusFiltro] || null;
@@ -237,11 +236,7 @@ export async function GET(request: NextRequest) {
       cfdi: factura.UUID || `CFDI-${factura.ID}`,
       serie: factura.Serie,
       empresa: factura.Empresa,
-      empresaNombre: empresaFiltro === 'la-cantera' ? 'La Cantera' :
-                     empresaFiltro === 'peralillo' ? 'Peralillo' :
-                     empresaFiltro === 'plaza-galerena' ? 'Plaza Galereña' :
-                     empresaFiltro === 'inmobiliaria-galerena' ? 'Inmobiliaria Galereña' :
-                     empresaFiltro === 'icrear' ? 'Icrear' : empresaFiltro,
+      empresaNombre: getNombreEmpresa(empresaFiltro),
       fechaEmision: factura.FechaEmision,
       moneda: factura.Moneda || 'MXN',
       tipoCambio: factura.TipoCambio || 1,

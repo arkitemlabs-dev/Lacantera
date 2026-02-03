@@ -17,14 +17,45 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth.config';
 import { storedProcedures } from '@/lib/database/stored-procedures';
+import { getEmpresaERPFromTenant } from '@/lib/database/tenant-configs';
 
 export async function GET(request: NextRequest) {
   try {
+    // Obtener la sesión del usuario para usar su empresa actual
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { success: false, error: 'No autenticado' },
+        { status: 401 }
+      );
+    }
+
+    const empresaActual = session.user.empresaActual;
+    if (!empresaActual) {
+      return NextResponse.json(
+        { success: false, error: 'No hay empresa seleccionada en la sesión' },
+        { status: 400 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
 
+    // Usar la empresa del parámetro si viene, o la de la sesión
+    const empresaParam = searchParams.get('empresa');
+    const empresaERP = empresaParam || getEmpresaERPFromTenant(empresaActual);
+
+    if (!empresaERP) {
+      return NextResponse.json(
+        { success: false, error: 'No se pudo determinar la empresa' },
+        { status: 400 }
+      );
+    }
+
     const params = {
-      empresa: searchParams.get('empresa') || '01',
+      empresa: empresaERP,
       proveedor: searchParams.get('proveedor') || null,
       rfc: searchParams.get('rfc') || null,
       movId: searchParams.get('movId') || null,

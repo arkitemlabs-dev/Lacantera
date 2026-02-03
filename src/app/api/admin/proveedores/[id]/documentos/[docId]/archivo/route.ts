@@ -39,8 +39,17 @@ export async function GET(
     const { id, docId } = await params;
     console.log(`[ADMIN DOCUMENTO ARCHIVO] Proveedor: ${id}, Documento IDR: ${docId}`);
 
-    // Conectar al ERP
-    const erpPool = await getERPConnection('la-cantera');
+    // Obtener empresa de la sesión
+    const empresaActual = session.user.empresaActual;
+    if (!empresaActual) {
+      return NextResponse.json(
+        { success: false, error: 'No hay empresa seleccionada en la sesión' },
+        { status: 400 }
+      );
+    }
+
+    // Conectar al ERP usando la empresa de la sesión
+    const erpPool = await getERPConnection(empresaActual);
 
     // Obtener información del documento desde AnexoCta
     const anexoResult = await erpPool.request()

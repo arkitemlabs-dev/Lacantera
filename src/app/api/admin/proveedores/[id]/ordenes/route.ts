@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
 import { getERPConnection } from '@/lib/database/multi-tenant-connection';
+import { getEmpresaERPFromTenant } from '@/lib/database/tenant-configs';
 import sql from 'mssql';
 
 /**
@@ -13,7 +14,7 @@ import sql from 'mssql';
  *
  * Query params:
  * - estatus: 'PENDIENTE' | 'CONCLUIDO' | 'CANCELADO' | 'todas' (default: 'todas')
- * - empresa: código de empresa (default: '01')
+ * - empresa: código de empresa ERP (opcional, usa la empresa de la sesión si no se especifica)
  */
 export async function GET(
   request: NextRequest,
@@ -40,15 +41,33 @@ export async function GET(
 
     const { id: proveedorId } = await params;
 
+    // Obtener la empresa de la sesión
+    const empresaActual = session.user.empresaActual;
+    if (!empresaActual) {
+      return NextResponse.json(
+        { success: false, error: 'No hay empresa seleccionada en la sesión' },
+        { status: 400 }
+      );
+    }
+
     // Obtener parámetros de query
     const { searchParams } = new URL(request.url);
     const estatusFiltro = searchParams.get('estatus') || 'todas';
-    const empresaParam = searchParams.get('empresa') || '01';
+    // Usar la empresa del parámetro si viene, o la de la sesión
+    const empresaParamRaw = searchParams.get('empresa');
+    const empresaParam = empresaParamRaw || getEmpresaERPFromTenant(empresaActual);
+
+    if (!empresaParam) {
+      return NextResponse.json(
+        { success: false, error: 'No se pudo determinar la empresa' },
+        { status: 400 }
+      );
+    }
 
     console.log(`[ADMIN ORDENES] Proveedor: ${proveedorId}, Estatus: ${estatusFiltro}, Empresa: ${empresaParam}`);
 
-    // Conectar al ERP
-    const erpPool = await getERPConnection('la-cantera');
+    // Conectar al ERP usando la empresa de la sesión
+    const erpPool = await getERPConnection(empresaActual);
 
     // Primero obtener el RFC del proveedor
     const provResult = await erpPool.request()

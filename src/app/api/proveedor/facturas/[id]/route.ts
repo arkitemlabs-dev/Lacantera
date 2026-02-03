@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
 import { getPortalConnection, getERPConnection } from '@/lib/database/multi-tenant-connection';
+import { getEmpresaERPFromTenant, getNombreEmpresa } from '@/lib/database/tenant-configs';
 import sql from 'mssql';
 
 /**
@@ -139,12 +140,16 @@ export async function GET(
     console.log(`✅ Factura encontrada: ${factura.Folio}`);
 
     // 6. Buscar XML en SatXml si existe
+    // Obtener código ERP de la empresa
+    const empresaERP = getEmpresaERPFromTenant(empresa);
+
     let xmlData = null;
     try {
       // Intentar buscar por MovID o Folio en SatXml
       const xmlResult = await pool.request()
         .input('movID', sql.VarChar(20), factura.MovID)
         .input('folio', sql.VarChar(40), factura.Folio)
+        .input('empresaERP', sql.VarChar(10), empresaERP)
         .query(`
           SELECT TOP 1
             FolioFiscal AS UUID,
@@ -171,7 +176,7 @@ export async function GET(
             UrlXml
           FROM SatXml
           WHERE (MovID = @movID OR Folio = @folio)
-            AND Empresa = '01'
+            AND Empresa = @empresaERP
           ORDER BY FechadeEmision DESC
         `);
 
@@ -213,11 +218,7 @@ export async function GET(
       factura: {
         ...factura,
         EmpresaCodigo: empresa,
-        EmpresaNombre: empresa === 'la-cantera' ? 'La Cantera' :
-          empresa === 'peralillo' ? 'Peralillo' :
-            empresa === 'plaza-galerena' ? 'Plaza Galereña' :
-              empresa === 'inmobiliaria-galerena' ? 'Inmobiliaria Galereña' :
-                empresa === 'icrear' ? 'Icrear' : empresa,
+        EmpresaNombre: getNombreEmpresa(empresa),
         CodigoProveedor: erp_proveedor_code
       },
       xml: xmlData,

@@ -41,8 +41,17 @@ export async function GET(
       );
     }
 
+    // Obtener empresa de la sesión
+    const empresaActual = session.user.empresaActual;
+    if (!empresaActual) {
+      return NextResponse.json(
+        { error: 'No hay empresa seleccionada en la sesión' },
+        { status: 400 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
-    const empresa = searchParams.get('empresa') || 'la-cantera';
+    const empresa = searchParams.get('empresa') || empresaActual;
     const formato = searchParams.get('formato') || 'erp'; // 'erp' o 'form'
 
     const proveedorId = decodeURIComponent(params.id);
@@ -132,8 +141,17 @@ export async function POST(
       );
     }
 
+    // Obtener empresa de la sesión
+    const empresaActual = session.user.empresaActual;
+    if (!empresaActual) {
+      return NextResponse.json(
+        { success: false, error: 'No hay empresa seleccionada en la sesión' },
+        { status: 400 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
-    const empresa = searchParams.get('empresa') || 'la-cantera';
+    const empresa = searchParams.get('empresa') || empresaActual;
 
     const proveedorId = decodeURIComponent(params.id);
 
