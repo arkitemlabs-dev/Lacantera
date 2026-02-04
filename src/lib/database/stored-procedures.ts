@@ -866,18 +866,63 @@ export class StoredProcedures {
       if (isTestEmpresa) {
         // --- LOGICA PARA BASE DE DATOS DE PRUEBAS (Cantera_Ajustes) ---
         // Params: @Empresa, @MovId, @Factura
-        const result = await pool.request()
+        let spMessages: string[] = [];
+        const request = pool.request();
+
+        // Capture PRINT messages from SP
+        request.on('info', (info) => {
+          console.log('[SP MSG]', info.message);
+          spMessages.push(info.message);
+        });
+
+        const result = await request
           .input('Empresa', sql.VarChar(5), empresaERP)
           .input('MovId', sql.VarChar(20), movId)
           .input('Factura', sql.VarChar(20), factura)
           .execute('spGeneraRemisionCompra');
 
-        console.log(`[SP - TEST] spGeneraRemisionCompra ejecutado.`);
+        console.log(`[SP - TEST] spGeneraRemisionCompra ejecutado. Recordsets: ${result.recordsets.length}`);
+
+        // Log PRINT messages captured
+        if (spMessages.length > 0) {
+          console.log('[SP - TEST] Mensajes PRINT capturados:', spMessages);
+        }
+
         const firstRecord = result.recordset?.[0] as any;
+        if (firstRecord) {
+          console.log('[SP - TEST] Primer registro devuelto:', firstRecord);
+        }
+
+        let message = '';
+
+        // 1. Intentar obtener propiedad 'Mensaje' explícita
+        if (firstRecord?.Mensaje) {
+          message = firstRecord.Mensaje;
+        }
+        // 2. Si hay registro pero no 'Mensaje', usar el primer valor (posiblemente columna sin nombre)
+        else if (firstRecord) {
+          const values = Object.values(firstRecord);
+          if (values.length > 0 && typeof values[0] === 'string') {
+            message = values[0] as string;
+          }
+        }
+
+        // 3. Si no hay mensaje de recordset, usar mensajes PRINT acumulados
+        if (!message && spMessages.length > 0) {
+          message = spMessages.join('. ');
+        }
+
+        // 4. Default fallback
+        if (!message) {
+          message = 'Remisión generada correctamente (Test - Sin mensaje explicito del SP)';
+        }
+
+        console.log('[SP - TEST] Mensaje final a retornar:', message);
+
         return {
           success: true,
           data: firstRecord || null,
-          message: firstRecord?.Mensaje || 'Remisión generada correctamente (Test)'
+          message: message
         };
 
       } else {
