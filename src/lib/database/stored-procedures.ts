@@ -190,11 +190,11 @@ export class StoredProcedures {
 
   /**
    * Obtiene la conexión al ERP según el código de empresa
-   * Convierte automáticamente códigos como '01' a tenant IDs como 'la-cantera'
+   * REGLA: Siempre usamos Cantera_Ajustes (la-cantera-test) como entrada para los SPs
    */
   private async getPool(empresaCode: string = 'la-cantera'): Promise<sql.ConnectionPool> {
-    const tenantId = empresaToTenant(empresaCode);
-    return await getERPConnection(tenantId);
+    // El usuario especifica que siempre llamamos desde Cantera_Ajustes
+    return await getERPConnection('la-cantera-test');
   }
 
   /**
@@ -281,29 +281,23 @@ export class StoredProcedures {
   async getOrdenesCompra(params: GetOrdenesCompraParams = {}): Promise<GetOrdenesCompraResult> {
     const {
       rfc = null,
+      empresa,
+      fechaDesde = null,
+      fechaHasta = null,
+      page = 1,
       limit = 50
     } = params;
 
     // Validate required empresa
     if (!empresa) throw new Error('Empresa es requerida para getOrdenesCompra');
 
-    const pool = await this.getPool(empresa || '01');
+    const pool = await this.getPool(empresa);
 
     // Calcular cantidad de páginas para que el SP devuelve el total
     const cuantasPaginas = 1;
 
-    // Convertir fechas de string YYYY-MM-DD a objeto Date para sql.Date
-    const parseDateForSP = (dateStr: string | null | undefined): Date | null => {
-      if (!dateStr) return null;
-      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-        const [year, month, day] = dateStr.split('-');
-        return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      }
-      return new Date(dateStr);
-    };
-
-    const fechaDesdeDate = parseDateForSP(fechaDesde as string);
-    const fechaHastaDate = parseDateForSP(fechaHasta as string);
+    const fechaDesdeDate = this.toDate(fechaDesde);
+    const fechaHastaDate = this.toDate(fechaHasta);
 
     console.log('[SP] Fechas enviadas:', { fechaDesdeDate, fechaHastaDate });
 
@@ -399,13 +393,13 @@ export class StoredProcedures {
     const pool = await this.getPool(empresa);
 
     const result = await pool.request()
-      .input('Proveedor', sql.VarChar(20), proveedor)
-      .input('RFC', sql.VarChar(13), rfc)
+      .input('Proveedor', sql.VarChar(20), proveedor || '')
+      .input('Rfc', sql.VarChar(20), rfc || '')
       .input('Empresa', sql.VarChar(10), empresaERP)
-      .input('Estatus', sql.VarChar(20), estatus)
+      .input('Estatus', sql.VarChar(20), estatus || '')
       .input('FechaDesde', sql.Date, this.toDate(fechaDesde))
       .input('FechaHasta', sql.Date, this.toDate(fechaHasta))
-      .input('NumeroFactura', sql.VarChar(50), numeroFactura)
+      .input('NumeroFactura', sql.VarChar(50), numeroFactura || '')
       .input('Page', sql.Int, page)
       .input('Limit', sql.Int, limit)
       .execute('sp_GetFacturas');
