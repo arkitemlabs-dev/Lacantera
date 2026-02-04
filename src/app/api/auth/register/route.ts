@@ -281,6 +281,61 @@ export async function POST(request: NextRequest) {
 
       await transaction.commit();
 
+      // 8. NUEVO: También crear en WebUsuario para unificar sistema de mensajería
+      // Esto permite que el proveedor aparezca en la lista de destinatarios
+      try {
+        const portalPool = await getPortalConnection();
+
+        // Verificar si ya existe en WebUsuario por email
+        const existingWebUser = await portalPool
+          .request()
+          .input('email', sql.VarChar(100), email)
+          .query('SELECT UsuarioWeb FROM WebUsuario WHERE eMail = @email');
+
+        if (existingWebUser.recordset.length === 0) {
+          // Crear usuario en WebUsuario usando el mismo ID que pNetUsuario
+          await portalPool
+            .request()
+            .input('usuarioWeb', sql.VarChar(50), String(userId))
+            .input('nombre', sql.VarChar(100), nombre)
+            .input('email', sql.VarChar(100), email)
+            .input('contrasena', sql.VarChar(255), passwordHash)
+            .input('rol', sql.VarChar(50), 'proveedor')
+            .input('proveedor', sql.VarChar(50), proveedorCodigo)
+            .input('empresa', sql.VarChar(50), razonSocial || null)
+            .query(`
+              INSERT INTO WebUsuario (
+                UsuarioWeb,
+                Nombre,
+                eMail,
+                Contrasena,
+                Rol,
+                Estatus,
+                Alta,
+                UltimoCambio,
+                Proveedor,
+                Empresa
+              )
+              VALUES (
+                @usuarioWeb,
+                @nombre,
+                @email,
+                @contrasena,
+                @rol,
+                'ACTIVO',
+                GETDATE(),
+                GETDATE(),
+                @proveedor,
+                @empresa
+              )
+            `);
+          console.log(`✅ [REGISTRO] Proveedor también creado en WebUsuario: ${email} (ID: ${userId}, Proveedor: ${proveedorCodigo})`);
+        }
+      } catch (webUserError: any) {
+        // No fallar el registro si falla la creación en WebUsuario
+        console.error('⚠️ [REGISTRO] Error creando proveedor en WebUsuario (no crítico):', webUserError.message);
+      }
+
       // 8. AUTO-SINCRONIZACIÓN: Buscar al proveedor en todos los ERPs
       console.log(`🔄 Iniciando auto-sincronización para RFC: ${rfc}`);
       let syncResult = null;

@@ -7,10 +7,8 @@ import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 
-// Ruta de red para escribir archivos desde la app
-const ERP_RUTA_RED = '\\\\104.46.127.151\\PasoPruebas';
-// Ruta local del servidor ERP (la que recibe el SP)
-const ERP_RUTA_LOCAL = 'F:\\PasoPruebas';
+// Ruta local para guardar facturas de proveedores
+const FACTURAS_PROV_PATH = 'C:\\FacturasProv';
 
 // Subir archivo al filesystem local
 export async function uploadFile(data: {
@@ -25,7 +23,9 @@ export async function uploadFile(data: {
     const base64Data = file.split(',')[1] || file;
     const buffer = Buffer.from(base64Data, 'base64');
 
-    const destDir = path.join(ERP_RUTA_RED, folder);
+    // Para archivos generales seguimos usando una ruta relativa al proceso o una específica si se requiere
+    // Pero por ahora mantenemos la lógica de carpetas
+    const destDir = path.join(process.cwd(), 'uploads', folder);
     if (!existsSync(destDir)) {
       await mkdir(destDir, { recursive: true });
     }
@@ -104,13 +104,26 @@ export async function uploadFactura(data: {
       };
     }
 
-    // 2. Guardar XML en F:\pasopruebas
-    const erpArchivo = `${essentialData.uuid}.xml`;
-    const erpXmlPath = path.join(ERP_RUTA_RED, erpArchivo);
+    // 4. Preparar parámetros para spGeneraRemisionCompra
+    const serie = essentialData.serie || 'F';
+    const folio = essentialData.folio || '';
+    const facturaParam = `${serie}${folio ? '-' + folio : ''}`;
+
+    // Usar el código de empresa proporcionado o fallar si no existe (no asumir '01')
+    if (!data.empresaCode) {
+      throw new Error('El código de empresa es requerido para procesar la factura');
+    }
+    const empresaCode = data.empresaCode;
+
+    // 2. Guardar XML en C:\FacturasProv usando el NOMBRE CORRECTO (Serie-Folio)
+    // Esto debe coincidir con lo que espera el SP
+    const safeFilename = facturaParam.replace(/[^a-zA-Z0-9-]/g, '_');
+    const erpArchivo = `${safeFilename}.xml`;
+    const erpXmlPath = path.join(FACTURAS_PROV_PATH, erpArchivo);
 
     try {
-      if (!existsSync(ERP_RUTA_RED)) {
-        await mkdir(ERP_RUTA_RED, { recursive: true });
+      if (!existsSync(FACTURAS_PROV_PATH)) {
+        await mkdir(FACTURAS_PROV_PATH, { recursive: true });
       }
       const xmlContent = Buffer.from(xmlBase64Data, 'base64').toString('utf-8');
       await writeFile(erpXmlPath, xmlContent);
@@ -119,30 +132,28 @@ export async function uploadFactura(data: {
       console.error('Error guardando XML:', copyError.message);
       return {
         success: false,
-        error: 'Error al guardar archivo XML en el servidor',
+        error: 'Error al guardar archivo XML en C:\\FacturasProv',
       };
     }
 
-    // 3. Guardar PDF si se proporcionó
+    // 3. Guardar PDF si se proporcionó (opcional, usamos UUID para unicidad en carpeta uploads, pero aquí no es crítico para el SP)
     let pdfPath: string | null = null;
     if (pdfFile && pdfFileName) {
       const pdfBase64Data = pdfFile.split(',')[1] || pdfFile;
       if (pdfBase64Data) {
         const pdfBuffer = Buffer.from(pdfBase64Data, 'base64');
-        pdfPath = path.join(ERP_RUTA_RED, `${essentialData.uuid}.pdf`);
+        pdfPath = path.join(FACTURAS_PROV_PATH, `${safeFilename}.pdf`); // Usamos mismo nombre base para consistencia
         await writeFile(pdfPath, pdfBuffer);
         console.log(`PDF guardado en: ${pdfPath}`);
       }
     }
 
-    // 4. Ejecutar spGeneraRemisionCompra
-    const empresaCode = data.empresaCode || '01';
+    // 5. Ejecutar spGeneraRemisionCompra (Solo enviar los parámetros requeridos por el nuevo SP)
     const sp = getStoredProcedures();
     const remisionResult = await sp.generaRemisionCompra({
       empresa: empresaCode,
-      ordenId: data.ordenCompraId.trim(),
-      rutaArchivo: ERP_RUTA_LOCAL,
-      archivo: erpArchivo
+      movId: data.ordenCompraId.trim(),
+      factura: facturaParam
     });
 
     console.log('spGeneraRemisionCompra resultado:', remisionResult);
@@ -176,20 +187,20 @@ export async function uploadFactura(data: {
 export async function uploadDocumentoProveedor(data: {
   proveedorId: string;
   tipoDocumento:
-    | 'acta_constitutiva'
-    | 'comprobante_domicilio'
-    | 'identificacion_representante'
-    | 'constancia_fiscal'
-    | 'caratula_bancaria'
-    | 'poder_notarial'
-    | 'opinion_cumplimiento'
-    | 'foto_domicilio'
-    | 'referencias_comerciales'
-    | 'codigo_etica'
-    | 'repse'
-    | 'titulo_propiedad'
-    | 'pago_predial'
-    | 'poliza_seguro';
+  | 'acta_constitutiva'
+  | 'comprobante_domicilio'
+  | 'identificacion_representante'
+  | 'constancia_fiscal'
+  | 'caratula_bancaria'
+  | 'poder_notarial'
+  | 'opinion_cumplimiento'
+  | 'foto_domicilio'
+  | 'referencias_comerciales'
+  | 'codigo_etica'
+  | 'repse'
+  | 'titulo_propiedad'
+  | 'pago_predial'
+  | 'poliza_seguro';
   file: string;
   fileName: string;
   fileType: string;

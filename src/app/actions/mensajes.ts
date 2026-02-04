@@ -422,60 +422,86 @@ export async function getUsuariosParaConversacion(usuarioId: string, empresaId: 
 
       const { hybridDB } = await import('@/lib/database/hybrid-queries');
 
-      // 🔥 PRIMERO: Buscar en WebUsuario (sistema nuevo) - proveedores con campo Proveedor no vacío
-      console.log('🔍 Buscando en WebUsuario (sistema nuevo)...');
+      // 🔥 COMBINAR: Buscar en WebUsuario Y pNetUsuario simultáneamente
+      console.log('🔍 Buscando proveedores en WebUsuario y pNetUsuario...');
+
+      // Buscar en WebUsuario (sistema nuevo) - proveedores con campo Proveedor no vacío
       const webUsuarioResult = await hybridDB.queryPortal(`
         SELECT
-          UsuarioWeb as id,
+          CAST(UsuarioWeb AS NVARCHAR(100)) as id,
           Nombre as nombre,
           eMail as email,
           Proveedor as codigoProveedor,
-          'Proveedor' as rol
+          'Proveedor' as rol,
+          'WebUsuario' as origen
         FROM WebUsuario
         WHERE Proveedor IS NOT NULL
           AND Proveedor != ''
           AND Estatus = 'ACTIVO'
           AND Nombre IS NOT NULL
           AND Nombre != ''
-        ORDER BY Nombre ASC
       `);
 
-      if (webUsuarioResult.recordset && webUsuarioResult.recordset.length > 0) {
-        console.log('📦 Proveedores de WebUsuario encontrados:', webUsuarioResult.recordset.length);
-        return { success: true, data: webUsuarioResult.recordset };
-      }
-
-      // 🔥 SEGUNDO: Si no hay en WebUsuario, buscar en pNetUsuario (sistema antiguo)
-      console.log('🔍 Buscando en pNetUsuario (sistema antiguo)...');
-      const portalResult = await hybridDB.queryPortal(`
+      // Buscar en pNetUsuario (sistema antiguo) - proveedores tipo 4
+      const pNetResult = await hybridDB.queryPortal(`
         SELECT
-          u.IDUsuario as id,
+          CAST(u.IDUsuario AS NVARCHAR(100)) as id,
           u.Nombre as nombre,
           u.eMail as email,
           u.Usuario as codigoProveedor,
-          'Proveedor' as rol
+          'Proveedor' as rol,
+          'pNetUsuario' as origen
         FROM pNetUsuario u
         WHERE u.IDUsuarioTipo = 4
-          AND u.Estatus = 'ALTA'
+          AND (u.Estatus = 'ALTA' OR u.Estatus = 'ACTIVO')
           AND u.Nombre IS NOT NULL
           AND u.Nombre != ''
-        ORDER BY u.Nombre ASC
       `);
 
-      // Si hay proveedores en pNetUsuario, usarlos
-      if (portalResult.recordset && portalResult.recordset.length > 0) {
-        console.log('📦 Proveedores de pNetUsuario encontrados:', portalResult.recordset.length);
-        return { success: true, data: portalResult.recordset };
+      // Combinar resultados evitando duplicados por email
+      const proveedoresMap = new Map<string, any>();
+
+      // Agregar proveedores de WebUsuario (tienen prioridad)
+      if (webUsuarioResult.recordset) {
+        for (const prov of webUsuarioResult.recordset) {
+          const emailKey = (prov.email || '').toLowerCase();
+          if (emailKey && !proveedoresMap.has(emailKey)) {
+            proveedoresMap.set(emailKey, prov);
+          }
+        }
+        console.log('📦 Proveedores de WebUsuario:', webUsuarioResult.recordset.length);
       }
 
-      // 🔥 TERCERO: Si no hay proveedores en el portal, obtener del ERP como fallback
+      // Agregar proveedores de pNetUsuario (si no hay duplicado por email)
+      if (pNetResult.recordset) {
+        for (const prov of pNetResult.recordset) {
+          const emailKey = (prov.email || '').toLowerCase();
+          if (emailKey && !proveedoresMap.has(emailKey)) {
+            proveedoresMap.set(emailKey, prov);
+          }
+        }
+        console.log('📦 Proveedores de pNetUsuario:', pNetResult.recordset.length);
+      }
+
+      // Convertir a array y ordenar por nombre
+      const proveedoresCombinados = Array.from(proveedoresMap.values())
+        .sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' }));
+
+      console.log('📦 Total proveedores combinados:', proveedoresCombinados.length);
+
+      if (proveedoresCombinados.length > 0) {
+        return { success: true, data: proveedoresCombinados };
+      }
+
+      // 🔥 FALLBACK: Si no hay proveedores en el portal, obtener del ERP
       console.log('⚠️ No hay proveedores en portal, usando ERP como fallback');
       const erpResult = await hybridDB.queryERP('la-cantera', `
         SELECT
           p.Proveedor as id,
           p.Nombre as nombre,
           COALESCE(p.eMail1, 'sin-email@proveedor.com') as email,
-          'Proveedor' as rol
+          'Proveedor' as rol,
+          'ERP' as origen
         FROM Prov p
         WHERE UPPER(p.Estatus) = 'ALTA'
           AND p.Nombre IS NOT NULL
@@ -637,6 +663,107 @@ export async function debugFixConversacion(conversacionId: string, oldUserId: st
     return { success: true, message: `Conversación actualizada: ${oldUserId} → ${newUserId}` };
   } catch (error: any) {
     console.error('Error corrigiendo conversación:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ==================== SINCRONIZAR PROVEEDORES PARA MENSAJERÍA ====================
+
+/**
+ * Sincroniza proveedores de pNetUsuario a WebUsuario para que aparezcan en mensajería.
+ * Ejecutar esta función una vez para migrar proveedores existentes.
+ */
+export async function sincronizarProveedoresParaMensajeria() {
+  try {
+    console.log('🔄 Iniciando sincronización de proveedores para mensajería...');
+
+    const { hybridDB } = await import('@/lib/database/hybrid-queries');
+    const bcrypt = await import('bcrypt');
+
+    // Obtener todos los proveedores de pNetUsuario que NO están en WebUsuario
+    const proveedoresResult = await hybridDB.queryPortal(`
+      SELECT
+        u.IDUsuario,
+        u.Usuario as CodigoProveedor,
+        u.Nombre,
+        u.eMail,
+        pp.PasswordHash
+      FROM pNetUsuario u
+      LEFT JOIN pNetUsuarioPassword pp ON u.IDUsuario = pp.IDUsuario
+      WHERE u.IDUsuarioTipo = 4
+        AND (u.Estatus = 'ALTA' OR u.Estatus = 'ACTIVO')
+        AND u.eMail IS NOT NULL
+        AND u.eMail != ''
+        AND NOT EXISTS (
+          SELECT 1 FROM WebUsuario w WHERE w.eMail = u.eMail
+        )
+    `);
+
+    if (!proveedoresResult.recordset || proveedoresResult.recordset.length === 0) {
+      console.log('✅ No hay proveedores para sincronizar');
+      return { success: true, message: 'No hay proveedores para sincronizar', sincronizados: 0 };
+    }
+
+    console.log(`📦 Proveedores a sincronizar: ${proveedoresResult.recordset.length}`);
+
+    let sincronizados = 0;
+    let errores: string[] = [];
+
+    for (const prov of proveedoresResult.recordset) {
+      try {
+        // Usar el IDUsuario como UsuarioWeb para mantener consistencia
+        const passwordHash = prov.PasswordHash || await bcrypt.hash('temporal123', 10);
+
+        await hybridDB.queryPortal(`
+          INSERT INTO WebUsuario (
+            UsuarioWeb,
+            Nombre,
+            eMail,
+            Contrasena,
+            Rol,
+            Estatus,
+            Alta,
+            UltimoCambio,
+            Proveedor
+          )
+          VALUES (
+            @usuarioWeb,
+            @nombre,
+            @email,
+            @contrasena,
+            'proveedor',
+            'ACTIVO',
+            GETDATE(),
+            GETDATE(),
+            @proveedor
+          )
+        `, {
+          usuarioWeb: String(prov.IDUsuario),
+          nombre: prov.Nombre || 'Sin nombre',
+          email: prov.eMail,
+          contrasena: passwordHash,
+          proveedor: prov.CodigoProveedor || ''
+        });
+
+        sincronizados++;
+        console.log(`✅ Proveedor sincronizado: ${prov.eMail} (ID: ${prov.IDUsuario})`);
+      } catch (error: any) {
+        errores.push(`${prov.eMail}: ${error.message}`);
+        console.error(`❌ Error sincronizando ${prov.eMail}:`, error.message);
+      }
+    }
+
+    console.log(`🎉 Sincronización completada: ${sincronizados}/${proveedoresResult.recordset.length} proveedores`);
+
+    return {
+      success: true,
+      message: `Sincronización completada`,
+      sincronizados,
+      total: proveedoresResult.recordset.length,
+      errores: errores.length > 0 ? errores : undefined
+    };
+  } catch (error: any) {
+    console.error('💥 Error en sincronización:', error);
     return { success: false, error: error.message };
   }
 }

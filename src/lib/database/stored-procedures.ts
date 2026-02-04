@@ -202,8 +202,8 @@ export class StoredProcedures {
    */
   private getEmpresaERP(empresa: string | null | undefined): string {
     if (!empresa) {
-      console.log('[SP] getEmpresaERP: empresa es null/undefined, usando default 01');
-      return '01'; // Default general
+      // STRICT SCENARIO: Never default to Production '01' without explicit instruction.
+      throw new Error('[SP SECURITY] El código de empresa es OBLIGATORIO. No se permite defaulting a Producción.');
     }
     try {
       const config = getTenantConfig(empresa);
@@ -281,12 +281,11 @@ export class StoredProcedures {
   async getOrdenesCompra(params: GetOrdenesCompraParams = {}): Promise<GetOrdenesCompraResult> {
     const {
       rfc = null,
-      empresa = '01',
-      fechaDesde = null,
-      fechaHasta = null,
-      page = 1,
       limit = 50
     } = params;
+
+    // Validate required empresa
+    if (!empresa) throw new Error('Empresa es requerida para getOrdenesCompra');
 
     const pool = await this.getPool(empresa || '01');
 
@@ -338,11 +337,12 @@ export class StoredProcedures {
    * SP 5: sp_GetOrdenCompraConDetalle
    * Orden con partidas (2 result sets)
    */
-  async getOrdenCompraConDetalle(ordenId: number, empresa?: string): Promise<{
+  async getOrdenCompraConDetalle(ordenId: number, empresa: string): Promise<{
     encabezado: unknown | null;
     partidas: unknown[];
   }> {
-    const pool = await this.getPool(empresa || '01');
+    if (!empresa) throw new Error('Empresa es requerida para getOrdenCompraConDetalle');
+    const pool = await this.getPool(empresa);
 
     const result = await pool.request()
       .input('OrdenID', sql.Int, ordenId)
@@ -359,8 +359,9 @@ export class StoredProcedures {
    * SP 6: sp_GetPartidasOrdenCompra
    * Solo partidas de una orden
    */
-  async getPartidasOrdenCompra(ordenId: number, empresa?: string): Promise<unknown[]> {
-    const pool = await this.getPool(empresa || '01');
+  async getPartidasOrdenCompra(ordenId: number, empresa: string): Promise<unknown[]> {
+    if (!empresa) throw new Error('Empresa es requerida para getPartidasOrdenCompra');
+    const pool = await this.getPool(empresa);
 
     const result = await pool.request()
       .input('OrdenID', sql.Int, ordenId)
@@ -381,7 +382,7 @@ export class StoredProcedures {
     const {
       proveedor = null,
       rfc = null,
-      empresa = '01',
+      empresa, // Required
       estatus = null,
       fechaDesde = null,
       fechaHasta = null,
@@ -390,10 +391,12 @@ export class StoredProcedures {
       limit = 10
     } = params;
 
+    if (!empresa) throw new Error('Empresa es requerida para getFacturas');
+
     const empresaERP = this.getEmpresaERP(empresa);
     console.log(`[SP getFacturas] Parámetros: empresa=${empresa}, empresaERP=${empresaERP}, estatus=${estatus}, page=${page}, limit=${limit}`);
 
-    const pool = await this.getPool(empresa || '01');
+    const pool = await this.getPool(empresa);
 
     const result = await pool.request()
       .input('Proveedor', sql.VarChar(20), proveedor)
@@ -425,12 +428,13 @@ export class StoredProcedures {
    * SP 2: sp_GetFacturaPorID
    * Detalle completo de una factura
    */
-  async getFacturaPorID(id: number, empresa?: string): Promise<{
+  async getFacturaPorID(id: number, empresa: string): Promise<{
     factura: Factura | null;
     datosXML: unknown | null;
     ordenCompra: unknown | null;
   }> {
-    const pool = await this.getPool(empresa || '01');
+    if (!empresa) throw new Error('Empresa es requerida para getFacturaPorID');
+    const pool = await this.getPool(empresa);
 
     const result = await pool.request()
       .input('ID', sql.Int, id)
@@ -448,14 +452,15 @@ export class StoredProcedures {
    * SP 3: sp_GetFacturasStats
    * Estadísticas para dashboard de facturas (Admin)
    */
-  async getFacturasStats(params: { empresa?: string; proveedor?: string; fechaDesde?: Date | string; fechaHasta?: Date | string } = {}): Promise<{
+  async getFacturasStats(params: { empresa: string; proveedor?: string; fechaDesde?: Date | string; fechaHasta?: Date | string }): Promise<{
     totales: unknown;
     topProveedores: unknown[];
     porMes: unknown[];
     porEstatus: unknown[];
   }> {
     const { empresa, proveedor, fechaDesde, fechaHasta } = params;
-    const pool = await this.getPool(empresa || '01');
+    if (!empresa) throw new Error('Empresa es requerida para getFacturasStats');
+    const pool = await this.getPool(empresa);
 
     const result = await pool.request()
       .input('Empresa', sql.VarChar(10), this.getEmpresaERP(empresa))
@@ -537,13 +542,14 @@ export class StoredProcedures {
    * SP 6: sp_ValidarFacturaDuplicada
    * Verifica si ya existe una factura con el mismo UUID
    */
-  async validarFacturaDuplicada(uuid: string, empresa?: string): Promise<{
+  async validarFacturaDuplicada(uuid: string, empresa: string): Promise<{
     existe: boolean;
     facturaId: number | null;
     folio: string | null;
     estatus: string | null;
   }> {
-    const pool = await this.getPool(empresa || '01');
+    if (!empresa) throw new Error('Empresa es requerida para validarFacturaDuplicada');
+    const pool = await this.getPool(empresa);
 
     const result = await pool.request()
       .input('UUID', sql.VarChar(36), uuid)
@@ -563,12 +569,13 @@ export class StoredProcedures {
    * SP 7: sp_GetFacturaConOrdenCompra
    * Factura con OC para validación de conceptos
    */
-  async getFacturaConOrdenCompra(facturaId: number, empresa?: string): Promise<{
+  async getFacturaConOrdenCompra(facturaId: number, empresa: string): Promise<{
     factura: unknown | null;
     ordenCompra: unknown | null;
     partidas: unknown[];
   }> {
-    const pool = await this.getPool(empresa || '01');
+    if (!empresa) throw new Error('Empresa es requerida para getFacturaConOrdenCompra');
+    const pool = await this.getPool(empresa);
 
     const result = await pool.request()
       .input('FacturaID', sql.Int, facturaId)
@@ -833,42 +840,75 @@ export class StoredProcedures {
    * Genera una remisión de compra a partir de una orden y un documento digital (XML)
    *
    * @param empresa - Clave de la empresa (ej. '01')
-   * @param ordenId - ID del movimiento de compra
+   * @param moId - Folio de la orden de compra (ingresado manualmente)
+   * @param factura - Serie + Folio de la factura
    * @param rutaArchivo - Path donde se guarda el documento digital
    * @param archivo - Nombre y extensión del archivo digital
    */
   async generaRemisionCompra(params: {
     empresa: string;
-    ordenId: string;
-    rutaArchivo: string;
-    archivo: string;
+    movId: string;
+    factura: string;
   }): Promise<{ success: boolean; data: any; message: string }> {
-    const { empresa, ordenId, rutaArchivo, archivo } = params;
+    const { empresa, movId, factura } = params;
 
     try {
       const pool = await this.getPool(empresa);
       const empresaERP = this.getEmpresaERP(empresa);
 
-      console.log(`[SP] spGeneraRemisionCompra - Empresa: ${empresaERP}, OrdenId: ${ordenId}, Ruta: ${rutaArchivo}, Archivo: ${archivo}`);
+      // Determine if we are in Production or Test based on the Company Code
+      // Prod: 01, 02, 03, 04, 05
+      // Test: 06, 07, 08, 09, 10
+      const isTestEmpresa = ['06', '07', '08', '09', '10'].includes(empresaERP);
 
-      const result = await pool.request()
-        .input('Empresa', sql.VarChar(5), empresaERP)
-        .input('OrdenId', sql.VarChar(20), ordenId)
-        .input('RutaArchivo', sql.VarChar(255), rutaArchivo)
-        .input('Archivo', sql.VarChar(200), archivo)
-        .execute('spGeneraRemisionCompra');
+      console.log(`[SP] spGeneraRemisionCompra - Empresa: ${empresaERP}, IsTest: ${isTestEmpresa}, MovId: ${movId}, Factura: ${factura}`);
 
-      console.log(`[SP] spGeneraRemisionCompra - Recordsets: ${result.recordsets.length}, RowsAffected: ${result.rowsAffected}`);
+      if (isTestEmpresa) {
+        // --- LOGICA PARA BASE DE DATOS DE PRUEBAS (Cantera_Ajustes) ---
+        // Params: @Empresa, @MovId, @Factura
+        const result = await pool.request()
+          .input('Empresa', sql.VarChar(5), empresaERP)
+          .input('MovId', sql.VarChar(20), movId)
+          .input('Factura', sql.VarChar(20), factura)
+          .execute('spGeneraRemisionCompra');
 
-      const firstRecord = result.recordset?.[0] as any;
+        console.log(`[SP - TEST] spGeneraRemisionCompra ejecutado.`);
+        const firstRecord = result.recordset?.[0] as any;
+        return {
+          success: true,
+          data: firstRecord || null,
+          message: firstRecord?.Mensaje || 'Remisión generada correctamente (Test)'
+        };
 
-      return {
-        success: true,
-        data: firstRecord || null,
-        message: firstRecord?.Mensaje || 'Remisión generada correctamente'
-      };
+      } else {
+        // --- BLOQUEO DE SEGURIDAD PARA PRODUCCION ---
+        // El usuario indicó explícitamente que NO se debe tocar producción durante las pruebas.
+        // Si llegamos aquí, es porque el frontend envió una empresa de producción (01-05).
+
+        console.warn(`[SP - PROD BLOCKED] Intento de escritura en Producción detectado para empresa ${empresaERP}`);
+
+        return {
+          success: false,
+          data: null,
+          message: `🛑 SEGURIDAD: Estás intentando subir una factura a la empresa de PRODUCCIÓN (${empresaERP}). Para realizar pruebas, por favor selecciona la empresa '[TEST]' correspondiente (ej. La Cantera [TEST]) en el selector de empresas.`
+        };
+      }
     } catch (error: any) {
       console.error('[SP] Error en spGeneraRemisionCompra:', error);
+
+      // Fallback inteligente: si falla por parámetros en Prod, intentamos la firma de Test (y viceversa si fuera necesario)
+      // Esto ayuda si la BD de test es actualizada a la estructura de prod sin que actualicemos el código
+      if (error.message && error.message.includes('expects parameter')) {
+        console.warn('[SP] Detectado error de parámetros. Verificando versión del SP...');
+        // Aquí podríamos hacer un retry con la otra firma si fuera crítico,
+        // por ahora devolvemos el error claro.
+        return {
+          success: false,
+          data: null,
+          message: `Error de compatibilidad con SP: ${error.message}. Verifica si estás en la empresa correcta (Test vs Prod).`
+        };
+      }
+
       return {
         success: false,
         data: null,

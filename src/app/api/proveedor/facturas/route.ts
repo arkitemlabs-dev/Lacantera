@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
-import { getPortalConnection } from '@/lib/database/multi-tenant-connection';
+import { getPortalConnection, getERPConnection } from '@/lib/database/multi-tenant-connection';
 import { storedProcedures } from '@/lib/database/stored-procedures';
 import { getEmpresaERPFromTenant, getNombreEmpresa } from '@/lib/database/tenant-configs';
 import sql from 'mssql';
@@ -71,15 +71,14 @@ export async function GET(request: NextRequest) {
 
     console.log('📍 Parámetros:', { empresaFiltro, fechaDesde, fechaHasta, estatusFiltro, busqueda, page, limit });
 
-    // 3. Obtener RFC del proveedor desde el mapping del portal
+    // 3. Obtener código del proveedor desde el mapping del portal
     const portalPool = await getPortalConnection();
     const mappingResult = await portalPool.request()
       .input('userId', sql.NVarChar(50), userId)
       .input('empresaCode', sql.VarChar(50), empresaFiltro)
       .query(`
         SELECT
-          erp_proveedor_code,
-          rfc_proveedor
+          erp_proveedor_code
         FROM portal_proveedor_mapping
         WHERE portal_user_id = @userId
           AND empresa_code = @empresaCode
@@ -93,14 +92,32 @@ export async function GET(request: NextRequest) {
       }, { status: 404 });
     }
 
-    const { erp_proveedor_code, rfc_proveedor } = mappingResult.recordset[0];
+    const { erp_proveedor_code } = mappingResult.recordset[0];
 
-    // Si no tenemos RFC, intentar obtenerlo del ERP usando el código de proveedor
-    let rfcProveedor = rfc_proveedor;
-    if (!rfcProveedor && erp_proveedor_code) {
-      console.log(`📍 RFC no encontrado en mapping, buscando en ERP para proveedor: ${erp_proveedor_code}`);
-      // Podríamos buscar el RFC en el ERP, pero por ahora usamos el código de proveedor
-      // El SP puede buscar por código de proveedor si no se proporciona RFC
+    // 3b. Obtener RFC directamente del ERP (Fuente de Verdad)
+    let rfcProveedor = null;
+    if (erp_proveedor_code) {
+      try {
+        console.log(`📍 Buscando RFC en ERP para proveedor: ${erp_proveedor_code} en empresa: ${empresaFiltro}`);
+        const erpPool = await getERPConnection(empresaFiltro);
+
+        const rfcResult = await erpPool.request()
+          .input('Codigo', sql.VarChar(20), erp_proveedor_code)
+          .query('SELECT TOP 1 RFC FROM Prov WHERE Proveedor = @Codigo');
+
+        if (rfcResult.recordset.length > 0) {
+          rfcProveedor = rfcResult.recordset[0].RFC;
+          console.log(`✅ RFC recuperado del ERP: ${rfcProveedor}`);
+        } else {
+          console.warn(`⚠️ Proveedor ${erp_proveedor_code} no encontrado en tabla Prov`);
+          // Fallback: usar el código como RFC por si el SP lo soporta o es un error de datos
+          rfcProveedor = erp_proveedor_code;
+        }
+      } catch (err) {
+        console.error('❌ Error buscando RFC en ERP:', err);
+        // Fallback en error
+        rfcProveedor = erp_proveedor_code;
+      }
     }
 
     console.log(`📍 Proveedor ERP: ${erp_proveedor_code}, RFC: ${rfcProveedor}`);
@@ -126,8 +143,16 @@ export async function GET(request: NextRequest) {
     let total = 0;
 
     try {
+      // Validar si tenemos un RFC válido para le SP (diferente al código)
+      const isRfcValido = rfcProveedor && rfcProveedor !== erp_proveedor_code && rfcProveedor.length >= 10;
+
+      if (!isRfcValido) {
+        console.warn(`⚠️ RFC no válido o idéntico al código (${rfcProveedor}). Saltando SP y usando Query Directa por Código.`);
+        throw new Error('RFC no disponible para SP');
+      }
+
       const spResult = await storedProcedures.getFacturasProveedor(
-        rfcProveedor || erp_proveedor_code, // Usar RFC o código de proveedor
+        rfcProveedor || '', // TypeScript check
         empresaCode,
         {
           estatus: estatusSP || undefined,
@@ -246,9 +271,9 @@ export async function GET(request: NextRequest) {
       saldo: factura.Saldo || 0,
       // Mapear estatus del SP al formato del frontend
       estado: factura.Estatus === 'EN_REVISION' ? 'En revisión' :
-              factura.Estatus === 'APROBADA' ? 'Aprobada' :
-              factura.Estatus === 'PAGADA' ? 'Pagada' :
-              factura.Estatus === 'RECHAZADA' ? 'Rechazada' : factura.Estatus,
+        factura.Estatus === 'APROBADA' ? 'Aprobada' :
+          factura.Estatus === 'PAGADA' ? 'Pagada' :
+            factura.Estatus === 'RECHAZADA' ? 'Rechazada' : factura.Estatus,
       ordenAsociada: factura.OrdenCompraMovID || factura.Referencia || '-',
       ordenCompraID: factura.OrdenCompraID,
       referencia: factura.Referencia,

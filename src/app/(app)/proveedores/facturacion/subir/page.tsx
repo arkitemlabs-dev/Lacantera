@@ -1,5 +1,4 @@
 'use client';
-
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -18,9 +17,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 
 export default function SubirFacturaPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [xmlFile, setXmlFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [ordenCompraId, setOrdenCompraId] = useState('');
@@ -46,6 +47,19 @@ export default function SubirFacturaPage() {
       return;
     }
 
+    // Obtener código de empresa de la sesión
+    // Nota: En el objeto session, la empresa seleccionada viene en 'empresaActual' (que es el tenant ID, ej: 'la-cantera-test')
+    // Esto es lo correcto para pasar al backend.
+    const empresaCode = (session?.user as any)?.empresaActual;
+
+    if (!empresaCode) {
+      setResult({
+        success: false,
+        error: 'No se ha detectado una empresa seleccionada en la sesión. Por favor recarga o vuelve a iniciar sesión.'
+      });
+      return;
+    }
+
     setLoading(true);
     setResult(null);
 
@@ -54,13 +68,14 @@ export default function SubirFacturaPage() {
       const pdfBase64 = pdfFile ? await fileToBase64(pdfFile) : '';
 
       const response = await uploadFactura({
-        proveedorId: 'proveedor-1',
+        proveedorId: session?.user?.id || 'proveedor-1',
         xmlFile: xmlBase64,
         xmlFileName: xmlFile.name,
         pdfFile: pdfBase64,
         pdfFileName: pdfFile?.name || '',
         ordenCompraId: ordenCompraId,
         observaciones: observaciones || undefined,
+        empresaCode: empresaCode, // Enviamos el tenantId (ej: 'la-cantera-test')
       });
 
       setResult(response);

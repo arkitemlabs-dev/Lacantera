@@ -236,35 +236,39 @@ export async function POST(request: NextRequest) {
       console.log(`✅ PDF guardado: ${pdfPath}`);
     }
 
-    // 8.5. Copiar XML a ruta del ERP y ejecutar spGeneraRemisionCompra
-    const erpRutaRed = '\\\\104.46.127.151\\PasoPruebas';
-    const erpRutaLocal = 'F:\\PasoPruebas';
-    const erpArchivo = `${cfdiData.uuid}.xml`;
-    const erpXmlPath = path.join(erpRutaRed, erpArchivo);
+    // 8.5. Preparar datos para spGeneraRemisionCompra y guardar XML local
+    const facturasProvPath = 'C:\\FacturasProv';
 
-    // Copiar XML a la ruta de red del ERP
+    // Preparar parámetro Factura: serie-folio o F-folio
+    // NOTA: El SP espera encontrar el archivo con este mismo nombre en C:\FacturasProv
+    const serie = cfdiData.serie || 'F';
+    const folio = cfdiData.folio || '';
+    const facturaParam = `${serie}${folio ? '-' + folio : ''}`;
+
+    // Validar nombre de archivo seguro
+    const safeFilename = facturaParam.replace(/[^a-zA-Z0-9-]/g, '_');
+    const erpArchivo = `${safeFilename}.xml`;
+    const erpXmlPath = path.join(facturasProvPath, erpArchivo);
+
+    // Guardar XML en C:\FacturasProv
     try {
-      if (!existsSync(erpRutaRed)) {
-        await mkdir(erpRutaRed, { recursive: true });
+      if (!existsSync(facturasProvPath)) {
+        await mkdir(facturasProvPath, { recursive: true });
       }
       await writeFile(erpXmlPath, xmlString);
-      console.log(`✅ XML copiado a ERP: ${erpXmlPath}`);
-    } catch (copyError: any) {
-      console.error('❌ Error copiando XML a ruta ERP:', copyError.message);
-      return NextResponse.json({
-        success: false,
-        error: 'Error al copiar archivo XML a la ruta del ERP',
-        details: process.env.NODE_ENV === 'development' ? copyError.message : undefined
-      }, { status: 500 });
+      console.log(`✅ XML guardado en C:\\FacturasProv: ${erpXmlPath}`);
+    } catch (saveError: any) {
+      console.error('❌ Error guardando XML en C:\\FacturasProv:', saveError.message);
+      // No fallamos toda la operación, pero logueamos el error grave ya que el SP fallará
+      console.error('⚠️ El SP spGeneraRemisionCompra probablemente fallará porque no se pudo guardar el archivo');
     }
 
     // Ejecutar SP spGeneraRemisionCompra
     const sp = getStoredProcedures();
     const remisionResult = await sp.generaRemisionCompra({
       empresa: empresaCode,
-      ordenId: ordenCompraId.trim(),
-      rutaArchivo: erpRutaLocal,
-      archivo: erpArchivo
+      movId: ordenCompraId.trim(),
+      factura: safeFilename // Enviamos el nombre sin extensión, que coincide con serie-folio
     });
 
     console.log(`📋 spGeneraRemisionCompra resultado:`, remisionResult);
