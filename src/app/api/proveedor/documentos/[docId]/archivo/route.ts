@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
 import { getERPConnection } from '@/lib/database/multi-tenant-connection';
+import { generateReadSasUrl } from '@/lib/blob-storage';
 import sql from 'mssql';
 import fs from 'fs';
 import path from 'path';
@@ -89,7 +90,20 @@ export async function GET(
       );
     }
 
-    // Intentar leer el archivo desde el sistema de archivos
+    // Si la ruta empieza con 'empresa/' es un blob path — generar SAS URL
+    if (rutaArchivo.startsWith('empresa/')) {
+      const downloadUrl = generateReadSasUrl(rutaArchivo);
+      return NextResponse.json({
+        success: true,
+        data: {
+          downloadUrl,
+          isBlob: true,
+          nombreArchivo: anexo.NombreDocumento || path.basename(rutaArchivo),
+        },
+      });
+    }
+
+    // Fallback: Intentar leer el archivo desde el sistema de archivos
     try {
       let rutaFinal = rutaArchivo;
 

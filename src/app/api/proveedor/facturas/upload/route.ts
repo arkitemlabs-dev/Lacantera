@@ -10,6 +10,9 @@ import { existsSync } from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { getStoredProcedures } from '@/lib/database/stored-procedures';
+import { uploadBufferToBlob } from '@/lib/blob-storage';
+import { buildBlobPath } from '@/lib/blob-path-builder';
+import { getEmpresaERPFromTenant } from '@/lib/database/tenant-configs';
 
 /**
  * POST /api/proveedor/facturas/upload
@@ -212,28 +215,43 @@ export async function POST(request: NextRequest) {
       satMensaje = `Error al validar con SAT: ${satError.message}`;
     }
 
-    // 8. Guardar archivos en el servidor
-    const uploadDir = path.join(process.cwd(), 'uploads', 'facturas', empresaCode, cfdiData.uuid);
+    // 8. Subir archivos a Azure Blob Storage
+    const erpEmpresa = getEmpresaERPFromTenant(empresaCode) || empresaCode;
+    const xmlBlobPath = buildBlobPath({
+      kind: 'factura-xml',
+      empresaCode: erpEmpresa,
+      idProveedor: erp_proveedor_code,
+      rfc: cfdiData.rfcEmisor,
+      uuid: cfdiData.uuid,
+    });
 
-    // Crear directorio si no existe
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
+    const xmlBlobResult = await uploadBufferToBlob(
+      Buffer.from(xmlString),
+      xmlBlobPath,
+      'text/xml'
+    );
+    console.log(`✅ XML subido a blob: ${xmlBlobResult.blobPath}`);
 
-    // Guardar XML
-    const xmlPath = path.join(uploadDir, `${cfdiData.uuid}.xml`);
-    await writeFile(xmlPath, xmlString);
-    console.log(`✅ XML guardado: ${xmlPath}`);
-
-    // Guardar PDF si existe
-    let pdfPath = null;
-    let pdfTamano = null;
+    let pdfBlobPath: string | null = null;
+    let pdfTamano: number | null = null;
+    let pdfBlobContainer: string | null = null;
     if (pdfFile) {
-      const pdfBuffer = await pdfFile.arrayBuffer();
-      pdfPath = path.join(uploadDir, `${cfdiData.uuid}.pdf`);
-      await writeFile(pdfPath, Buffer.from(pdfBuffer));
-      pdfTamano = pdfBuffer.byteLength;
-      console.log(`✅ PDF guardado: ${pdfPath}`);
+      const pdfArrayBuffer = await pdfFile.arrayBuffer();
+      pdfBlobPath = buildBlobPath({
+        kind: 'factura-pdf',
+        empresaCode: erpEmpresa,
+        idProveedor: erp_proveedor_code,
+        rfc: cfdiData.rfcEmisor,
+        uuid: cfdiData.uuid,
+      });
+      const pdfBlobResult = await uploadBufferToBlob(
+        Buffer.from(pdfArrayBuffer),
+        pdfBlobPath,
+        'application/pdf'
+      );
+      pdfTamano = pdfArrayBuffer.byteLength;
+      pdfBlobContainer = pdfBlobResult.container;
+      console.log(`✅ PDF subido a blob: ${pdfBlobResult.blobPath}`);
     }
 
     // 8.5. Preparar datos para spGeneraRemisionCompra y guardar XML local
@@ -311,10 +329,13 @@ export async function POST(request: NextRequest) {
       .input('moneda', sql.VarChar(3), cfdiData.moneda)
       .input('tipoCambio', sql.Decimal(10, 4), cfdiData.tipoCambio || 1)
       .input('xmlContenido', sql.NVarChar(sql.MAX), xmlString)
-      .input('xmlRuta', sql.VarChar(500), xmlPath)
-      .input('pdfRuta', sql.VarChar(500), pdfPath)
+      .input('xmlRuta', sql.VarChar(500), xmlBlobPath)
+      .input('pdfRuta', sql.VarChar(500), pdfBlobPath)
       .input('xmlTamano', sql.Int, xmlTamano)
       .input('pdfTamano', sql.Int, pdfTamano)
+      .input('xmlBlobContainer', sql.VarChar(100), xmlBlobResult.container)
+      .input('pdfBlobContainer', sql.VarChar(100), pdfBlobContainer)
+      .input('storageType', sql.VarChar(20), 'blob')
       // Campos de validación SAT
       .input('satValidado', sql.Bit, satValidado ? 1 : 0)
       .input('satEstado', sql.VarChar(50), satEstado)
@@ -334,6 +355,7 @@ export async function POST(request: NextRequest) {
           moneda, tipo_cambio,
           xml_contenido, xml_ruta, pdf_ruta,
           xml_tamano, pdf_tamano,
+          xml_blob_container, pdf_blob_container, storage_type,
           sat_validado, sat_estado, sat_codigo_estatus,
           sat_es_cancelable, sat_validacion_efos,
           sat_fecha_consulta, sat_mensaje,
@@ -348,6 +370,7 @@ export async function POST(request: NextRequest) {
           @moneda, @tipoCambio,
           @xmlContenido, @xmlRuta, @pdfRuta,
           @xmlTamano, @pdfTamano,
+          @xmlBlobContainer, @pdfBlobContainer, @storageType,
           @satValidado, @satEstado, @satCodigoEstatus,
           @satEsCancelable, @satValidacionEFOS,
           @satFechaConsulta, @satMensaje,
@@ -403,10 +426,11 @@ export async function POST(request: NextRequest) {
         empresaCode
       },
       archivos: {
-        xml: xmlPath,
-        pdf: pdfPath,
+        xml: xmlBlobPath,
+        pdf: pdfBlobPath,
         xmlTamano,
-        pdfTamano
+        pdfTamano,
+        storageType: 'blob'
       },
       validacion: {
         warnings: validation.warnings

@@ -1,3 +1,8 @@
+/**
+ * @deprecated Firebase Storage ha sido reemplazado por Azure Blob Storage.
+ * Usar `src/lib/blob-storage.ts` para nuevas integraciones de almacenamiento.
+ * Este archivo se mantiene temporalmente por si existen imports indirectos.
+ */
 // Firebase configuration for storage only
 // Only used for file uploads (facturas, documentos, etc.)
 

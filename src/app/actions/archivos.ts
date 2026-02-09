@@ -6,11 +6,14 @@ import { getStoredProcedures } from '@/lib/database/stored-procedures';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+import { uploadBufferToBlob } from '@/lib/blob-storage';
+import { buildBlobPath } from '@/lib/blob-path-builder';
+import { getEmpresaERPFromTenant } from '@/lib/database/tenant-configs';
 
-// Ruta local para guardar facturas de proveedores
+// Ruta local para guardar facturas de proveedores (necesaria para spGeneraRemisionCompra)
 const FACTURAS_PROV_PATH = 'C:\\FacturasProv';
 
-// Subir archivo al filesystem local
+// Subir archivo a Azure Blob Storage
 export async function uploadFile(data: {
   file: string; // Base64
   fileName: string;
@@ -18,29 +21,24 @@ export async function uploadFile(data: {
   folder: string;
 }) {
   try {
-    const { file, fileName, folder } = data;
+    const { file, fileName, fileType, folder } = data;
 
     const base64Data = file.split(',')[1] || file;
     const buffer = Buffer.from(base64Data, 'base64');
 
-    // Para archivos generales seguimos usando una ruta relativa al proceso o una específica si se requiere
-    // Pero por ahora mantenemos la lógica de carpetas
-    const destDir = path.join(process.cwd(), 'uploads', folder);
-    if (!existsSync(destDir)) {
-      await mkdir(destDir, { recursive: true });
-    }
-
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const filePath = path.join(destDir, sanitizedFileName);
+    const blobPath = `${folder}/${sanitizedFileName}`;
 
-    await writeFile(filePath, buffer);
+    const result = await uploadBufferToBlob(buffer, blobPath, fileType);
 
     return {
       success: true,
       data: {
-        url: filePath,
-        path: filePath,
+        url: result.blobPath,
+        path: result.blobPath,
         fileName: sanitizedFileName,
+        container: result.container,
+        storageType: 'blob' as const,
       },
     };
   } catch (error: any) {
@@ -109,14 +107,44 @@ export async function uploadFactura(data: {
     const folio = essentialData.folio || '';
     const facturaParam = `${serie}${folio ? '-' + folio : ''}`;
 
-    // Usar el código de empresa proporcionado o fallar si no existe (no asumir '01')
+    // Usar el código de empresa proporcionado o fallar si no existe
     if (!data.empresaCode) {
       throw new Error('El código de empresa es requerido para procesar la factura');
     }
     const empresaCode = data.empresaCode;
+    const erpEmpresa = getEmpresaERPFromTenant(empresaCode) || empresaCode;
 
-    // 2. Guardar XML en C:\FacturasProv usando el NOMBRE CORRECTO (Serie-Folio)
-    // Esto debe coincidir con lo que espera el SP
+    // 2. Subir XML a Azure Blob Storage
+    const xmlContent = Buffer.from(xmlBase64Data, 'base64').toString('utf-8');
+    const xmlBlobPath = buildBlobPath({
+      kind: 'factura-xml',
+      empresaCode: erpEmpresa,
+      idProveedor: data.proveedorId,
+      rfc: essentialData.rfcEmisor || 'SIN-RFC',
+      uuid: essentialData.uuid,
+    });
+    await uploadBufferToBlob(Buffer.from(xmlContent), xmlBlobPath, 'text/xml');
+    console.log(`XML subido a blob: ${xmlBlobPath}`);
+
+    // 3. Subir PDF a blob si se proporcionó
+    let pdfBlobPath: string | null = null;
+    if (pdfFile && pdfFileName) {
+      const pdfBase64Data = pdfFile.split(',')[1] || pdfFile;
+      if (pdfBase64Data) {
+        const pdfBuffer = Buffer.from(pdfBase64Data, 'base64');
+        pdfBlobPath = buildBlobPath({
+          kind: 'factura-pdf',
+          empresaCode: erpEmpresa,
+          idProveedor: data.proveedorId,
+          rfc: essentialData.rfcEmisor || 'SIN-RFC',
+          uuid: essentialData.uuid,
+        });
+        await uploadBufferToBlob(pdfBuffer, pdfBlobPath, 'application/pdf');
+        console.log(`PDF subido a blob: ${pdfBlobPath}`);
+      }
+    }
+
+    // 4. Guardar XML en C:\FacturasProv para compatibilidad con spGeneraRemisionCompra
     const safeFilename = facturaParam.replace(/[^a-zA-Z0-9-]/g, '_');
     const erpArchivo = `${safeFilename}.xml`;
     const erpXmlPath = path.join(FACTURAS_PROV_PATH, erpArchivo);
@@ -125,30 +153,14 @@ export async function uploadFactura(data: {
       if (!existsSync(FACTURAS_PROV_PATH)) {
         await mkdir(FACTURAS_PROV_PATH, { recursive: true });
       }
-      const xmlContent = Buffer.from(xmlBase64Data, 'base64').toString('utf-8');
       await writeFile(erpXmlPath, xmlContent);
       console.log(`XML guardado en: ${erpXmlPath}`);
     } catch (copyError: any) {
-      console.error('Error guardando XML:', copyError.message);
-      return {
-        success: false,
-        error: 'Error al guardar archivo XML en C:\\FacturasProv',
-      };
+      console.error('Error guardando XML en C:\\FacturasProv:', copyError.message);
+      // No fallamos — el blob ya tiene el archivo
     }
 
-    // 3. Guardar PDF si se proporcionó (opcional, usamos UUID para unicidad en carpeta uploads, pero aquí no es crítico para el SP)
-    let pdfPath: string | null = null;
-    if (pdfFile && pdfFileName) {
-      const pdfBase64Data = pdfFile.split(',')[1] || pdfFile;
-      if (pdfBase64Data) {
-        const pdfBuffer = Buffer.from(pdfBase64Data, 'base64');
-        pdfPath = path.join(FACTURAS_PROV_PATH, `${safeFilename}.pdf`); // Usamos mismo nombre base para consistencia
-        await writeFile(pdfPath, pdfBuffer);
-        console.log(`PDF guardado en: ${pdfPath}`);
-      }
-    }
-
-    // 5. Ejecutar spGeneraRemisionCompra (Solo enviar los parámetros requeridos por el nuevo SP)
+    // 5. Ejecutar spGeneraRemisionCompra
     const sp = getStoredProcedures();
     const remisionResult = await sp.generaRemisionCompra({
       empresa: empresaCode,
@@ -168,9 +180,10 @@ export async function uploadFactura(data: {
     return {
       success: true,
       data: {
-        xmlPath: erpXmlPath,
-        pdfPath,
+        xmlPath: xmlBlobPath,
+        pdfPath: pdfBlobPath,
         remision: remisionResult.data,
+        storageType: 'blob',
         message: 'Factura subida y remisión generada exitosamente',
       },
     };
@@ -204,28 +217,36 @@ export async function uploadDocumentoProveedor(data: {
   file: string;
   fileName: string;
   fileType: string;
+  empresaCode?: string;
 }) {
   try {
     const { proveedorId, tipoDocumento, file, fileName, fileType } = data;
+    const erpEmpresa = data.empresaCode
+      ? (getEmpresaERPFromTenant(data.empresaCode) || data.empresaCode)
+      : 'general';
 
-    // Subir archivo
-    const uploadResult = await uploadFile({
-      file,
-      fileName,
-      fileType,
-      folder: `proveedores/${proveedorId}/documentos`,
+    const ext = path.extname(fileName).replace(/^\./, '') || 'pdf';
+
+    // Subir a blob con ruta multi-tenant
+    const blobPath = buildBlobPath({
+      kind: 'documento-proveedor',
+      empresaCode: erpEmpresa,
+      idProveedor: proveedorId,
+      tipoDocumento,
+      extension: ext,
     });
 
-    if (!uploadResult.success) {
-      return uploadResult;
-    }
+    const base64Data = file.split(',')[1] || file;
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    const blobResult = await uploadBufferToBlob(buffer, blobPath, fileType);
 
     // Crear registro de documento
     const documentoData = {
       proveedorId,
       tipoDocumento,
-      archivoUrl: uploadResult.data!.url,
-      archivoNombre: uploadResult.data!.fileName,
+      archivoUrl: blobResult.blobPath,
+      archivoNombre: fileName.replace(/[^a-zA-Z0-9.-]/g, '_'),
       archivoTipo: fileType,
       status: 'pendiente' as const,
       uploadedAt: new Date(),
@@ -237,7 +258,9 @@ export async function uploadDocumentoProveedor(data: {
       success: true,
       data: {
         documentoId: docId,
-        url: uploadResult.data!.url,
+        url: blobResult.blobPath,
+        container: blobResult.container,
+        storageType: 'blob',
         message: 'Documento subido exitosamente',
       },
     };

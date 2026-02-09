@@ -29,7 +29,8 @@
       "Bash(move:*)",
       "Bash(npm --version:*)",
       "Bash(grep:*)",
-      "Bash(head:*)"
+      "Bash(head:*)",
+      "Bash(if not exist \"C:\\\\Users\\\\Viviana Diaz\\\\Documents\\\\Trabajo Arkitem\\\\CANTERA\\\\App web\\\\Lacantera\\\\sql\" mkdir \"C:\\\\Users\\\\Viviana Diaz\\\\Documents\\\\Trabajo Arkitem\\\\CANTERA\\\\App web\\\\Lacantera\\\\sql\")"
     ],
     "deny": [],
     "ask": []

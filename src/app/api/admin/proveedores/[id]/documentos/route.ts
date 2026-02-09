@@ -6,6 +6,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
 import { getERPConnection, getPortalConnection } from '@/lib/database/multi-tenant-connection';
+import { uploadBufferToBlob } from '@/lib/blob-storage';
+import { buildBlobPath } from '@/lib/blob-path-builder';
+import { getEmpresaERPFromTenant } from '@/lib/database/tenant-configs';
 import sql from 'mssql';
 
 /**
@@ -331,18 +334,49 @@ export async function POST(
     }
 
     const { id } = await params;
-    const body = await request.json();
-    const { tipoDocumento, file, fileName, fileType } = body;
+
+    // Soportar tanto FormData (nuevo) como JSON (legacy)
+    const contentType = request.headers.get('content-type') || '';
+    let tipoDocumento: string;
+    let buffer: Buffer;
+    let fileName: string;
+    let fileContentType: string;
+
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await request.formData();
+      const file = formData.get('file') as File;
+      tipoDocumento = formData.get('tipoDocumento') as string;
+      fileName = file?.name || 'documento';
+      fileContentType = file?.type || 'application/octet-stream';
+
+      if (!file || !tipoDocumento) {
+        return NextResponse.json(
+          { success: false, error: 'Datos incompletos: se requiere file y tipoDocumento' },
+          { status: 400 }
+        );
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+    } else {
+      const body = await request.json();
+      tipoDocumento = body.tipoDocumento;
+      fileName = body.fileName;
+      fileContentType = body.fileType || 'application/octet-stream';
+
+      if (!tipoDocumento || !body.file || !fileName) {
+        return NextResponse.json(
+          { success: false, error: 'Datos incompletos: se requiere tipoDocumento, file y fileName' },
+          { status: 400 }
+        );
+      }
+
+      const base64Data = body.file.split(',')[1] || body.file;
+      buffer = Buffer.from(base64Data, 'base64');
+    }
 
     console.log(`[ADMIN DOCUMENTOS POST] Subiendo documento para proveedor ${id}`);
     console.log(`[ADMIN DOCUMENTOS POST] Tipo: ${tipoDocumento}, Archivo: ${fileName}`);
-
-    if (!tipoDocumento || !file || !fileName) {
-      return NextResponse.json(
-        { success: false, error: 'Datos incompletos: se requiere tipoDocumento, file y fileName' },
-        { status: 400 }
-      );
-    }
 
     // Obtener empresa de la sesión
     const empresaActual = session.user.empresaActual;
@@ -369,59 +403,49 @@ export async function POST(
     }
 
     const codigoProveedor = provResult.recordset[0].Proveedor;
+    const erpEmpresa = getEmpresaERPFromTenant(empresaActual) || empresaActual;
 
-    // Convertir base64 a buffer
-    const base64Data = file.split(',')[1] || file;
-    const buffer = Buffer.from(base64Data, 'base64');
+    // Subir a Azure Blob Storage
+    const ext = fileName.split('.').pop() || 'pdf';
+    const blobPath = buildBlobPath({
+      kind: 'documento-proveedor',
+      empresaCode: erpEmpresa,
+      idProveedor: codigoProveedor,
+      tipoDocumento,
+      extension: ext,
+    });
 
-    // Crear la estructura de directorios para guardar el archivo
-    // Formato: {ERP_ANEXOS_PATH}/Proveedores/{Año}/{Mes}/{Día}/{nombreArchivo}
-    const now = new Date();
-    const year = now.getFullYear().toString();
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const day = now.getDate().toString().padStart(2, '0');
+    const blobResult = await uploadBufferToBlob(buffer, blobPath, fileContentType);
+    console.log(`[ADMIN DOCUMENTOS POST] Archivo subido a blob: ${blobResult.blobPath}`);
 
-    // Ruta base para anexos (configurar en variables de entorno)
-    const erpAnexosPath = process.env.ERP_ANEXOS_PATH || 'C:\\Anexos';
+    // Escritura local dual (opcional, para compatibilidad ERP)
+    let fullFilePath = blobResult.blobPath; // Default: usar blob path en AnexoCta
+    if (process.env.KEEP_LOCAL_ANEXOS === 'true') {
+      try {
+        const fs = await import('fs');
+        const path = await import('path');
+        const erpAnexosPath = process.env.ERP_ANEXOS_PATH || 'C:\\Anexos';
+        const now = new Date();
+        const year = now.getFullYear().toString();
+        const month = (now.getMonth() + 1).toString().padStart(2, '0');
+        const day = now.getDate().toString().padStart(2, '0');
+        const timestamp = Date.now();
+        const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const finalFileName = `${timestamp}-${sanitizedFileName}`;
+        const relativePath = `Proveedores\\${codigoProveedor}\\${year}\\${month}\\${day}`;
+        const fullDirPath = `${erpAnexosPath}\\${relativePath}`;
+        const localPath = path.join(fullDirPath, finalFileName);
 
-    // Sanitizar nombre de archivo
-    const timestamp = Date.now();
-    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const finalFileName = `${timestamp}-${sanitizedFileName}`;
-
-    // Construir ruta completa
-    const relativePath = `Proveedores\\${codigoProveedor}\\${year}\\${month}\\${day}`;
-    const fullDirPath = `${erpAnexosPath}\\${relativePath}`;
-    const fullFilePath = `${fullDirPath}\\${finalFileName}`;
-
-    // Importar fs dinámicamente para escribir el archivo
-    const fs = await import('fs');
-    const path = await import('path');
-
-    // Crear directorios si no existen
-    try {
-      fs.mkdirSync(fullDirPath, { recursive: true });
-    } catch (mkdirError) {
-      console.error('[ADMIN DOCUMENTOS POST] Error creando directorio:', mkdirError);
+        fs.mkdirSync(fullDirPath, { recursive: true });
+        fs.writeFileSync(localPath, buffer);
+        fullFilePath = localPath;
+        console.log(`[ADMIN DOCUMENTOS POST] Copia local guardada en: ${localPath}`);
+      } catch (localError: any) {
+        console.error('[ADMIN DOCUMENTOS POST] Error en escritura local (no bloqueante):', localError.message);
+      }
     }
 
-    // Guardar el archivo
-    try {
-      fs.writeFileSync(fullFilePath, buffer);
-      console.log(`[ADMIN DOCUMENTOS POST] Archivo guardado en: ${fullFilePath}`);
-    } catch (writeError: any) {
-      console.error('[ADMIN DOCUMENTOS POST] Error guardando archivo:', writeError);
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Error al guardar el archivo en el servidor',
-          details: writeError.message
-        },
-        { status: 500 }
-      );
-    }
-
-    // Insertar registro en AnexoCta
+    // Insertar registro en AnexoCta con blob path (o ruta local si KEEP_LOCAL_ANEXOS)
     const insertResult = await erpPool.request()
       .input('rama', sql.VarChar(10), 'CXP')
       .input('cuenta', sql.VarChar(20), codigoProveedor)
@@ -444,8 +468,9 @@ export async function POST(
       message: 'Documento subido correctamente',
       data: {
         idr: nuevoIDR,
-        rutaArchivo: fullFilePath,
-        nombreArchivo: finalFileName,
+        blobPath: blobResult.blobPath,
+        container: blobResult.container,
+        storageType: 'blob',
         tipoDocumento
       }
     });

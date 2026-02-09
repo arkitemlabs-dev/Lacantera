@@ -84,23 +84,16 @@ export function DocumentoUpload({
     try {
       setUploading(true);
 
-      // En producción, primero subirías el archivo a un storage (S3, Azure Blob, etc.)
-      // Por ahora, simulamos una URL
-      const archivoURL = `https://storage.example.com/documentos/${Date.now()}-${selectedFile.name}`;
+      // Subir archivo real via FormData a Azure Blob Storage
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('tipoDocumento', tipoDocumento);
+      formData.append('empresa', empresa);
+      formData.append('proveedor', proveedor);
 
-      // Llamar a la API para registrar el documento
-      const response = await fetch('/api/proveedores/documentos', {
+      const response = await fetch('/api/proveedor/documentos/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          proveedor,
-          empresa,
-          tipoDocumento,
-          nombreArchivo: selectedFile.name,
-          archivoURL,
-          archivoTipo: selectedFile.type,
-          archivoTamanio: selectedFile.size,
-        }),
+        body: formData,
       });
 
       if (!response.ok) {

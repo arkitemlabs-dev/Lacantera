@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { FileUpload } from '@/components/upload/file-upload';
-import { uploadFactura } from '@/app/actions/archivos';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -29,15 +28,6 @@ export default function SubirFacturaPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-    });
-  };
-
   const handleSubmit = async () => {
     if (!xmlFile || !ordenCompraId) {
       setResult({
@@ -47,9 +37,6 @@ export default function SubirFacturaPage() {
       return;
     }
 
-    // Obtener código de empresa de la sesión
-    // Nota: En el objeto session, la empresa seleccionada viene en 'empresaActual' (que es el tenant ID, ej: 'la-cantera-test')
-    // Esto es lo correcto para pasar al backend.
     const empresaCode = (session?.user as any)?.empresaActual;
 
     if (!empresaCode) {
@@ -64,23 +51,24 @@ export default function SubirFacturaPage() {
     setResult(null);
 
     try {
-      const xmlBase64 = await fileToBase64(xmlFile);
-      const pdfBase64 = pdfFile ? await fileToBase64(pdfFile) : '';
+      const formData = new FormData();
+      formData.append('xml', xmlFile);
+      if (pdfFile) {
+        formData.append('pdf', pdfFile);
+      }
+      formData.append('empresa_code', empresaCode);
+      formData.append('orden_compra_id', ordenCompraId);
 
-      const response = await uploadFactura({
-        proveedorId: session?.user?.id || 'proveedor-1',
-        xmlFile: xmlBase64,
-        xmlFileName: xmlFile.name,
-        pdfFile: pdfBase64,
-        pdfFileName: pdfFile?.name || '',
-        ordenCompraId: ordenCompraId,
-        observaciones: observaciones || undefined,
-        empresaCode: empresaCode, // Enviamos el tenantId (ej: 'la-cantera-test')
+      const response = await fetch('/api/proveedor/facturas/upload', {
+        method: 'POST',
+        body: formData,
       });
 
-      setResult(response);
+      const data = await response.json();
 
-      if (response.success) {
+      setResult(data);
+
+      if (data.success) {
         setTimeout(() => {
           router.push('/proveedores/facturacion');
         }, 2000);
