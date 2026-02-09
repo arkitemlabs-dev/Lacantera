@@ -27,7 +27,9 @@
       "Bash(del:*)",
       "Bash(ren:*)",
       "Bash(move:*)",
-      "Bash(npm --version:*)"
+      "Bash(npm --version:*)",
+      "Bash(grep:*)",
+      "Bash(head:*)"
     ],
     "deny": [],
     "ask": []

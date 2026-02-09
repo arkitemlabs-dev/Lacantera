@@ -18,11 +18,11 @@ async function testCrearProveedorSinDatos() {
         },
     };
 
-    console.log('🔌 Conectando...\n');
+    console.log(' Conectando...\n');
 
     try {
         const pool = await sql.connect(config);
-        console.log('✅ Conectado\n');
+        console.log(' Conectado\n');
 
         console.log('='.repeat(80));
         console.log('TEST: Crear proveedor (operación A) SIN RFC, Clave ni Nombre');
@@ -32,7 +32,7 @@ async function testCrearProveedorSinDatos() {
         console.log('2. Retornar el mismo usuario pero con una clave diferente\n');
 
         // Ejecutar SP con operación 'A' (Alta) sin datos
-        console.log('📤 Ejecutando SP con operación A...');
+        console.log(' Ejecutando SP con operación A...');
         console.log('Parámetros enviados:');
 
         const params = {
@@ -82,17 +82,17 @@ async function testCrearProveedorSinDatos() {
             }
         }
 
-        console.log('\n⏳ Ejecutando stored procedure...\n');
+        console.log('\n Ejecutando stored procedure...\n');
         const result = await request.execute('spDatosProveedor');
 
         console.log('='.repeat(80));
-        console.log('📥 RESULTADO DEL SP:');
+        console.log(' RESULTADO DEL SP:');
         console.log('='.repeat(80));
         console.log('returnValue:', result.returnValue);
         console.log('rowsAffected:', result.rowsAffected);
         console.log('recordsets.length:', result.recordsets.length);
 
-        console.log('\n📋 Recordsets:');
+        console.log('\n Recordsets:');
         result.recordsets.forEach((recordset, index) => {
             console.log(`\nRecordset ${index}:`);
             console.log('Rows:', recordset.length);
@@ -114,7 +114,7 @@ async function testCrearProveedorSinDatos() {
                 // Buscar campos que puedan contener la clave
                 if (row.Proveedor || row.CveProv || row.Clave || row.Codigo) {
                     claveGenerada = row.Proveedor || row.CveProv || row.Clave || row.Codigo;
-                    console.log('✅ Clave de proveedor generada:', claveGenerada);
+                    console.log(' Clave de proveedor generada:', claveGenerada);
                     console.log('Datos completos del registro:', JSON.stringify(row, null, 2));
                     break;
                 }
@@ -123,7 +123,7 @@ async function testCrearProveedorSinDatos() {
         }
 
         if (!claveGenerada) {
-            console.log('⚠️  No se encontró una clave de proveedor en la respuesta');
+            console.log('  No se encontró una clave de proveedor en la respuesta');
             console.log('El SP puede haber retornado un mensaje o error');
         }
 
@@ -139,17 +139,17 @@ async function testCrearProveedorSinDatos() {
                 .execute('spDatosProveedor');
 
             if (verificacion.recordset && verificacion.recordset.length > 0) {
-                console.log('✅ Proveedor encontrado:');
+                console.log('Proveedor encontrado:');
                 console.log(JSON.stringify(verificacion.recordset[0], null, 2));
             } else {
-                console.log('❌ No se encontró el proveedor con clave:', claveGenerada);
+                console.log(' No se encontró el proveedor con clave:', claveGenerada);
             }
         }
 
         await pool.close();
 
     } catch (error) {
-        console.error('\n❌ Error:', error.message);
+        console.error('\n Error:', error.message);
         console.error('\nDetalles completos:');
         console.error(error);
     }
