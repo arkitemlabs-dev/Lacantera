@@ -87,15 +87,23 @@ export async function GET(
       );
     }
 
-    // Si la ruta empieza con 'empresa/' es un blob path — generar SAS URL
+    // Detectar si es un blob path o una URL de blob
+    let blobPath: string | null = null;
     if (rutaArchivo.startsWith('empresa/')) {
-      const downloadUrl = generateReadSasUrl(rutaArchivo);
+      blobPath = rutaArchivo;
+    } else if (rutaArchivo.includes('.blob.core.windows.net/')) {
+      const match = rutaArchivo.match(/portal-proveedores\/(empresa\/[^?]+)/);
+      if (match) blobPath = match[1];
+    }
+
+    if (blobPath) {
+      const downloadUrl = generateReadSasUrl(blobPath);
       return NextResponse.json({
         success: true,
         data: {
           downloadUrl,
           isBlob: true,
-          nombreArchivo: anexo.NombreDocumento || path.basename(rutaArchivo),
+          nombreArchivo: anexo.NombreDocumento || path.basename(blobPath),
         },
       });
     }

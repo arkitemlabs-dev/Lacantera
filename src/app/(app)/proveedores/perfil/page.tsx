@@ -743,14 +743,18 @@ export default function PerfilProveedorPage() {
           alert(result.error || 'Error al subir el documento');
         }
       } else {
-        // Vista de proveedor: usar la acción original
-        const result = await uploadDocumentoProveedor({
-          proveedorId,
-          tipoDocumento: selectedDocTipo,
-          file: base64,
-          fileName: selectedFile.name,
-          fileType: selectedFile.type,
+        // Vista de proveedor: usar endpoint API de documentos
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        formData.append('tipoDocumento', selectedDocTipo);
+        if (selectedDocIdr) formData.append('replaceIdr', selectedDocIdr.toString());
+
+        const response = await fetch('/api/proveedor/documentos/upload', {
+          method: 'POST',
+          body: formData,
         });
+
+        const result = await response.json();
 
         if (result.success) {
           await cargarDocumentos(proveedorId);
@@ -758,7 +762,7 @@ export default function PerfilProveedorPage() {
           setSelectedFile(null);
           setSelectedDocTipo(null);
         } else {
-          alert(result.error);
+          alert(result.error || 'Error al subir el documento');
         }
       }
     } catch (error: any) {

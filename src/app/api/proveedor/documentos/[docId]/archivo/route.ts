@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
-import { getERPConnection } from '@/lib/database/multi-tenant-connection';
+import { getERPConnection, getPortalConnection } from '@/lib/database/multi-tenant-connection';
 import { generateReadSasUrl } from '@/lib/blob-storage';
 import sql from 'mssql';
 import fs from 'fs';
@@ -30,11 +30,9 @@ export async function GET(
     }
 
     const { docId } = await params;
-    const codigoProveedor = session.user.proveedor;
+    const portalProveedor = session.user.proveedor;
 
-    console.log(`[PROVEEDOR DOCUMENTO ARCHIVO] Proveedor: ${codigoProveedor}, Documento IDR: ${docId}`);
-
-    if (!codigoProveedor) {
+    if (!portalProveedor) {
       return NextResponse.json(
         { success: false, error: 'No se encontró código de proveedor en la sesión' },
         { status: 400 }
@@ -49,6 +47,23 @@ export async function GET(
         { status: 400 }
       );
     }
+
+    // Obtener código ERP del proveedor via mapping
+    const portalPool = await getPortalConnection();
+    const mappingResult = await portalPool.request()
+      .input('userId', sql.NVarChar(50), session.user.id)
+      .input('empresa', sql.VarChar(50), empresaActual)
+      .query(`
+        SELECT erp_proveedor_code
+        FROM portal_proveedor_mapping
+        WHERE portal_user_id = @userId AND empresa_code = @empresa AND activo = 1
+      `);
+
+    const codigoProveedor = mappingResult.recordset.length > 0
+      ? mappingResult.recordset[0].erp_proveedor_code
+      : portalProveedor;
+
+    console.log(`[PROVEEDOR DOCUMENTO ARCHIVO] Portal: ${portalProveedor}, ERP: ${codigoProveedor}, Documento IDR: ${docId}`);
 
     // Conectar al ERP usando la empresa de la sesión
     const erpPool = await getERPConnection(empresaActual);
@@ -90,15 +105,24 @@ export async function GET(
       );
     }
 
-    // Si la ruta empieza con 'empresa/' es un blob path — generar SAS URL
+    // Detectar si es un blob path o una URL de blob
+    let blobPath: string | null = null;
     if (rutaArchivo.startsWith('empresa/')) {
-      const downloadUrl = generateReadSasUrl(rutaArchivo);
+      blobPath = rutaArchivo;
+    } else if (rutaArchivo.includes('.blob.core.windows.net/')) {
+      // Extraer blob path de una URL completa: .../<container>/empresa/... → empresa/...
+      const match = rutaArchivo.match(/portal-proveedores\/(empresa\/[^?]+)/);
+      if (match) blobPath = match[1];
+    }
+
+    if (blobPath) {
+      const downloadUrl = generateReadSasUrl(blobPath);
       return NextResponse.json({
         success: true,
         data: {
           downloadUrl,
           isBlob: true,
-          nombreArchivo: anexo.NombreDocumento || path.basename(rutaArchivo),
+          nombreArchivo: anexo.NombreDocumento || path.basename(blobPath),
         },
       });
     }

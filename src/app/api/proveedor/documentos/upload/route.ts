@@ -34,7 +34,8 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File;
     const tipoDocumento = formData.get('tipoDocumento') as string;
     const empresa = formData.get('empresa') as string;
-    const proveedor = formData.get('proveedor') as string;
+    const replaceIdrStr = formData.get('replaceIdr') as string;
+    const replaceIdr = replaceIdrStr ? parseInt(replaceIdrStr) : null;
 
     if (!file || !tipoDocumento) {
       return NextResponse.json(
@@ -63,8 +64,22 @@ export async function POST(request: NextRequest) {
     const empresaActual = empresa || session.user.empresaActual;
     const erpEmpresa = getEmpresaERPFromTenant(empresaActual) || empresaActual || 'general';
 
-    // Obtener código de proveedor
-    const proveedorCode = proveedor || session.user.proveedor || session.user.id;
+    // Obtener código ERP del proveedor via mapping
+    const portalPool = await getPortalConnection();
+    const mappingResult = await portalPool.request()
+      .input('userId', sql.NVarChar(50), session.user.id)
+      .input('empresa', sql.VarChar(50), empresaActual)
+      .query(`
+        SELECT erp_proveedor_code
+        FROM portal_proveedor_mapping
+        WHERE portal_user_id = @userId AND empresa_code = @empresa AND activo = 1
+      `);
+
+    const proveedorCode = mappingResult.recordset.length > 0
+      ? mappingResult.recordset[0].erp_proveedor_code
+      : (session.user.proveedor || session.user.id);
+
+    console.log(`[DOCUMENTO UPLOAD] Portal: ${session.user.proveedor}, ERP: ${proveedorCode}`);
 
     // Construir ruta blob
     const ext = path.extname(file.name).replace(/^\./, '') || 'pdf';
@@ -83,27 +98,62 @@ export async function POST(request: NextRequest) {
 
     console.log(`[DOCUMENTO UPLOAD] Subido a blob: ${blobResult.blobPath}`);
 
-    // Registrar en AnexoCta (ERP) si hay empresa
-    let nuevoIDR: number | null = null;
+    // Registrar/actualizar en AnexoCta (ERP) si hay empresa
+    let finalIDR: number | null = null;
     if (empresaActual) {
       try {
         const erpPool = await getERPConnection(empresaActual);
-        const insertResult = await erpPool.request()
-          .input('rama', sql.VarChar(10), 'CXP')
-          .input('cuenta', sql.VarChar(20), proveedorCode)
-          .input('nombre', sql.VarChar(255), tipoDocumento)
-          .input('direccion', sql.VarChar(500), blobResult.blobPath)
-          .input('documento', sql.VarChar(50), tipoDocumento)
-          .input('usuario', sql.VarChar(10), (session.user.name || session.user.email || 'PortalProv').substring(0, 10))
-          .query(`
-            INSERT INTO AnexoCta (Rama, Cuenta, Nombre, Direccion, Documento, Alta, Usuario, Autorizado, Rechazado)
-            OUTPUT INSERTED.IDR
-            VALUES (@rama, @cuenta, @nombre, @direccion, @documento, GETDATE(), @usuario, 0, 0)
-          `);
-        nuevoIDR = insertResult.recordset[0]?.IDR;
-        console.log(`[DOCUMENTO UPLOAD] Insertado en AnexoCta con IDR: ${nuevoIDR}`);
+
+        if (replaceIdr) {
+          // Reemplazo: borrar blob anterior y actualizar registro
+          const oldRecord = await erpPool.request()
+            .input('idr', sql.Int, replaceIdr)
+            .query(`SELECT Direccion FROM AnexoCta WHERE IDR = @idr`);
+
+          if (oldRecord.recordset.length > 0) {
+            const oldPath = oldRecord.recordset[0].Direccion;
+            if (oldPath && oldPath.startsWith('empresa/')) {
+              try {
+                const { deleteBlob } = await import('@/lib/blob-storage');
+                await deleteBlob(oldPath);
+                console.log(`[DOCUMENTO UPLOAD] Blob anterior eliminado: ${oldPath}`);
+              } catch (delError: any) {
+                console.error('[DOCUMENTO UPLOAD] Error eliminando blob anterior:', delError.message);
+              }
+            }
+          }
+
+          await erpPool.request()
+            .input('idr', sql.Int, replaceIdr)
+            .input('direccion', sql.VarChar(255), blobResult.blobPath)
+            .input('usuario', sql.VarChar(10), (session.user.name || session.user.email || 'PortalProv').substring(0, 10))
+            .query(`
+              UPDATE AnexoCta
+              SET Direccion = @direccion, UltimoCambio = GETDATE(), Usuario = @usuario, Autorizado = 0, Rechazado = 0
+              WHERE IDR = @idr
+            `);
+
+          finalIDR = replaceIdr;
+          console.log(`[DOCUMENTO UPLOAD] Documento reemplazado IDR: ${finalIDR}`);
+        } else {
+          // Nuevo registro
+          const insertResult = await erpPool.request()
+            .input('rama', sql.VarChar(5), 'CXP')
+            .input('cuenta', sql.VarChar(20), proveedorCode)
+            .input('nombre', sql.VarChar(255), tipoDocumento)
+            .input('direccion', sql.VarChar(255), blobResult.blobPath)
+            .input('documento', sql.VarChar(50), tipoDocumento)
+            .input('usuario', sql.VarChar(10), (session.user.name || session.user.email || 'PortalProv').substring(0, 10))
+            .query(`
+              INSERT INTO AnexoCta (Rama, Cuenta, Nombre, Direccion, Documento, Alta, Usuario, Autorizado, Rechazado)
+              OUTPUT INSERTED.IDR
+              VALUES (@rama, @cuenta, @nombre, @direccion, @documento, GETDATE(), @usuario, 0, 0)
+            `);
+          finalIDR = insertResult.recordset[0]?.IDR;
+          console.log(`[DOCUMENTO UPLOAD] Insertado en AnexoCta con IDR: ${finalIDR}`);
+        }
       } catch (erpError: any) {
-        console.error('[DOCUMENTO UPLOAD] Error insertando en AnexoCta:', erpError.message);
+        console.error('[DOCUMENTO UPLOAD] Error en AnexoCta:', erpError.message);
       }
     }
 
@@ -120,7 +170,7 @@ export async function POST(request: NextRequest) {
         .input('tamano', sql.BigInt, file.size)
         .input('tipoArchivo', sql.VarChar(50), 'documento-proveedor')
         .input('entidadTipo', sql.VarChar(50), 'documento')
-        .input('entidadId', sql.VarChar(100), nuevoIDR ? nuevoIDR.toString() : null)
+        .input('entidadId', sql.VarChar(100), finalIDR ? finalIDR.toString() : null)
         .input('nombreOriginal', sql.NVarChar(255), file.name)
         .input('createdBy', sql.NVarChar(100), session.user.email || session.user.id)
         .query(`
@@ -143,7 +193,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        documentoId: nuevoIDR,
+        documentoId: finalIDR,
         blobPath: blobResult.blobPath,
         container: blobResult.container,
         storageType: 'blob',
