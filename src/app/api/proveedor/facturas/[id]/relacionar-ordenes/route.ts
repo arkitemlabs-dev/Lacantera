@@ -58,16 +58,16 @@ export async function POST(
       .input('userId', sql.NVarChar(50), userId)
       .query(`
         SELECT
-          id,
-          portal_user_id,
-          empresa_code,
-          uuid,
-          total,
-          estatus,
-          ordenes_relacionadas
-        FROM proveedor_facturas
-        WHERE id = @facturaId
-          AND portal_user_id = @userId
+          ID AS id,
+          SubidoPor AS portal_user_id,
+          Empresa AS empresa_code,
+          UUID AS uuid,
+          Total AS total,
+          Estatus AS estatus,
+          OrdenesRelacionadas AS ordenes_relacionadas
+        FROM ProvFacturas
+        WHERE ID = @facturaId
+          AND SubidoPor = @userId
       `);
 
     if (!facturaResult.recordset || facturaResult.recordset.length === 0) {
@@ -212,11 +212,11 @@ export async function POST(
       .input('facturaId', sql.UniqueIdentifier, facturaId)
       .input('ordenesJSON', sql.NVarChar(sql.MAX), ordenesJSON)
       .query(`
-        UPDATE proveedor_facturas
+        UPDATE ProvFacturas
         SET
-          ordenes_relacionadas = @ordenesJSON,
-          updated_at = GETDATE()
-        WHERE id = @facturaId
+          OrdenesRelacionadas = @ordenesJSON,
+          UpdatedAt = GETDATE()
+        WHERE ID = @facturaId
       `);
 
     console.log('✅ Campo ordenes_relacionadas actualizado');

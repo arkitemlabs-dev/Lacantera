@@ -43,11 +43,11 @@ export async function GET(
       .input('id', sql.UniqueIdentifier, id)
       .query(`
         SELECT
-          xml_ruta, pdf_ruta,
-          xml_blob_container, pdf_blob_container,
-          storage_type, xml_contenido, uuid
-        FROM proveedor_facturas
-        WHERE id = @id
+          XMLURL AS xml_ruta, PDFURL AS pdf_ruta,
+          XMLBlobContainer AS xml_blob_container, PDFBlobContainer AS pdf_blob_container,
+          StorageType AS storage_type, XMLContenido AS xml_contenido, UUID AS uuid
+        FROM ProvFacturas
+        WHERE ID = @id
       `);
 
     if (!result.recordset || result.recordset.length === 0) {

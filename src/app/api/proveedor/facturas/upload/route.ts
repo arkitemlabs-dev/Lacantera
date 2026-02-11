@@ -148,9 +148,9 @@ export async function POST(request: NextRequest) {
     const duplicadoResult = await portalPool.request()
       .input('uuid', sql.VarChar(36), cfdiData.uuid)
       .query(`
-        SELECT id
-        FROM proveedor_facturas
-        WHERE uuid = @uuid
+        SELECT ID
+        FROM ProvFacturas
+        WHERE UUID = @uuid
       `);
 
     if (duplicadoResult.recordset && duplicadoResult.recordset.length > 0) {
@@ -233,7 +233,6 @@ export async function POST(request: NextRequest) {
     console.log(`✅ XML subido a blob: ${xmlBlobResult.blobPath}`);
 
     let pdfBlobPath: string | null = null;
-    let pdfTamano: number | null = null;
     let pdfBlobContainer: string | null = null;
     if (pdfFile) {
       const pdfArrayBuffer = await pdfFile.arrayBuffer();
@@ -249,7 +248,6 @@ export async function POST(request: NextRequest) {
         pdfBlobPath,
         'application/pdf'
       );
-      pdfTamano = pdfArrayBuffer.byteLength;
       pdfBlobContainer = pdfBlobResult.container;
       console.log(`✅ PDF subido a blob: ${pdfBlobResult.blobPath}`);
     }
@@ -299,9 +297,8 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // 9. Insertar en base de datos (tabla proveedor_facturas)
+    // 9. Insertar en base de datos (tabla ProvFacturas)
     const facturaId = uuidv4();
-    const xmlTamano = xmlBuffer.byteLength;
 
     // Preparar datos de validación SAT para BD
     const satCodigoEstatus = validacionSAT?.validacionCFDI?.codigoEstatus || null;
@@ -331,8 +328,6 @@ export async function POST(request: NextRequest) {
       .input('xmlContenido', sql.NVarChar(sql.MAX), xmlString)
       .input('xmlRuta', sql.VarChar(500), xmlBlobPath)
       .input('pdfRuta', sql.VarChar(500), pdfBlobPath)
-      .input('xmlTamano', sql.Int, xmlTamano)
-      .input('pdfTamano', sql.Int, pdfTamano)
       .input('xmlBlobContainer', sql.VarChar(100), xmlBlobResult.container)
       .input('pdfBlobContainer', sql.VarChar(100), pdfBlobContainer)
       .input('storageType', sql.VarChar(20), 'blob')
@@ -345,21 +340,20 @@ export async function POST(request: NextRequest) {
       .input('satFechaConsulta', sql.DateTime2, satFechaConsulta)
       .input('satMensaje', sql.NVarChar(500), satMensaje)
       .query(`
-        INSERT INTO proveedor_facturas (
-          id, portal_user_id, empresa_code,
-          uuid, serie, folio,
-          fecha_emision, fecha_timbrado,
-          rfc_emisor, nombre_emisor,
-          rfc_receptor, nombre_receptor,
-          subtotal, descuento, impuestos, total,
-          moneda, tipo_cambio,
-          xml_contenido, xml_ruta, pdf_ruta,
-          xml_tamano, pdf_tamano,
-          xml_blob_container, pdf_blob_container, storage_type,
-          sat_validado, sat_estado, sat_codigo_estatus,
-          sat_es_cancelable, sat_validacion_efos,
-          sat_fecha_consulta, sat_mensaje,
-          estatus, created_at, updated_at
+        INSERT INTO ProvFacturas (
+          ID, SubidoPor, Empresa,
+          UUID, Serie, Folio,
+          Fecha, FechaTimbrado,
+          RFCEmisor, NombreEmisor,
+          RFCReceptor, NombreReceptor,
+          Subtotal, Descuento, IVA, Total,
+          Moneda, TipoCambio,
+          XMLContenido, XMLURL, PDFURL,
+          XMLBlobContainer, PDFBlobContainer, StorageType,
+          ValidadaSAT, EstatusSAT, SATCodigoEstatus,
+          SATEsCancelable, SATValidacionEFOS,
+          FechaValidacionSAT, SATMensaje,
+          Estatus, CreatedAt, UpdatedAt
         ) VALUES (
           @id, @portalUserId, @empresaCode,
           @uuid, @serie, @folio,
@@ -369,7 +363,6 @@ export async function POST(request: NextRequest) {
           @subtotal, @descuento, @impuestos, @total,
           @moneda, @tipoCambio,
           @xmlContenido, @xmlRuta, @pdfRuta,
-          @xmlTamano, @pdfTamano,
           @xmlBlobContainer, @pdfBlobContainer, @storageType,
           @satValidado, @satEstado, @satCodigoEstatus,
           @satEsCancelable, @satValidacionEFOS,
@@ -428,8 +421,6 @@ export async function POST(request: NextRequest) {
       archivos: {
         xml: xmlBlobPath,
         pdf: pdfBlobPath,
-        xmlTamano,
-        pdfTamano,
         storageType: 'blob'
       },
       validacion: {

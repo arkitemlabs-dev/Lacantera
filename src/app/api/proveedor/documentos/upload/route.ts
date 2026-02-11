@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
           .input('nombre', sql.VarChar(255), tipoDocumento)
           .input('direccion', sql.VarChar(500), blobResult.blobPath)
           .input('documento', sql.VarChar(50), tipoDocumento)
-          .input('usuario', sql.VarChar(50), session.user.name || session.user.email || 'Portal Proveedor')
+          .input('usuario', sql.VarChar(10), (session.user.name || session.user.email || 'PortalProv').substring(0, 10))
           .query(`
             INSERT INTO AnexoCta (Rama, Cuenta, Nombre, Direccion, Documento, Alta, Usuario, Autorizado, Rechazado)
             OUTPUT INSERTED.IDR

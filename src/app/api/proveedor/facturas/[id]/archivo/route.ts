@@ -43,11 +43,11 @@ export async function GET(
       .input('portalUserId', sql.NVarChar(50), session.user.id)
       .query(`
         SELECT
-          xml_ruta, pdf_ruta,
-          xml_blob_container, pdf_blob_container,
-          storage_type, xml_contenido, uuid
-        FROM proveedor_facturas
-        WHERE id = @id AND portal_user_id = @portalUserId
+          XMLURL AS xml_ruta, PDFURL AS pdf_ruta,
+          XMLBlobContainer AS xml_blob_container, PDFBlobContainer AS pdf_blob_container,
+          StorageType AS storage_type, XMLContenido AS xml_contenido, UUID AS uuid
+        FROM ProvFacturas
+        WHERE ID = @id AND SubidoPor = @portalUserId
       `);
 
     if (!result.recordset || result.recordset.length === 0) {

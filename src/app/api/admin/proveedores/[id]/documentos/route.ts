@@ -452,7 +452,7 @@ export async function POST(
       .input('nombre', sql.VarChar(255), tipoDocumento)
       .input('direccion', sql.VarChar(500), fullFilePath)
       .input('documento', sql.VarChar(50), tipoDocumento)
-      .input('usuario', sql.VarChar(50), session.user.name || session.user.email || 'Admin Portal')
+      .input('usuario', sql.VarChar(10), (session.user.name || session.user.email || 'AdminPort').substring(0, 10))
       .query(`
         INSERT INTO AnexoCta (Rama, Cuenta, Nombre, Direccion, Documento, Alta, Usuario, Autorizado, Rechazado)
         OUTPUT INSERTED.IDR
