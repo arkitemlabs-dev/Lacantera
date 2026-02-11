@@ -143,7 +143,7 @@ export class CFDIParser {
 
       // Extraer datos básicos del comprobante
       const cfdiData: CFDIData = {
-        version: comprobante['@_Version'] || comprobante['@_version'],
+        version: String(comprobante['@_Version'] || comprobante['@_version'] || ''),
         serie: comprobante['@_Serie'] || comprobante['@_serie'],
         folio: comprobante['@_Folio'] || comprobante['@_folio'],
         fecha: comprobante['@_Fecha'] || comprobante['@_fecha'],
@@ -352,7 +352,8 @@ export class CFDIParser {
       errors.push('Total debe ser mayor a 0');
     }
 
-    if (!cfdiData.version || !['3.3', '4.0'].includes(cfdiData.version)) {
+    const versionesValidas = ['3.3', '4.0', '4', '3'];
+    if (!cfdiData.version || !versionesValidas.includes(cfdiData.version)) {
       errors.push('Versión de CFDI debe ser 3.3 o 4.0');
     }
 
