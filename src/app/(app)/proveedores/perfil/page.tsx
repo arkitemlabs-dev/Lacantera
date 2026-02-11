@@ -228,6 +228,7 @@ export default function PerfilProveedorPage() {
   const [loading, setLoading] = useState(true);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedDocTipo, setSelectedDocTipo] = useState<TipoDocumento | null>(null);
+  const [selectedDocIdr, setSelectedDocIdr] = useState<number | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -693,8 +694,9 @@ export default function PerfilProveedorPage() {
     }));
   };
 
-  const openUploadDialog = (tipo: TipoDocumento) => {
+  const openUploadDialog = (tipo: TipoDocumento, idr?: number) => {
     setSelectedDocTipo(tipo);
+    setSelectedDocIdr(idr || null);
     setSelectedFile(null);
     setUploadDialogOpen(true);
   };
@@ -726,6 +728,7 @@ export default function PerfilProveedorPage() {
             file: base64,
             fileName: selectedFile.name,
             fileType: selectedFile.type,
+            replaceIdr: selectedDocIdr || undefined,
           })
         });
 
@@ -837,7 +840,11 @@ export default function PerfilProveedorPage() {
         throw new Error(result.error || result.details || 'Error al obtener el documento');
       }
 
-      if (result.data?.contenido) {
+      if (result.data?.isBlob && result.data?.downloadUrl) {
+        // Archivo en Azure Blob — abrir URL SAS directamente
+        window.open(result.data.downloadUrl, '_blank');
+        setViewDialogOpen(false);
+      } else if (result.data?.contenido) {
         setDocumentoParaVer({
           ...docERP,
           contenidoBase64: result.data.contenido,
@@ -879,8 +886,17 @@ export default function PerfilProveedorPage() {
 
       const result = await response.json();
 
-      if (result.success && result.data?.contenido) {
-        // Crear blob y descargar
+      if (result.success && result.data?.isBlob && result.data?.downloadUrl) {
+        // Archivo en Azure Blob — descargar via URL SAS
+        const a = document.createElement('a');
+        a.href = result.data.downloadUrl;
+        a.download = docERP.nombreArchivo || result.data.nombreArchivo || `${docERP.documentoRequerido}.pdf`;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else if (result.success && result.data?.contenido) {
+        // Archivo local — descargar desde base64
         const byteCharacters = atob(result.data.contenido);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -889,7 +905,6 @@ export default function PerfilProveedorPage() {
         const byteArray = new Uint8Array(byteNumbers);
         const blob = new Blob([byteArray], { type: result.data.tipoMime || 'application/pdf' });
 
-        // Crear enlace de descarga
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -1280,7 +1295,7 @@ export default function PerfilProveedorPage() {
                                       <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => openUploadDialog(docERP.documentoRequerido as TipoDocumento)}
+                                        onClick={() => openUploadDialog(docERP.documentoRequerido as TipoDocumento, docERP.idr)}
                                       >
                                         <Upload className="mr-2 h-4 w-4" />
                                         Reemplazar
@@ -1308,6 +1323,15 @@ export default function PerfilProveedorPage() {
 
                                     {isAdminView && (
                                       <>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => openUploadDialog(docERP.documentoRequerido as TipoDocumento, docERP.idr)}
+                                        >
+                                          <Upload className="mr-2 h-4 w-4" />
+                                          Reemplazar
+                                        </Button>
+
                                         {!docERP.autorizado && (
                                           <Button
                                             variant="ghost"

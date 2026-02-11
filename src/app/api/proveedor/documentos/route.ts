@@ -139,32 +139,29 @@ export async function GET(request: NextRequest) {
           return true;
         }
 
-        // Matching parcial (el nombre del anexo contiene palabras clave del documento requerido)
-        if (nombreAnexo.includes(documentoRequerido) || documentoRequerido.includes(nombreAnexo)) {
-          return true;
-        }
-
-        // Matching por palabras clave específicas
-        const keywords: { [key: string]: string[] } = {
-          'acta constitutiva': ['acta', 'constitutiva'],
-          'poder del representante legal': ['poder', 'representante', 'legal'],
-          'ine del representante legal': ['ine', 'identificacion'],
-          'comprobante de domicilio fiscal': ['comprobante', 'domicilio'],
-          'opinión de cumplimiento obligaciones sat': ['opinion', 'cumplimiento', 'sat'],
-          'pago del imss': ['pago', 'imss'],
-          'constancia de situación fiscal actual': ['constancia', 'fiscal'],
-          'estados financieros': ['estados', 'financieros'],
-          'acuse de declaración anual': ['acuse', 'declaracion'],
-          'caratula estado de cuenta bancario': ['caratula', 'cuenta', 'bancaria', 'bancario', 'estado de cuenta'],
-          'fotografia a color exterior del domicilio fiscal': ['fotografia', 'foto', 'exterior', 'domicilio'],
-          'referencias comerciales': ['referencias', 'comerciales'],
-          'solicitud de alta proveedor': ['solicitud', 'alta'],
-          'ficha de proveedores': ['ficha', 'proveedores']
+        // Matching por frases clave (todas las palabras del grupo deben estar presentes)
+        const matchingRules: { [key: string]: string[][] } = {
+          'acta constitutiva': [['acta', 'constitutiva']],
+          'poder del representante legal': [['poder', 'representante']],
+          'ine del representante legal': [['ine', 'representante'], ['ine', 'legal']],
+          'comprobante de domicilio fiscal': [['comprobante', 'domicilio']],
+          'opinión de cumplimiento obligaciones sat': [['opinion', 'cumplimiento'], ['cumplimiento', 'sat']],
+          'pago del imss': [['pago', 'imss'], ['imss']],
+          'constancia de situación fiscal actual': [['constancia', 'fiscal'], ['situacion', 'fiscal']],
+          'estados financieros': [['estados', 'financieros']],
+          'acuse de declaración anual': [['acuse', 'declaracion']],
+          'caratula estado de cuenta bancario': [['caratula', 'cuenta'], ['estado de cuenta', 'bancari']],
+          'fotografia a color exterior del domicilio fiscal': [['fotografia', 'exterior'], ['foto', 'domicilio']],
+          'referencias comerciales': [['referencias', 'comerciales']],
+          'solicitud de alta proveedor': [['solicitud', 'alta']],
+          'ficha de proveedores': [['ficha', 'proveedores']]
         };
 
-        const keywordList = keywords[documentoRequerido];
-        if (keywordList) {
-          return keywordList.some(keyword => nombreAnexo.includes(keyword));
+        const phraseGroups = matchingRules[documentoRequerido];
+        if (phraseGroups) {
+          return phraseGroups.some(group =>
+            group.every(word => nombreAnexo.includes(word))
+          );
         }
 
         return false;

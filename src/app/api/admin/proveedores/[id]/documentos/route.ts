@@ -180,30 +180,34 @@ export async function GET(
         }
 
         // Matching por palabras clave específicas para cada documento
-        const matchingRules: { [key: string]: string[] } = {
-          'acta constitutiva': ['acta', 'constitutiva'],
-          'poder del representante legal': ['poder', 'representante', 'legal'],
-          'ine del representante legal': ['ine', 'identificacion', 'representante'],
-          'comprobante de domicilio fiscal': ['comprobante', 'domicilio', 'fiscal'],
-          'opinión de cumplimiento obligaciones sat': ['opinion', 'cumplimiento', 'sat', 'obligaciones'],
-          'pago del imss': ['pago', 'imss'],
-          'constancia de situación fiscal actual': ['constancia', 'situacion', 'fiscal'],
-          'estados financieros': ['estados', 'financieros'],
-          'acuse de declaración anual': ['acuse', 'declaracion', 'anual'],
-          'caratula estado de cuenta bancario': ['caratula', 'estado', 'cuenta', 'bancario', 'bancaria'],
-          'fotografia a color exterior del domicilio fiscal': ['fotografia', 'foto', 'exterior', 'domicilio'],
-          'referencias comerciales': ['referencias', 'comerciales'],
-          'solicitud de alta proveedor (fm-lo-19)': ['solicitud', 'alta', 'proveedor', 'fm-lo-19'],
-          'ficha de proveedores (fm-lo-18)': ['ficha', 'proveedores', 'fm-lo-18']
+        // Matching por frases clave (todas las palabras del grupo deben estar presentes)
+        const matchingRules: { [key: string]: string[][] } = {
+          'acta constitutiva': [['acta', 'constitutiva']],
+          'poder del representante legal': [['poder', 'representante']],
+          'ine del representante legal': [['ine', 'representante'], ['ine', 'legal']],
+          'comprobante de domicilio fiscal': [['comprobante', 'domicilio']],
+          'opinión de cumplimiento obligaciones sat': [['opinion', 'cumplimiento'], ['cumplimiento', 'sat']],
+          'pago del imss': [['pago', 'imss'], ['imss']],
+          'constancia de situación fiscal actual': [['constancia', 'fiscal'], ['situacion', 'fiscal']],
+          'estados financieros': [['estados', 'financieros']],
+          'acuse de declaración anual': [['acuse', 'declaracion']],
+          'caratula estado de cuenta bancario': [['caratula', 'cuenta'], ['estado de cuenta', 'bancari']],
+          'fotografia a color exterior del domicilio fiscal': [['fotografia', 'exterior'], ['foto', 'domicilio']],
+          'referencias comerciales': [['referencias', 'comerciales']],
+          'solicitud de alta proveedor (fm-lo-19)': [['solicitud', 'alta'], ['fm-lo-19']],
+          'ficha de proveedores (fm-lo-18)': [['ficha', 'proveedores'], ['fm-lo-18']]
         };
 
-        const keywords = matchingRules[documentoRequerido];
-        if (keywords) {
-          return keywords.some(keyword => nombreAnexo.includes(keyword));
+        const phraseGroups = matchingRules[documentoRequerido];
+        if (phraseGroups) {
+          // Al menos un grupo debe tener TODAS sus palabras presentes en el nombre del anexo
+          return phraseGroups.some(group =>
+            group.every(word => nombreAnexo.includes(word))
+          );
         }
 
-        // Matching genérico por inclusión
-        return nombreAnexo.includes(documentoRequerido) || documentoRequerido.includes(nombreAnexo);
+        // Matching genérico por inclusión exacta (no parcial)
+        return nombreAnexo === documentoRequerido || documentoAnexo === documentoRequerido;
       });
 
       const anexoReciente = anexos.length > 0 ? anexos[0] : null;
@@ -341,6 +345,7 @@ export async function POST(
     let buffer: Buffer;
     let fileName: string;
     let fileContentType: string;
+    let replaceIdr: number | null = null;
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData();
@@ -348,6 +353,8 @@ export async function POST(
       tipoDocumento = formData.get('tipoDocumento') as string;
       fileName = file?.name || 'documento';
       fileContentType = file?.type || 'application/octet-stream';
+      const replaceIdrStr = formData.get('replaceIdr') as string;
+      if (replaceIdrStr) replaceIdr = parseInt(replaceIdrStr);
 
       if (!file || !tipoDocumento) {
         return NextResponse.json(
@@ -361,6 +368,7 @@ export async function POST(
     } else {
       const body = await request.json();
       tipoDocumento = body.tipoDocumento;
+      if (body.replaceIdr) replaceIdr = parseInt(body.replaceIdr);
       fileName = body.fileName;
       fileContentType = body.fileType || 'application/octet-stream';
 
@@ -445,33 +453,87 @@ export async function POST(
       }
     }
 
-    // Insertar registro en AnexoCta con blob path (o ruta local si KEEP_LOCAL_ANEXOS)
-    const insertResult = await erpPool.request()
-      .input('rama', sql.VarChar(10), 'CXP')
-      .input('cuenta', sql.VarChar(20), codigoProveedor)
-      .input('nombre', sql.VarChar(255), tipoDocumento)
-      .input('direccion', sql.VarChar(500), fullFilePath)
-      .input('documento', sql.VarChar(50), tipoDocumento)
-      .input('usuario', sql.VarChar(10), (session.user.name || session.user.email || 'AdminPort').substring(0, 10))
-      .query(`
-        INSERT INTO AnexoCta (Rama, Cuenta, Nombre, Direccion, Documento, Alta, Usuario, Autorizado, Rechazado)
-        OUTPUT INSERTED.IDR
-        VALUES (@rama, @cuenta, @nombre, @direccion, @documento, GETDATE(), @usuario, 0, 0)
-      `);
+    let finalIDR: number;
 
-    const nuevoIDR = insertResult.recordset[0]?.IDR;
+    if (replaceIdr) {
+      // Reemplazo: borrar blob anterior y actualizar AnexoCta
+      const oldRecord = await erpPool.request()
+        .input('idr', sql.Int, replaceIdr)
+        .query(`SELECT Direccion FROM AnexoCta WHERE IDR = @idr`);
 
-    console.log(`[ADMIN DOCUMENTOS POST] Documento insertado con IDR: ${nuevoIDR}`);
+      if (oldRecord.recordset.length > 0) {
+        const oldPath = oldRecord.recordset[0].Direccion;
+        if (oldPath && oldPath.startsWith('empresa/')) {
+          try {
+            const { deleteBlob } = await import('@/lib/blob-storage');
+            await deleteBlob(oldPath);
+            console.log(`[ADMIN DOCUMENTOS POST] Blob anterior eliminado: ${oldPath}`);
+          } catch (delError: any) {
+            console.error('[ADMIN DOCUMENTOS POST] Error eliminando blob anterior:', delError.message);
+          }
+        }
+      }
+
+      await erpPool.request()
+        .input('idr', sql.Int, replaceIdr)
+        .input('direccion', sql.VarChar(255), fullFilePath)
+        .input('usuario', sql.VarChar(10), (session.user.name || session.user.email || 'AdminPort').substring(0, 10))
+        .query(`
+          UPDATE AnexoCta
+          SET Direccion = @direccion,
+              UltimoCambio = GETDATE(),
+              Usuario = @usuario,
+              Autorizado = 0,
+              Rechazado = 0
+          WHERE IDR = @idr
+        `);
+
+      finalIDR = replaceIdr;
+      console.log(`[ADMIN DOCUMENTOS POST] Documento reemplazado IDR: ${finalIDR}`);
+
+      // Resetear estado en portal (ProvDocumentosEstado)
+      try {
+        const portalPool = await getPortalConnection();
+        await portalPool.request()
+          .input('documentoIDR', sql.Int, replaceIdr)
+          .input('proveedorCodigo', sql.VarChar(20), codigoProveedor)
+          .query(`
+            UPDATE ProvDocumentosEstado
+            SET Estatus = 'PENDIENTE', Observaciones = 'Documento reemplazado', UpdatedAt = GETDATE()
+            WHERE DocumentoIDR = @documentoIDR AND ProveedorCodigo = @proveedorCodigo
+          `);
+      } catch (portalError: any) {
+        console.error('[ADMIN DOCUMENTOS POST] Error reseteando estado portal:', portalError.message);
+      }
+    } else {
+      // Insertar nuevo registro en AnexoCta
+      const insertResult = await erpPool.request()
+        .input('rama', sql.VarChar(5), 'CXP')
+        .input('cuenta', sql.VarChar(20), codigoProveedor)
+        .input('nombre', sql.VarChar(255), tipoDocumento)
+        .input('direccion', sql.VarChar(255), fullFilePath)
+        .input('documento', sql.VarChar(50), tipoDocumento)
+        .input('usuario', sql.VarChar(10), (session.user.name || session.user.email || 'AdminPort').substring(0, 10))
+        .query(`
+          INSERT INTO AnexoCta (Rama, Cuenta, Nombre, Direccion, Documento, Alta, Usuario, Autorizado, Rechazado)
+          OUTPUT INSERTED.IDR
+          VALUES (@rama, @cuenta, @nombre, @direccion, @documento, GETDATE(), @usuario, 0, 0)
+        `);
+
+      finalIDR = insertResult.recordset[0]?.IDR;
+      console.log(`[ADMIN DOCUMENTOS POST] Documento insertado con IDR: ${finalIDR}`);
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Documento subido correctamente',
+      message: replaceIdr ? 'Documento reemplazado correctamente' : 'Documento subido correctamente',
       data: {
-        idr: nuevoIDR,
+        idr: finalIDR,
         blobPath: blobResult.blobPath,
         container: blobResult.container,
         storageType: 'blob',
-        tipoDocumento
+        tipoDocumento,
+        replaced: !!replaceIdr,
       }
     });
 
