@@ -576,11 +576,28 @@ export class SqlServerPNetDatabase implements Database {
         WHERE u.IDUsuarioTipo = 4
       `;
 
-      console.log('[PORTAL-QUERY] Obteniendo usuarios del portal...');
+      console.log('[PORTAL-QUERY] Obteniendo usuarios del portal con extensiones...');
       const portalResult = await portalPool.request().query(portalProveedoresQuery);
       console.log(`[PORTAL-QUERY] Encontrados ${portalResult.recordset.length} usuarios proveedores en portal`);
 
       // 3. Crear mapas de proveedores registrados en el portal por múltiples criterios
+      const portalUsuariosPorRFC = new Map<string, any>();
+      try {
+        const extResult = await portalPool.request().query("SELECT IDUsuario, RFC FROM pNetUsuarioExtension");
+        const rfcMap = new Map();
+        extResult.recordset.forEach((r: any) => rfcMap.set(r.IDUsuario, r.RFC));
+
+        // Asignar RFC a cada usuario del portal
+        portalResult.recordset.forEach((u: any) => {
+          u.PortalRFC = rfcMap.get(u.IDUsuario);
+          if (u.PortalRFC) {
+            portalUsuariosPorRFC.set(String(u.PortalRFC).trim().toUpperCase(), u);
+          }
+        });
+      } catch (e: any) {
+        console.warn('[PORTAL-QUERY] No se pudieron obtener extensiones RFC:', e.message);
+      }
+
       const portalUsuariosPorCodigo = new Map<string, any>();
       const portalUsuariosPorNombre = new Map<string, any>();
 
@@ -591,6 +608,12 @@ export class SqlServerPNetDatabase implements Database {
           portalUsuariosPorCodigo.set(codigoNorm, usuario);
         }
 
+        // Mapear por RFC
+        if (usuario.PortalRFC) {
+          const rfcNorm = String(usuario.PortalRFC).trim().toUpperCase();
+          portalUsuariosPorRFC.set(rfcNorm, usuario);
+        }
+
         // Mapear por nombre
         if (usuario.UsuarioNombre) {
           const nombreNorm = String(usuario.UsuarioNombre).trim().toUpperCase();
@@ -598,9 +621,9 @@ export class SqlServerPNetDatabase implements Database {
         }
       }
 
-      console.log(`[PORTAL-MAP] Total códigos mapeados: ${portalUsuariosPorCodigo.size}, nombres: ${portalUsuariosPorNombre.size}`);
+      console.log(`[PORTAL-MAP] Mapas creados - Por Código: ${portalUsuariosPorCodigo.size}, Por RFC: ${portalUsuariosPorRFC.size}, Por Nombre: ${portalUsuariosPorNombre.size}`);
 
-      // 4. Combinar datos: ERP + Portal (cruce por código y nombre)
+      // 4. Combinar datos: ERP + Portal (cruce por código, RFC y nombre)
       let proveedores: ProveedorUser[] = erpFiltered.map((erpRow: any) => {
         let portalUsuario = null;
 
@@ -610,9 +633,15 @@ export class SqlServerPNetDatabase implements Database {
           portalUsuario = portalUsuariosPorCodigo.get(codigoERP);
         }
 
-        // 2. Si no se encontró, intentar por nombre
-        if (!portalUsuario && erpRow.ProveedorNombre) {
-          const nombreERP = String(erpRow.ProveedorNombre).trim().toUpperCase();
+        // 2. Intentar por RFC (Nueva prioridad alta según requerimiento)
+        if (!portalUsuario && (erpRow.RFC || erpRow.Rfc)) {
+          const rfcERP = String(erpRow.RFC || erpRow.Rfc).trim().toUpperCase();
+          portalUsuario = portalUsuariosPorRFC.get(rfcERP);
+        }
+
+        // 3. Si no se encontró, intentar por nombre
+        if (!portalUsuario && (erpRow.ProveedorNombre || erpRow.Nombre)) {
+          const nombreERP = String(erpRow.ProveedorNombre || erpRow.Nombre).trim().toUpperCase();
           portalUsuario = portalUsuariosPorNombre.get(nombreERP);
         }
 

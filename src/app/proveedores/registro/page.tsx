@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Eye, EyeOff, Building2 } from 'lucide-react';
+import { Eye, EyeOff, Building2, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
@@ -47,12 +47,41 @@ export default function RegistroProveedorPage() {
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isVerifyingRfc, setIsVerifyingRfc] = useState(false);
+  const [rfcVerified, setRfcVerified] = useState<boolean | null>(null);
+  const [detectedNombre, setDetectedNombre] = useState<string | null>(null);
 
   const router = useRouter();
   const { user } = useAuth();
   const { toast } = useToast();
-  const logo = PlaceHolderImages.find((img) => img.id === 'login-logo');
-  const bgImage = PlaceHolderImages.find((img) => img.id === 'login-background');
+
+  const verifyRfc = async (val: string, empCode: string) => {
+    if (val.length < 12 || !empCode) return;
+
+    setIsVerifyingRfc(true);
+    setRfcVerified(null);
+    try {
+      const resp = await fetch('/api/auth/verify-rfc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rfc: val, empresaCode: empCode }),
+      });
+      const data = await resp.json();
+      if (data.success && data.isProvider) {
+        setRfcVerified(true);
+        setDetectedNombre(data.data.nombre);
+        // Sugerir la razón social si está vacía
+        if (!razonSocial) setRazonSocial(data.data.nombre);
+      } else {
+        setRfcVerified(false);
+        setDetectedNombre(null);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsVerifyingRfc(false);
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -60,12 +89,30 @@ export default function RegistroProveedorPage() {
     }
   }, [user, router]);
 
+  // Verificar RFC cuando cambia el RFC o la Empresa
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (rfc.length >= 12 && empresaCode) {
+        verifyRfc(rfc, empresaCode);
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [rfc, empresaCode]);
+
+  const logo = PlaceHolderImages.find((img) => img.id === 'login-logo');
+  const bgImage = PlaceHolderImages.find((img) => img.id === 'login-background');
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     if (!empresaCode) {
       setError("Por favor, seleccione una empresa.");
+      return;
+    }
+
+    if (!rfcVerified) {
+      setError("El RFC no ha sido validado en el sistema de la empresa seleccionada.");
       return;
     }
 
@@ -80,6 +127,7 @@ export default function RegistroProveedorPage() {
     }
 
     setLoading(true);
+    // ... rest of the function continues correctly
 
     try {
       const response = await fetch('/api/auth/register', {
@@ -211,16 +259,40 @@ export default function RegistroProveedorPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label htmlFor="rfc">RFC</Label>
-                <Input
-                  id="rfc"
-                  type="text"
-                  placeholder="SUE010101ABC"
-                  required
-                  value={rfc}
-                      onChange={(e) => setRfc(e.target.value)}
-                      disabled={loading}
-                      maxLength={13}
-                    />
+                <div className="relative">
+                  <Input
+                    id="rfc"
+                    type="text"
+                    placeholder="SUE010101ABC"
+                    required
+                    value={rfc}
+                    onChange={(e) => setRfc(e.target.value.toUpperCase())}
+                    disabled={loading}
+                    maxLength={13}
+                    className={
+                      rfcVerified === true
+                        ? 'border-green-500 pr-10'
+                        : rfcVerified === false
+                          ? 'border-red-500 pr-10'
+                          : 'pr-10'
+                    }
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {isVerifyingRfc && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                    {rfcVerified === true && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                    {rfcVerified === false && <XCircle className="h-4 w-4 text-red-500" />}
+                  </div>
+                </div>
+                {rfcVerified === true && detectedNombre && (
+                  <p className="text-[10px] text-green-600 font-medium">
+                    ✓ Proveedor identificado: {detectedNombre}
+                  </p>
+                )}
+                {rfcVerified === false && rfc.length >= 12 && (
+                  <p className="text-[10px] text-red-600 font-medium">
+                    ✗ RFC no encontrado como proveedor en esta empresa.
+                  </p>
+                )}
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="contactName">Nombre del Contacto</Label>

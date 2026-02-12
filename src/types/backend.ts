@@ -304,6 +304,7 @@ export interface Conversacion {
     [uid: string]: number;
   };
   asunto: string;
+  empresaId?: string;
   createdAt: Timestamp | Date;
   updatedAt: Timestamp | Date;
 }

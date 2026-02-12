@@ -138,12 +138,31 @@ export async function getProveedoresConDatosERP(
 
     // 3. Crear mapas de usuarios del portal por diferentes criterios
     const portalMapByCodigo = new Map();
+    const portalMapByRFC = new Map();
     const portalMapByNombre = new Map();
+
+    // NEW: Obtener RFCs de extensiones por separado para evitar errores de JOIN
+    try {
+      const extResult = await hybridDB.queryPortal("SELECT IDUsuario, RFC FROM pNetUsuarioExtension");
+      const rfcMap = new Map();
+      extResult.recordset.forEach((r: any) => rfcMap.set(r.IDUsuario, r.RFC));
+
+      // Asignar RFC a cada usuario del portal
+      portalResult.recordset.forEach((u: any) => {
+        u.PortalRFC = rfcMap.get(u.IDUsuario);
+      });
+    } catch (e: any) {
+      console.warn('[getProveedoresConDatosERP] No se pudieron obtener extensiones RFC:', e.message);
+    }
 
     portalResult.recordset.forEach(u => {
       // Mapear por código de proveedor
       if (u.Usuario) {
         portalMapByCodigo.set(u.Usuario.trim().toUpperCase(), u);
+      }
+      // Mapear por RFC
+      if (u.PortalRFC) {
+        portalMapByRFC.set(u.PortalRFC.trim().toUpperCase(), u);
       }
       // Mapear por nombre (normalizado)
       if (u.Nombre) {
@@ -164,7 +183,12 @@ export async function getProveedoresConDatosERP(
         portalUser = portalMapByCodigo.get(erpProv.Proveedor.trim().toUpperCase());
       }
 
-      // 2. Si no se encontró, intentar por nombre
+      // 2. Intentar por RFC (Nueva prioridad alta según requerimiento)
+      if (!portalUser && erpProv.RFC) {
+        portalUser = portalMapByRFC.get(erpProv.RFC.trim().toUpperCase());
+      }
+
+      // 3. Si no se encontró, intentar por nombre
       if (!portalUser && erpProv.Nombre) {
         const nombreErpNorm = erpProv.Nombre.trim().toUpperCase();
         portalUser = portalMapByNombre.get(nombreErpNorm);

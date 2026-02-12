@@ -47,6 +47,14 @@ export function getERPConfig(code: string | null | undefined): ERPDatabaseConfig
 }
 
 /**
+ * Obtiene el código de empresa interno para SPs (@Empresa) desde el tenantId.
+ */
+export function getEmpresaERPFromTenant(tenantId: string | null | undefined): string | null {
+  const config = getERPConfig(tenantId);
+  return config ? config.empresa : null;
+}
+
+/**
  * Obtiene el nombre de la empresa para mostrar en UI.
  */
 export function getNombreEmpresa(code: string | null | undefined): string {
