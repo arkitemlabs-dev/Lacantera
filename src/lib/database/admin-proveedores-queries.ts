@@ -122,54 +122,60 @@ export async function getProveedoresConDatosERP(
 
     console.log(`[getProveedoresConDatosERP] SP retornó ${spResult.proveedores.length} proveedores, total: ${spResult.total}`);
 
-    // 2. Obtener usuarios del portal para mapear
+    // 2. Obtener usuarios del portal desde WebUsuario (tabla moderna)
     const portalResult = await hybridDB.queryPortal(`
-      SELECT
-        u.IDUsuario,
-        u.eMail,
-        u.Nombre,
-        u.Estatus,
-        u.FechaRegistro,
-        u.Telefono,
-        u.Usuario
-      FROM pNetUsuario u
-      WHERE u.IDUsuarioTipo = 4
+      SELECT UsuarioWeb as IDUsuario, Nombre, eMail, Estatus, Alta as FechaRegistro,
+             Proveedor, Empresa, Telefono
+      FROM WebUsuario
+      WHERE Rol = 'proveedor' AND Estatus = 'ACTIVO'
     `);
+
+    // Obtener mappings de portal_proveedor_mapping
+    let mappingRecords: any[] = [];
+    try {
+      const mappingResult = await hybridDB.queryPortal(`
+        SELECT portal_user_id, erp_proveedor_code, empresa_code
+        FROM portal_proveedor_mapping WHERE activo = 1
+      `);
+      mappingRecords = mappingResult.recordset;
+    } catch (e: any) {
+      console.warn('[getProveedoresConDatosERP] No se pudo consultar portal_proveedor_mapping:', e.message);
+    }
 
     // 3. Crear mapas de usuarios del portal por diferentes criterios
     const portalMapByCodigo = new Map();
-    const portalMapByRFC = new Map();
+    const portalMapByEmail = new Map();
     const portalMapByNombre = new Map();
 
-    // NEW: Obtener RFCs de extensiones por separado para evitar errores de JOIN
-    try {
-      const extResult = await hybridDB.queryPortal("SELECT IDUsuario, RFC FROM pNetUsuarioExtension");
-      const rfcMap = new Map();
-      extResult.recordset.forEach((r: any) => rfcMap.set(r.IDUsuario, r.RFC));
+    // Mapa por IDUsuario (aliased from UsuarioWeb) para lookup desde mappings
+    const webUsuarioMap = new Map();
+    portalResult.recordset.forEach((u: any) => {
+      webUsuarioMap.set(u.IDUsuario, u);
 
-      // Asignar RFC a cada usuario del portal
-      portalResult.recordset.forEach((u: any) => {
-        u.PortalRFC = rfcMap.get(u.IDUsuario);
-      });
-    } catch (e: any) {
-      console.warn('[getProveedoresConDatosERP] No se pudieron obtener extensiones RFC:', e.message);
-    }
-
-    portalResult.recordset.forEach(u => {
-      // Mapear por código de proveedor
-      if (u.Usuario) {
-        portalMapByCodigo.set(u.Usuario.trim().toUpperCase(), u);
+      // Mapear por código de proveedor directo (campo Proveedor en WebUsuario)
+      if (u.Proveedor) {
+        portalMapByCodigo.set(u.Proveedor.trim().toUpperCase(), u);
       }
-      // Mapear por RFC
-      if (u.PortalRFC) {
-        portalMapByRFC.set(u.PortalRFC.trim().toUpperCase(), u);
+      // Mapear por email
+      if (u.eMail) {
+        portalMapByEmail.set(u.eMail.trim().toUpperCase(), u);
       }
       // Mapear por nombre (normalizado)
       if (u.Nombre) {
-        const nombreNorm = u.Nombre.trim().toUpperCase();
-        portalMapByNombre.set(nombreNorm, u);
+        portalMapByNombre.set(u.Nombre.trim().toUpperCase(), u);
       }
     });
+
+    // Enriquecer mapas con portal_proveedor_mapping
+    for (const mapping of mappingRecords) {
+      if (mapping.erp_proveedor_code && mapping.portal_user_id) {
+        const codigoNorm = String(mapping.erp_proveedor_code).trim().toUpperCase();
+        const usuario = webUsuarioMap.get(mapping.portal_user_id);
+        if (usuario && !portalMapByCodigo.has(codigoNorm)) {
+          portalMapByCodigo.set(codigoNorm, usuario);
+        }
+      }
+    }
 
     // 4. Procesar SOLO los proveedores del ERP con estatus ALTA
     const proveedores: ProveedorCompleto[] = [];
@@ -178,14 +184,14 @@ export async function getProveedoresConDatosERP(
       // Buscar usuario del portal por múltiples criterios
       let portalUser = null;
 
-      // 1. Intentar por código de proveedor
+      // 1. Intentar por código de proveedor ERP (más confiable - viene de mapping o WebUsuario.Proveedor)
       if (erpProv.Proveedor) {
         portalUser = portalMapByCodigo.get(erpProv.Proveedor.trim().toUpperCase());
       }
 
-      // 2. Intentar por RFC (Nueva prioridad alta según requerimiento)
-      if (!portalUser && erpProv.RFC) {
-        portalUser = portalMapByRFC.get(erpProv.RFC.trim().toUpperCase());
+      // 2. Intentar por email del ERP
+      if (!portalUser && erpProv.eMail1) {
+        portalUser = portalMapByEmail.get(erpProv.eMail1.trim().toUpperCase());
       }
 
       // 3. Si no se encontró, intentar por nombre

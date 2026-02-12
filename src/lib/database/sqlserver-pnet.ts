@@ -4,7 +4,7 @@
 import sql from 'mssql';
 import bcrypt from 'bcrypt';
 import { getConnection } from '@/lib/sql-connection';
-import { getERPConnection, getTenantConfig } from './multi-tenant-connection';
+import { getERPConnection, getPortalConnection, getTenantConfig } from './multi-tenant-connection';
 import { getStoredProcedures } from './stored-procedures';
 import type {
   Database,
@@ -560,83 +560,110 @@ export class SqlServerPNetDatabase implements Database {
 
       console.log(`[SP-QUERY] SP retornó ${erpFiltered.length} proveedores, total: ${spResult.total}`);
 
-      // 2. Obtener usuarios registrados en el portal (sin JOIN a Prov del ERP)
-      const portalPool = await getConnection();
+      // 2. Obtener usuarios registrados en el portal desde WebUsuario (tabla moderna)
+      // Usar getPortalConnection() para garantizar conexión a BD 'PP' donde vive WebUsuario
+      const portalPool = await getPortalConnection();
 
-      const portalProveedoresQuery = `
-        SELECT
-          u.IDUsuario,
-          u.eMail,
-          u.Nombre as UsuarioNombre,
-          u.Estatus as UsuarioEstatus,
-          u.FechaRegistro,
-          u.Telefono as UsuarioTelefono,
-          u.Usuario as CodigoProveedorPortal
-        FROM pNetUsuario u
-        WHERE u.IDUsuarioTipo = 4
+      const webUsuarioQuery = `
+        SELECT UsuarioWeb, UsuarioWeb as IDUsuario, Nombre as UsuarioNombre, eMail,
+               Estatus as UsuarioEstatus, Alta as FechaRegistro, Proveedor, Empresa,
+               Telefono as UsuarioTelefono
+        FROM WebUsuario
+        WHERE Rol = 'proveedor' AND Estatus = 'ACTIVO'
       `;
 
-      console.log('[PORTAL-QUERY] Obteniendo usuarios del portal con extensiones...');
-      const portalResult = await portalPool.request().query(portalProveedoresQuery);
-      console.log(`[PORTAL-QUERY] Encontrados ${portalResult.recordset.length} usuarios proveedores en portal`);
+      console.log('[PORTAL-QUERY] Obteniendo usuarios proveedores de WebUsuario (BD: PP)...');
+      const webUsuarioResult = await portalPool.request().query(webUsuarioQuery);
+      console.log(`[PORTAL-QUERY] Encontrados ${webUsuarioResult.recordset.length} proveedores en WebUsuario`);
 
-      // 3. Crear mapas de proveedores registrados en el portal por múltiples criterios
-      const portalUsuariosPorRFC = new Map<string, any>();
-      try {
-        const extResult = await portalPool.request().query("SELECT IDUsuario, RFC FROM pNetUsuarioExtension");
-        const rfcMap = new Map();
-        extResult.recordset.forEach((r: any) => rfcMap.set(r.IDUsuario, r.RFC));
-
-        // Asignar RFC a cada usuario del portal
-        portalResult.recordset.forEach((u: any) => {
-          u.PortalRFC = rfcMap.get(u.IDUsuario);
-          if (u.PortalRFC) {
-            portalUsuariosPorRFC.set(String(u.PortalRFC).trim().toUpperCase(), u);
-          }
+      // DEBUG: Mostrar todos los usuarios encontrados para diagnóstico
+      if (webUsuarioResult.recordset.length > 0) {
+        webUsuarioResult.recordset.forEach((u: any) => {
+          console.log(`[PORTAL-DEBUG] WebUsuario: ${u.UsuarioWeb}, Proveedor: ${u.Proveedor}, Email: ${u.eMail}, Estatus: ${u.UsuarioEstatus}`);
         });
-      } catch (e: any) {
-        console.warn('[PORTAL-QUERY] No se pudieron obtener extensiones RFC:', e.message);
+      } else {
+        // Si no hay resultados, verificar si hay CUALQUIER registro en WebUsuario
+        try {
+          const allWebUsers = await portalPool.request().query('SELECT TOP 5 UsuarioWeb, Rol, Estatus, Proveedor FROM WebUsuario');
+          console.log(`[PORTAL-DEBUG] Total registros en WebUsuario (cualquier rol): ${allWebUsers.recordset.length}`);
+          allWebUsers.recordset.forEach((u: any) => {
+            console.log(`[PORTAL-DEBUG] -> ${u.UsuarioWeb}, Rol: ${u.Rol}, Estatus: ${u.Estatus}, Proveedor: ${u.Proveedor}`);
+          });
+        } catch (dbErr: any) {
+          console.error(`[PORTAL-DEBUG] Error consultando WebUsuario: ${dbErr.message}`);
+        }
       }
 
-      const portalUsuariosPorCodigo = new Map<string, any>();
+      // Obtener mappings de portal_proveedor_mapping para vincular por código ERP
+      let mappingRecords: any[] = [];
+      try {
+        const mappingResult = await portalPool.request().query(`
+          SELECT portal_user_id, erp_proveedor_code, empresa_code
+          FROM portal_proveedor_mapping WHERE activo = 1
+        `);
+        mappingRecords = mappingResult.recordset;
+      } catch (e: any) {
+        console.warn('[PORTAL-QUERY] No se pudo consultar portal_proveedor_mapping:', e.message);
+      }
+
+      // 3. Crear mapas de proveedores registrados por múltiples criterios
+      const portalUsuariosPorCodigoERP = new Map<string, any>();
+      const portalUsuariosPorEmail = new Map<string, any>();
       const portalUsuariosPorNombre = new Map<string, any>();
 
-      for (const usuario of portalResult.recordset) {
-        // Mapear por código de proveedor del portal
-        if (usuario.CodigoProveedorPortal) {
-          const codigoNorm = String(usuario.CodigoProveedorPortal).trim().toUpperCase();
-          portalUsuariosPorCodigo.set(codigoNorm, usuario);
+      // Crear mapa de WebUsuario por UsuarioWeb para lookup rápido
+      const webUsuarioMap = new Map<string, any>();
+      for (const u of webUsuarioResult.recordset) {
+        webUsuarioMap.set(u.UsuarioWeb, u);
+
+        // Mapear por código proveedor directo (campo Proveedor en WebUsuario)
+        if (u.Proveedor) {
+          const codigoNorm = String(u.Proveedor).trim().toUpperCase();
+          portalUsuariosPorCodigoERP.set(codigoNorm, u);
         }
 
-        // Mapear por RFC
-        if (usuario.PortalRFC) {
-          const rfcNorm = String(usuario.PortalRFC).trim().toUpperCase();
-          portalUsuariosPorRFC.set(rfcNorm, usuario);
+        // Mapear por email
+        if (u.eMail) {
+          const emailNorm = String(u.eMail).trim().toUpperCase();
+          portalUsuariosPorEmail.set(emailNorm, u);
         }
 
         // Mapear por nombre
-        if (usuario.UsuarioNombre) {
-          const nombreNorm = String(usuario.UsuarioNombre).trim().toUpperCase();
-          portalUsuariosPorNombre.set(nombreNorm, usuario);
+        if (u.UsuarioNombre) {
+          const nombreNorm = String(u.UsuarioNombre).trim().toUpperCase();
+          portalUsuariosPorNombre.set(nombreNorm, u);
         }
       }
 
-      console.log(`[PORTAL-MAP] Mapas creados - Por Código: ${portalUsuariosPorCodigo.size}, Por RFC: ${portalUsuariosPorRFC.size}, Por Nombre: ${portalUsuariosPorNombre.size}`);
+      // Enriquecer mapas con portal_proveedor_mapping (vinculación más confiable)
+      for (const mapping of mappingRecords) {
+        if (mapping.erp_proveedor_code && mapping.portal_user_id) {
+          const codigoNorm = String(mapping.erp_proveedor_code).trim().toUpperCase();
+          const usuario = webUsuarioMap.get(mapping.portal_user_id);
+          if (usuario && !portalUsuariosPorCodigoERP.has(codigoNorm)) {
+            portalUsuariosPorCodigoERP.set(codigoNorm, usuario);
+          }
+        }
+      }
+
+      console.log(`[PORTAL-MAP] Mapas creados - Por CódigoERP: ${portalUsuariosPorCodigoERP.size}, Por Email: ${portalUsuariosPorEmail.size}, Por Nombre: ${portalUsuariosPorNombre.size}`);
+      console.log(`[PORTAL-MAP] Códigos ERP en mapa: [${Array.from(portalUsuariosPorCodigoERP.keys()).join(', ')}]`);
+      console.log(`[PORTAL-MAP] Mappings encontrados: ${mappingRecords.length}`);
 
       // 4. Combinar datos: ERP + Portal (cruce por código, RFC y nombre)
       let proveedores: ProveedorUser[] = erpFiltered.map((erpRow: any) => {
         let portalUsuario = null;
 
-        // 1. Intentar por código de proveedor
+        // 1. Intentar por código de proveedor ERP (más confiable - viene de mapping o WebUsuario.Proveedor)
         if (erpRow.Proveedor) {
           const codigoERP = String(erpRow.Proveedor).trim().toUpperCase();
-          portalUsuario = portalUsuariosPorCodigo.get(codigoERP);
+          portalUsuario = portalUsuariosPorCodigoERP.get(codigoERP);
         }
 
-        // 2. Intentar por RFC (Nueva prioridad alta según requerimiento)
-        if (!portalUsuario && (erpRow.RFC || erpRow.Rfc)) {
-          const rfcERP = String(erpRow.RFC || erpRow.Rfc).trim().toUpperCase();
-          portalUsuario = portalUsuariosPorRFC.get(rfcERP);
+        // 2. Intentar por email del ERP
+        if (!portalUsuario && (erpRow.eMail1 || erpRow.ProveedorEmail)) {
+          const emailERP = String(erpRow.eMail1 || erpRow.ProveedorEmail).trim().toUpperCase();
+          portalUsuario = portalUsuariosPorEmail.get(emailERP);
         }
 
         // 3. Si no se encontró, intentar por nombre

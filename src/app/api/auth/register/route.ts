@@ -156,29 +156,6 @@ export async function POST(request: NextRequest) {
           VALUES (@usuarioWeb, @nombre, @email, @contrasena, 'proveedor', 'ACTIVO', GETDATE(), @proveedor, @empresa)
         `);
 
-      // 3. Crear Extensión del Usuario (RFC, Datos de contacto)
-      // Esto clasifica al usuario como proveedor con datos validados del ERP
-      await transaction
-        .request()
-        .input('usuarioWeb', sql.VarChar(50), usuarioWebCode)
-        .input('rfc', sql.VarChar(15), rfc)
-        .input('razonSocial', sql.NVarChar(255), proveedorERP.Nombre || razonSocial)
-        .input('telefono', sql.VarChar(20), telefono || '')
-        .query(`
-          IF NOT EXISTS (SELECT 1 FROM pNetUsuarioExtension WHERE IDUsuario = (SELECT IDUsuario FROM pNetUsuario WHERE Usuario = @usuarioWeb))
-          BEGIN
-            -- Intentar insertar usando el UsuarioWeb como referencia si pNetUsuario ya se sincronizó, 
-            -- o insertar en una tabla de extensión vinculada a UsuarioWeb
-            -- Por ahora, como pNetUsuario y WebUsuario son sistemas paralelos, 
-            -- nos aseguramos de que el RFC quede persistido donde el Admin lo busca.
-            
-            INSERT INTO pNetUsuarioExtension (IDUsuario, RFC, RazonSocial, Telefono, EmailVerified, UpdatedAt)
-            SELECT IDUsuario, @rfc, @razonSocial, @telefono, 0, GETDATE()
-            FROM pNetUsuario WHERE Usuario = @usuarioWeb
-            OR Usuario = @rfc -- Fallback si el usuario se creó con RFC como ID
-          END
-        `);
-
       // Insertar Mapping (Multi-tenant)
       await transaction
         .request()
