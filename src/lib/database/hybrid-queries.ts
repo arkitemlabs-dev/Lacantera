@@ -2,6 +2,7 @@
 // Helpers para queries híbridas Portal + ERP Intelisis
 
 import { hybridDB, getTenantConfig } from './multi-tenant-connection';
+import { ERP_DATABASES, getEmpresasProduccion, getTodasLasEmpresas, validateEmpresaCode } from './tenant-configs';
 
 /**
  * Obtiene proveedores del ERP con datos adicionales del Portal
@@ -101,14 +102,12 @@ export async function getOrdenesCompraHybrid(
 
   if (fechaDesde) {
     erpQuery += ' AND c.FechaEmision >= @fechaDesde';
-    erpParams.fechaDesde = fechaDesde.toISOString().split('T')[0]; // Solo fecha YYYY-MM-DD
-    console.log('🔍 DEBUG SQL - Fecha desde param:', erpParams.fechaDesde);
+    erpParams.fechaDesde = fechaDesde.toISOString().split('T')[0];
   }
 
   if (fechaHasta) {
     erpQuery += ' AND c.FechaEmision <= @fechaHasta';
-    erpParams.fechaHasta = fechaHasta.toISOString().split('T')[0]; // Solo fecha YYYY-MM-DD
-    console.log('🔍 DEBUG SQL - Fecha hasta param:', erpParams.fechaHasta);
+    erpParams.fechaHasta = fechaHasta.toISOString().split('T')[0];
   }
 
   erpQuery += `
@@ -120,17 +119,12 @@ export async function getOrdenesCompraHybrid(
   erpParams.offset = offset;
   erpParams.limit = limit;
 
-  console.log('🔍 DEBUG SQL - Query completa:', erpQuery);
-  console.log('🔍 DEBUG SQL - Parámetros:', erpParams);
-
   const erpResult = await hybridDB.queryERP(tenantId, erpQuery, erpParams);
 
-  // Si no hay órdenes, retornar vacío
   if (!erpResult.recordset.length) {
     return [];
   }
 
-  // Query Portal: Estados de las órdenes
   const ordenIds = erpResult.recordset.map(o => o.orden_id);
 
   const portalResult = await hybridDB.queryPortal(
@@ -153,12 +147,10 @@ export async function getOrdenesCompraHybrid(
     }
   );
 
-  // Crear mapa de estados del portal
   const portalStatusMap = new Map(
     portalResult.recordset.map(ps => [ps.erp_orden_id, ps])
   );
 
-  // Combinar datos ERP + Portal
   return erpResult.recordset.map(orden => ({
     ...orden,
     status_portal:
@@ -180,7 +172,6 @@ export async function getOrdenCompraDetalle(
 ) {
   const config = getTenantConfig(tenantId);
 
-  // Query ERP: Encabezado y detalle de la orden
   const erpResult = await hybridDB.queryERP(
     tenantId,
     `
@@ -222,14 +213,13 @@ export async function getOrdenCompraDetalle(
     { ordenId, empresaCodigo: config.codigoEmpresa }
   );
 
-  if (!erpResult.recordsets[0].length) {
+  if (!(erpResult as any).recordsets[0].length) {
     return null;
   }
 
-  const encabezado = erpResult.recordsets[0][0];
-  const detalle = erpResult.recordsets[1];
+  const encabezado = (erpResult as any).recordsets[0][0];
+  const detalle = (erpResult as any).recordsets[1];
 
-  // Query Portal: Estado de la orden
   const portalResult = await hybridDB.queryPortal(
     `
     SELECT
@@ -262,7 +252,6 @@ export async function getOrdenCompraDetalle(
 
 /**
  * Actualiza el estado de una orden en el Portal
- * (NO modifica el ERP)
  */
 export async function updateOrdenStatus(
   tenantId: string,
@@ -270,12 +259,12 @@ export async function updateOrdenStatus(
   statusData: {
     status_portal: string;
     observaciones_proveedor?: string;
-    respondido_por: string; // portal_usuarios.id
+    respondido_por: string;
   }
 ) {
   const config = getTenantConfig(tenantId);
 
-  const result = await hybridDB.queryPortal(
+  await hybridDB.queryPortal(
     `
     MERGE portal_orden_status AS target
     USING (
@@ -318,11 +307,7 @@ export async function updateOrdenStatus(
     }
   );
 
-  return {
-    success: true,
-    message: 'Estado actualizado en el portal',
-    note: 'El ERP no fue modificado',
-  };
+  return { success: true };
 }
 
 /**
@@ -339,7 +324,6 @@ export async function getFacturasHybrid(
   const config = getTenantConfig(tenantId);
   const { limit = 50, offset = 0 } = options;
 
-  // Query ERP: Facturas CFDI
   const erpResult = await hybridDB.queryERP(
     tenantId,
     `
@@ -365,7 +349,6 @@ export async function getFacturasHybrid(
     return [];
   }
 
-  // Query Portal: Workflow de facturas
   const cfdiIds = erpResult.recordset.map(f => f.cfdi_id);
 
   const portalResult = await hybridDB.queryPortal(
@@ -392,7 +375,6 @@ export async function getFacturasHybrid(
     }
   );
 
-  // Combinar datos
   const portalMap = new Map(
     portalResult.recordset.map(p => [p.erp_cfdi_id, p])
   );
@@ -427,52 +409,43 @@ export async function validateUserTenantAccess(
 }
 
 /**
- * Obtiene las empresas a las que un usuario tiene acceso
- * - Administradores (super-admin, admin): acceso a todas las empresas
- * - Proveedores: acceso según portal_proveedor_mapping
+ * Obtiene las empresas a las que un usuario tiene acceso.
+ * Retorna objetos con código numérico ('01'-'10').
  */
-export async function getUserTenants(userId: string, userRole?: string) {
-  // Mapear tenantIds a nombres amigables
-  const empresaToNameMap: Record<string, string> = {
-    // Producción
-    'la-cantera-prod': 'La Cantera Desarrollos Mineros',
-    'peralillo-prod': 'El Peralillo SA de CV',
-    'plaza-galerena-prod': 'Plaza Galereña',
-    'inmobiliaria-galerena-prod': 'Inmobiliaria Galereña',
-    'icrear-prod': 'Icrear',
-    // Pruebas
-    'la-cantera-test': 'La Cantera Desarrollos Mineros [TEST]',
-    'peralillo-test': 'El Peralillo SA de CV [TEST]',
-    'plaza-galerena-test': 'Plaza Galereña [TEST]',
-    'inmobiliaria-galerena-test': 'Inmobiliaria Galereña [TEST]',
-    'icrear-test': 'Icrear [TEST]',
-  };
-
-  // Si es administrador, dar acceso a todas las empresas (prod + test)
-  if (userRole === 'super-admin' || userRole === 'admin') {
-    const todasLasEmpresas = [
-      'la-cantera-prod',
-      'peralillo-prod',
-      'plaza-galerena-prod',
-      'inmobiliaria-galerena-prod',
-      'icrear-prod',
-      'la-cantera-test',
-      'peralillo-test',
-      'plaza-galerena-test',
-      'inmobiliaria-galerena-test',
-      'icrear-test',
-    ];
-
-    return todasLasEmpresas.map(empresaCode => ({
-      tenantId: empresaCode,
-      empresaCodigo: empresaCode,
+export async function getUserTenants(userId: string, userRole?: string, userEmail?: string) {
+  // Excepción para usuario de pruebas del desarrollador (Acceso Total)
+  const testerEmails = [
+    'ediaz@arkitem.com',
+    'admin@lacantera.com',
+    'viviana.diaz@arkitem.com',
+    'lmontero@arkitem.com',
+    'luis.montero@arkitem.com'
+  ];
+  if (userEmail && testerEmails.includes(userEmail.toLowerCase())) {
+    console.log(`[getUserTenants] Aplicando excepción de tester para: ${userEmail}`);
+    return getTodasLasEmpresas().map(config => ({
+      codigo: config.code,
+      nombre: config.nombre,
       proveedorCodigo: null,
-      permisos: ['admin'],
-      tenantName: empresaToNameMap[empresaCode] || empresaCode,
     }));
   }
 
-  // Para proveedores, buscar en portal_proveedor_mapping
+  if (userRole === 'super-admin') {
+    return getTodasLasEmpresas().map(config => ({
+      codigo: config.code,
+      nombre: config.nombre,
+      proveedorCodigo: null,
+    }));
+  }
+
+  if (userRole === 'admin') {
+    return getTodasLasEmpresas().map(config => ({
+      codigo: config.code,
+      nombre: config.nombre,
+      proveedorCodigo: null,
+    }));
+  }
+
   const result = await hybridDB.queryPortal(
     `
     SELECT DISTINCT
@@ -486,11 +459,19 @@ export async function getUserTenants(userId: string, userRole?: string) {
     { userId }
   );
 
-  return result.recordset.map(row => ({
-    tenantId: row.empresa_code, // Ahora empresa_code ES el tenantId (la-cantera, peralillo, etc.)
-    empresaCodigo: row.empresa_code,
-    proveedorCodigo: row.erp_proveedor_code,
-    permisos: row.permisos ? JSON.parse(row.permisos) : [],
-    tenantName: empresaToNameMap[row.empresa_code] || row.empresa_code,
-  }));
+  return result.recordset.map(row => {
+    let codigo: string;
+    try {
+      codigo = validateEmpresaCode(row.empresa_code);
+    } catch {
+      console.warn(`[getUserTenants] empresa_code no reconocido: ${row.empresa_code}`);
+      codigo = row.empresa_code;
+    }
+    const config = ERP_DATABASES[codigo];
+    return {
+      codigo,
+      nombre: config?.nombre || row.empresa_code,
+      proveedorCodigo: row.erp_proveedor_code,
+    };
+  });
 }

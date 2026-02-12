@@ -66,16 +66,22 @@ export async function validateTenantContext(request: NextRequest) {
 
   // 4. Validar que el usuario tenga acceso al tenant
   if ((session.user as any).role === 'proveedor') {
-    const hasAccess = await validateUserTenantAccess(
-      (session.user as any).id,
-      tenantId
-    );
+    // Primero verificar si ya fue validado en el login (tester exception o mapping previo)
+    const empresasDisponibles = (session.user as any).empresasDisponibles || [];
 
-    if (!hasAccess) {
-      throw new TenantError(
-        `No tiene acceso a la empresa: ${tenantConfig.nombre}`,
-        403
+    if (!empresasDisponibles.includes(tenantId)) {
+    // Si no está en la sesión, verificar en la BD (por si hubo cambios)
+      const hasAccess = await validateUserTenantAccess(
+        (session.user as any).id,
+        tenantId
       );
+
+      if (!hasAccess) {
+        throw new TenantError(
+          `No tiene acceso a la empresa: ${tenantConfig.nombre}`,
+          403
+        );
+      }
     }
   }
 

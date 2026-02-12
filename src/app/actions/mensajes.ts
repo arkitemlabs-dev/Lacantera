@@ -414,13 +414,16 @@ export async function getEstadisticasMensajeria(usuarioId: string, empresaId?: s
 
 export async function getUsuariosParaConversacion(usuarioId: string, empresaId: string, rol?: string) {
   try {
-    console.log('🔍 getUsuariosParaConversacion ejecutándose con:', { usuarioId, empresaId, rol });
+    // Normalizar rol: lowercase + espacios a guiones (frontend envía "Super Admin", backend usa "super-admin")
+    const rolNorm = (rol || '').toLowerCase().replace(/\s+/g, '-');
+    console.log('🔍 getUsuariosParaConversacion ejecutándose con:', { usuarioId, empresaId, rol, rolNorm });
 
-    // Si es Super Admin o Admin, obtener proveedores que tienen cuenta en el portal
-    if (rol === 'super-admin' || rol === 'admin' || rol === 'Super Admin' || rol === 'Admin') {
+    // Si es admin (cualquier variante), obtener proveedores que tienen cuenta en el portal
+    const esAdmin = ['super-admin', 'admin', 'compras', 'contabilidad', 'solo-lectura'].includes(rolNorm);
+    if (esAdmin) {
       console.log('✅ Es Admin, obteniendo proveedores con cuenta en el portal');
 
-      const { hybridDB } = await import('@/lib/database/hybrid-queries');
+      const { hybridDB } = await import('@/lib/database/multi-tenant-connection');
 
       // 🔥 COMBINAR: Buscar en WebUsuario Y pNetUsuario simultáneamente
       console.log('🔍 Buscando proveedores en WebUsuario y pNetUsuario...');
@@ -483,6 +486,62 @@ export async function getUsuariosParaConversacion(usuarioId: string, empresaId: 
         console.log('📦 Proveedores de pNetUsuario:', pNetResult.recordset.length);
       }
 
+      // Enriquecer con nombre de empresa del ERP usando portal_proveedor_mapping
+      try {
+        // 1. Obtener mappings activos (vínculo portal_user_id → erp_proveedor_code)
+        const mappingResult = await hybridDB.queryPortal(`
+          SELECT portal_user_id, erp_proveedor_code, empresa_code
+          FROM portal_proveedor_mapping
+          WHERE activo = 1
+        `);
+
+        if (mappingResult.recordset?.length > 0) {
+          // Agrupar por portal_user_id, priorizando empresas prod sobre test
+          const userErpCodes = new Map<string, string>();
+          for (const m of mappingResult.recordset) {
+            const userId = String(m.portal_user_id);
+            const isProd = !m.empresa_code.includes('test');
+            // Solo sobrescribir si no tenemos uno de prod aún
+            if (!userErpCodes.has(userId) || isProd) {
+              userErpCodes.set(userId, m.erp_proveedor_code);
+            }
+          }
+
+          // 2. Recopilar códigos ERP únicos para buscar en el ERP
+          const erpCodes = [...new Set(userErpCodes.values())];
+          if (erpCodes.length > 0) {
+            const erpCodesList = erpCodes.map(c => `'${c}'`).join(',');
+            const erpResult = await hybridDB.queryERP('la-cantera', `
+              SELECT Proveedor as codigo, Nombre as nombreEmpresa, RFC
+              FROM Prov
+              WHERE Proveedor IN (${erpCodesList})
+            `);
+
+            const erpMap = new Map<string, any>();
+            for (const erp of (erpResult.recordset || [])) {
+              erpMap.set(erp.codigo, erp);
+            }
+
+            // 3. Actualizar nombres en proveedoresMap
+            for (const [key, prov] of proveedoresMap) {
+              const erpCode = userErpCodes.get(String(prov.id));
+              if (erpCode) {
+                const erpData = erpMap.get(erpCode);
+                if (erpData) {
+                  prov.nombreEmpresa = erpData.nombreEmpresa;
+                  prov.rfc = erpData.RFC;
+                  prov.erpCode = erpCode;
+                  prov.nombre = `${erpData.nombreEmpresa} (${prov.nombre})`;
+                }
+              }
+            }
+            console.log('📦 Proveedores enriquecidos con ERP via mapping:', erpCodes.length);
+          }
+        }
+      } catch (enrichError) {
+        console.log('⚠️ No se pudo enriquecer con ERP:', enrichError);
+      }
+
       // Convertir a array y ordenar por nombre
       const proveedoresCombinados = Array.from(proveedoresMap.values())
         .sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' }));
@@ -493,7 +552,7 @@ export async function getUsuariosParaConversacion(usuarioId: string, empresaId: 
         return { success: true, data: proveedoresCombinados };
       }
 
-      // 🔥 FALLBACK: Si no hay proveedores en el portal, obtener del ERP
+      // FALLBACK: Si no hay proveedores en el portal, obtener del ERP
       console.log('⚠️ No hay proveedores en portal, usando ERP como fallback');
       const erpResult = await hybridDB.queryERP('la-cantera', `
         SELECT
@@ -514,10 +573,10 @@ export async function getUsuariosParaConversacion(usuarioId: string, empresaId: 
     }
 
     // Si es proveedor, obtener todos los usuarios internos de la empresa (admin, finanzas, etc.)
-    if (rol === 'proveedor') {
+    if (rolNorm === 'proveedor') {
       console.log('🔍 Es Proveedor, obteniendo usuarios internos de la empresa...');
 
-      const { hybridDB } = await import('@/lib/database/hybrid-queries');
+      const { hybridDB } = await import('@/lib/database/multi-tenant-connection');
 
       // Buscar todos los usuarios internos en WebUsuario (no proveedores, no clientes)
       const usuariosResult = await hybridDB.queryPortal(`
@@ -677,7 +736,7 @@ export async function sincronizarProveedoresParaMensajeria() {
   try {
     console.log('🔄 Iniciando sincronización de proveedores para mensajería...');
 
-    const { hybridDB } = await import('@/lib/database/hybrid-queries');
+    const { hybridDB } = await import('@/lib/database/multi-tenant-connection');
     const bcrypt = await import('bcrypt');
 
     // Obtener todos los proveedores de pNetUsuario que NO están en WebUsuario

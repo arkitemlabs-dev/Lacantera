@@ -40,23 +40,35 @@ export async function GET(request: NextRequest) {
     // 2. Obtener el mapping para saber qué código de proveedor usar en el ERP
     const portalPool = await getPortalConnection();
 
-    const mappingResult = await portalPool.request()
+    let mappingResult = await portalPool.request()
       .input('userId', sql.NVarChar(50), userId)
       .input('empresaCode', sql.VarChar(50), empresaActual)
       .query(`
-        SELECT
-          erp_proveedor_code,
-          empresa_code
+        SELECT erp_proveedor_code, empresa_code
         FROM portal_proveedor_mapping
         WHERE portal_user_id = @userId
           AND empresa_code = @empresaCode
           AND activo = 1
       `);
 
+    // FALLBACK: Si no hay mapping para esta empresa, buscar CUALQUIER mapping activo del usuario (útil para testers)
+    if (mappingResult.recordset.length === 0) {
+      console.log('⚠️ No se encontró mapping para la empresa actual, buscando fallback...');
+      mappingResult = await portalPool.request()
+        .input('userId', sql.NVarChar(50), userId)
+        .query(`
+          SELECT TOP 1 erp_proveedor_code, empresa_code
+          FROM portal_proveedor_mapping
+          WHERE portal_user_id = @userId
+            AND activo = 1
+          ORDER BY (CASE WHEN empresa_code = '01' THEN 0 ELSE 1 END), empresa_code
+        `);
+    }
+
     if (mappingResult.recordset.length === 0) {
       return NextResponse.json({
         success: false,
-        error: 'No se encontró mapping para esta empresa'
+        error: 'No se encontró mapping para este usuario en ninguna empresa'
       }, { status: 404 });
     }
 

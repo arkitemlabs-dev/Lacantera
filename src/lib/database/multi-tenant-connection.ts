@@ -2,22 +2,7 @@
 // Gestor de conexiones para arquitectura híbrida: Portal (PP) + ERP Intelisis
 
 import sql from 'mssql';
-import { ACTIVE_TENANT_CONFIGS } from './tenant-configs';
-
-/**
- * Configuración de empresas con sus respectivas BDs ERP
- */
-export interface TenantERPConfig {
-  id: string;
-  nombre: string;
-  erpDatabase: string;  // BD del ERP: Cantera (prod) o Cantera_Ajustes (test)
-  codigoEmpresa: string; // Código usado para mapeos en el Portal (ej: la-cantera o LCDM)
-  erpEmpresa: string;    // Código numérico usado por los Stored Procedures (ej: 01, 06)
-}
-
-// Todas las configuraciones vienen de tenant-configs.ts
-// Una sola conexión a BD Cantera, los SPs redirigen según @Empresa
-const TENANT_CONFIGS: Record<string, TenantERPConfig> = ACTIVE_TENANT_CONFIGS as Record<string, TenantERPConfig>;
+import { ERP_DATABASES, validateEmpresaCode, type ERPDatabaseConfig } from './tenant-configs';
 
 /**
  * Pool de conexiones compartido para el Portal (PP)
@@ -25,7 +10,8 @@ const TENANT_CONFIGS: Record<string, TenantERPConfig> = ACTIVE_TENANT_CONFIGS as
 let portalPool: sql.ConnectionPool | null = null;
 
 /**
- * Pools de conexiones por BD ERP (pueden ser compartidos si DB es la misma)
+ * Pools de conexiones por BD ERP (compartidos si DB es la misma)
+ * Clave = nombre de la BD (ej: 'Galbd', 'Cantera_ajustes')
  */
 const erpPools = new Map<string, sql.ConnectionPool>();
 
@@ -72,7 +58,7 @@ export async function getPortalConnection(): Promise<sql.ConnectionPool> {
 
     const config: sql.config = {
       ...portalConfig,
-      database: 'PP', // Tu BD del portal
+      database: 'PP',
       pool: {
         max: 20,
         min: 5,
@@ -89,74 +75,84 @@ export async function getPortalConnection(): Promise<sql.ConnectionPool> {
 }
 
 /**
- * Obtiene el pool de conexión para la BD ERP de un tenant
- * Conexión única: Cantera (prod) o Cantera_Ajustes (test)
- * Los SPs redirigen internamente según @Empresa
+ * Obtiene el pool de conexión para la BD ERP de una empresa.
+ * El sistema usa exclusivamente códigos numéricos de empresa (01–10).
+ * Pools se comparten por nombre de BD (ej: '03' y '04' comparten pool 'Galbd').
  */
 export async function getERPConnection(
-  tenantId: string
+  empresaInput: string
 ): Promise<sql.ConnectionPool> {
-  // Usar getTenantConfig para soportar fallback de IDs legacy
-  const tenantConfig = getTenantConfig(tenantId);
+  // Validar código numérico
+  const code = validateEmpresaCode(empresaInput);
+  const dbConfig = ERP_DATABASES[code];
+  const erpDatabase = dbConfig.db;
 
-  const erpDatabase = tenantConfig.erpDatabase;
-
-  // Verificar si el pool existe y está conectado
+  // Pool compartido por nombre de BD
   const existingPool = erpPools.get(erpDatabase);
-  if (!existingPool || !existingPool.connected) {
-    if (existingPool) {
-      try {
-        await existingPool.close();
-      } catch (error) {
-        console.log(`[ERP] Error cerrando pool anterior para ${erpDatabase}:`, error);
-      }
-      erpPools.delete(erpDatabase);
-    }
-
-    const config: sql.config = {
-      ...erpConfig,
-      database: erpDatabase,
-      pool: {
-        max: 10,
-        min: 2,
-        idleTimeoutMillis: 30000,
-      },
-    };
-
-    const pool = new sql.ConnectionPool(config);
-    await pool.connect();
-    erpPools.set(erpDatabase, pool);
-    console.log(`[ERP] Connected to ${erpDatabase} at ${erpConfig.server} for tenant ${tenantId}`);
+  if (existingPool && existingPool.connected) {
+    return existingPool;
   }
 
-  return erpPools.get(erpDatabase)!;
+  // Limpiar pool desconectado
+  if (existingPool) {
+    try {
+      await existingPool.close();
+    } catch (error) {
+      console.log(`[ERP] Error cerrando pool anterior para ${erpDatabase}:`, error);
+    }
+    erpPools.delete(erpDatabase);
+  }
+
+  const config: sql.config = {
+    ...erpConfig,
+    database: erpDatabase,
+    pool: {
+      max: 10,
+      min: 2,
+      idleTimeoutMillis: 30000,
+    },
+  };
+
+  const pool = new sql.ConnectionPool(config);
+  await pool.connect();
+  erpPools.set(erpDatabase, pool);
+  console.log(`[ERP] Connected to ${erpDatabase} at ${erpConfig.server} (empresa ${code})`);
+
+  return pool;
 }
 
 /**
- * Obtiene la configuración de un tenant
+ * Obtiene la configuración de un tenant mediante su código numérico.
  */
-export function getTenantConfig(tenantId: string): TenantERPConfig {
-  // Buscar directamente (nuevo formato: 'la-cantera-test', 'peralillo-prod', etc.)
-  let config = TENANT_CONFIGS[tenantId];
-  if (config) return config;
-
-  // Fallback: IDs antiguos sin sufijo (ej: 'la-cantera') → intentar con '-test'
-  if (!tenantId.endsWith('-test') && !tenantId.endsWith('-prod')) {
-    config = TENANT_CONFIGS[`${tenantId}-test`];
-    if (config) {
-      console.warn(`[TENANT] ID legacy '${tenantId}' resuelto a '${tenantId}-test'`);
-      return config;
-    }
-  }
-
-  throw new Error(`Configuración de tenant no encontrada: ${tenantId}`);
+export function getTenantConfig(empresaInput: string): {
+  id: string;
+  nombre: string;
+  erpDatabase: string;
+  codigoEmpresa: string;
+  erpEmpresa: string;
+} {
+  const code = validateEmpresaCode(empresaInput);
+  const config = ERP_DATABASES[code];
+  return {
+    id: code,
+    nombre: config.nombre,
+    erpDatabase: config.db,
+    codigoEmpresa: code,
+    erpEmpresa: config.empresa,
+  };
 }
 
 /**
- * Obtiene todos los tenants disponibles
+ * Obtiene todos los tenants disponibles (01-10)
  */
-export function getAllTenants(): TenantERPConfig[] {
-  return Object.values(TENANT_CONFIGS);
+export function getAllTenants() {
+  return Object.entries(ERP_DATABASES).map(([code, config]) => ({
+    id: code,
+    nombre: config.nombre,
+    erpDatabase: config.db,
+    codigoEmpresa: code,
+    erpEmpresa: config.empresa,
+  }));
 }
 
 /**
@@ -207,7 +203,6 @@ export class HybridDatabaseManager {
     const pool = await getPortalConnection();
     const request = pool.request();
 
-    // Agregar parámetros
     Object.entries(params).forEach(([key, value]) => {
       this.addParameter(request, key, value);
     });
@@ -220,28 +215,26 @@ export class HybridDatabaseManager {
    * Query al ERP (SELECT solamente - las escrituras van por SPs)
    */
   async queryERP(
-    tenantId: string,
+    empresaInput: string,
     queryString: string,
     params: Record<string, any> = {}
   ): Promise<sql.IResult<any>> {
-    const pool = await getERPConnection(tenantId);
+    const pool = await getERPConnection(empresaInput);
     const request = pool.request();
 
-    // Agregar parámetros
     Object.entries(params).forEach(([key, value]) => {
       this.addParameter(request, key, value);
     });
 
-    console.log(`[ERP-QUERY][${tenantId}]`, queryString.substring(0, 100));
+    console.log(`[ERP-QUERY][${empresaInput}]`, queryString.substring(0, 100));
     return await request.query(queryString);
   }
 
   /**
    * Query híbrida: combina datos del Portal y ERP
-   * Útil para joins entre tablas de ambas BDs
    */
   async queryHybrid(
-    tenantId: string,
+    empresaInput: string,
     portalQuery: string,
     erpQuery: string,
     portalParams: Record<string, any> = {},
@@ -249,29 +242,10 @@ export class HybridDatabaseManager {
   ): Promise<{ portal: sql.IResult<any>; erp: sql.IResult<any> }> {
     const [portalResult, erpResult] = await Promise.all([
       this.queryPortal(portalQuery, portalParams),
-      this.queryERP(tenantId, erpQuery, erpParams),
+      this.queryERP(empresaInput, erpQuery, erpParams),
     ]);
 
     return { portal: portalResult, erp: erpResult };
-  }
-
-  /**
-   * Valida que una query sea solo de lectura (SELECT)
-   */
-  private isReadOnlyQuery(query: string): boolean {
-    const normalized = query.trim().toUpperCase();
-    const readOnlyKeywords = ['SELECT', 'WITH'];
-    const writeKeywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER', 'TRUNCATE'];
-
-    const startsWithRead = readOnlyKeywords.some(keyword =>
-      normalized.startsWith(keyword)
-    );
-
-    const containsWrite = writeKeywords.some(keyword =>
-      normalized.includes(keyword)
-    );
-
-    return startsWithRead && !containsWrite;
   }
 
   /**
@@ -292,6 +266,8 @@ export class HybridDatabaseManager {
       } else {
         request.input(key, sql.Decimal(18, 2), value);
       }
+    } else if (typeof value === 'number') {
+      request.input(key, sql.Int, value);
     } else if (typeof value === 'boolean') {
       request.input(key, sql.Bit, value);
     } else if (value instanceof Date) {

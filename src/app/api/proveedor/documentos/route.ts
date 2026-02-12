@@ -40,23 +40,35 @@ export async function GET(request: NextRequest) {
     // 2. Obtener el mapping para saber qué código de proveedor usar en el ERP
     const portalPool = await getPortalConnection();
 
-    const mappingResult = await portalPool.request()
+    let mappingResult = await portalPool.request()
       .input('userId', sql.NVarChar(50), userId)
       .input('empresaCode', sql.VarChar(50), empresaActual)
       .query(`
-        SELECT
-          erp_proveedor_code,
-          empresa_code
+        SELECT erp_proveedor_code, empresa_code
         FROM portal_proveedor_mapping
         WHERE portal_user_id = @userId
           AND empresa_code = @empresaCode
           AND activo = 1
       `);
 
+    // FALLBACK: Si no hay mapping para esta empresa, buscar CUALQUIER mapping activo del usuario (útil para testers)
+    if (mappingResult.recordset.length === 0) {
+      console.log('⚠️ [GET /api/proveedor/documentos] No se encontró mapping para la empresa actual, buscando fallback...');
+      mappingResult = await portalPool.request()
+        .input('userId', sql.NVarChar(50), userId)
+        .query(`
+          SELECT TOP 1 erp_proveedor_code, empresa_code
+          FROM portal_proveedor_mapping
+          WHERE portal_user_id = @userId
+            AND activo = 1
+          ORDER BY (CASE WHEN empresa_code = '01' THEN 0 ELSE 1 END), empresa_code
+        `);
+    }
+
     if (mappingResult.recordset.length === 0) {
       return NextResponse.json({
         success: false,
-        error: 'No se encontró mapping para esta empresa'
+        error: 'No se encontró mapping para este usuario en ninguna empresa'
       }, { status: 404 });
     }
 
@@ -141,18 +153,18 @@ export async function GET(request: NextRequest) {
 
         // Matching por frases clave (todas las palabras del grupo deben estar presentes)
         const matchingRules: { [key: string]: string[][] } = {
-          'acta constitutiva': [['acta', 'constitutiva']],
-          'poder del representante legal': [['poder', 'representante']],
-          'ine del representante legal': [['ine', 'representante'], ['ine', 'legal']],
-          'comprobante de domicilio fiscal': [['comprobante', 'domicilio']],
-          'opinión de cumplimiento obligaciones sat': [['opinion', 'cumplimiento'], ['cumplimiento', 'sat']],
+          'acta constitutiva': [['acta', 'constitutiva'], ['escritura']],
+          'poder del representante legal': [['poder', 'representante'], ['poder', 'notarial']],
+          'ine del representante legal': [['ine', 'representante'], ['ine', 'legal'], ['ine']],
+          'comprobante de domicilio fiscal': [['comprobante', 'domicilio'], ['domicilio']],
+          'opinión de cumplimiento obligaciones sat': [['opinion', 'cumplimiento'], ['cumplimiento', 'sat'], ['op', 'cum']],
           'pago del imss': [['pago', 'imss'], ['imss']],
-          'constancia de situación fiscal actual': [['constancia', 'fiscal'], ['situacion', 'fiscal']],
-          'estados financieros': [['estados', 'financieros']],
-          'acuse de declaración anual': [['acuse', 'declaracion']],
-          'caratula estado de cuenta bancario': [['caratula', 'cuenta'], ['estado de cuenta', 'bancari']],
-          'fotografia a color exterior del domicilio fiscal': [['fotografia', 'exterior'], ['foto', 'domicilio']],
-          'referencias comerciales': [['referencias', 'comerciales']],
+          'constancia de situación fiscal actual': [['constancia', 'fiscal'], ['situacion', 'fiscal'], ['csf']],
+          'estados financieros': [['estados', 'financieros'], ['balance', 'general']],
+          'acuse de declaración anual': [['acuse', 'declaracion'], ['confirmacion', 'sat']],
+          'caratula estado de cuenta bancario': [['caratula', 'cuenta'], ['estado de cuenta', 'bancari'], ['cuenta', 'bancaria'], ['bancaria']],
+          'fotografia a color exterior del domicilio fiscal': [['fotografia', 'exterior'], ['foto', 'domicilio'], ['foto', 'negocio']],
+          'referencias comerciales': [['referencias', 'comerciales'], ['cartas', 'referencia']],
           'solicitud de alta proveedor': [['solicitud', 'alta']],
           'ficha de proveedores': [['ficha', 'proveedores']]
         };
@@ -212,9 +224,32 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    console.log(`✅ Procesados ${documentos.length} documentos`);
+    // 7. Identificar anexos que no se pudieron clasificar
+    const idsAnexosRelacionados = new Set();
+    documentos.forEach((d: any) => {
+      if (d.anexos) {
+        d.anexos.forEach((a: any) => idsAnexosRelacionados.add(a.idr));
+      }
+    });
 
-    // 7. Retornar datos
+    const anexosNoRelacionados = anexosResult.recordset
+      .filter((a: any) => !idsAnexosRelacionados.has(a.IDR))
+      .map((a: any) => ({
+        idr: a.IDR,
+        nombreArchivo: a.NombreDocumento,
+        rutaArchivo: a.RutaArchivo,
+        tipo: a.Tipo,
+        fechaAlta: a.FechaAlta,
+        categoria: a.Categoria,
+        grupo: a.Grupo,
+        documentoOrigen: a.Documento,
+        comentario: a.Comentario,
+        esDesconocido: true
+      }));
+
+    console.log(`✅ Procesados ${documentos.length} documentos requeridos y ${anexosNoRelacionados.length} anexos sin clasificar`);
+
+    // 8. Retornar datos
     return NextResponse.json({
       success: true,
       data: {
@@ -223,6 +258,7 @@ export async function GET(request: NextRequest) {
         totalDocumentosRequeridos: documentosRequeridosResult.recordset.length,
         totalArchivosSubidos: anexosResult.recordset.length,
         documentos: documentos,
+        anexosNoRelacionados: anexosNoRelacionados,
         // Estadísticas
         estadisticas: {
           documentosConArchivo: documentos.filter((d: any) => d.tieneArchivo).length,
@@ -230,6 +266,7 @@ export async function GET(request: NextRequest) {
           documentosAutorizados: documentos.filter((d: any) => d.autorizado).length,
           documentosRechazados: documentos.filter((d: any) => d.rechazado).length,
           documentosPendientes: documentos.filter((d: any) => d.tieneArchivo && !d.autorizado && !d.rechazado).length,
+          anexosSinClasificar: anexosNoRelacionados.length
         }
       }
     });

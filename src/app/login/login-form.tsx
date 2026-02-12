@@ -27,29 +27,13 @@ import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useAuth } from '../providers';
 import { useToast } from '@/hooks/use-toast';
+import { getTodasLasEmpresas } from '@/lib/database/tenant-configs';
 
-interface EmpresaDisponible {
-  tenantId: string;
-  tenantName: string;
-  empresaCodigo: string;
-  proveedorCodigo: string;
-}
-
-// Lista de empresas disponibles en el sistema
-const EMPRESAS_SISTEMA = [
-  // Producción (01-05)
-  { tenantId: 'la-cantera-prod', tenantName: 'La Cantera Desarrollos Mineros', empresaCodigo: 'LCDM' },
-  { tenantId: 'peralillo-prod', tenantName: 'El Peralillo SA de CV', empresaCodigo: 'PERA' },
-  { tenantId: 'plaza-galerena-prod', tenantName: 'Plaza Galereña', empresaCodigo: 'PLAZ' },
-  { tenantId: 'inmobiliaria-galerena-prod', tenantName: 'Inmobiliaria Galereña', empresaCodigo: 'INMO' },
-  { tenantId: 'icrear-prod', tenantName: 'Icrear', empresaCodigo: 'ICRE' },
-  // Pruebas (06-10)
-  { tenantId: 'la-cantera-test', tenantName: 'La Cantera Desarrollos Mineros [TEST]', empresaCodigo: 'LCDM' },
-  { tenantId: 'peralillo-test', tenantName: 'El Peralillo SA de CV [TEST]', empresaCodigo: 'PERA' },
-  { tenantId: 'plaza-galerena-test', tenantName: 'Plaza Galereña [TEST]', empresaCodigo: 'PLAZ' },
-  { tenantId: 'inmobiliaria-galerena-test', tenantName: 'Inmobiliaria Galereña [TEST]', empresaCodigo: 'INMO' },
-  { tenantId: 'icrear-test', tenantName: 'Icrear [TEST]', empresaCodigo: 'ICRE' },
-];
+// Generar lista de empresas desde la fuente de verdad
+const EMPRESAS_SISTEMA = getTodasLasEmpresas().map(config => ({
+  codigo: config.code,
+  nombre: config.nombre,
+}));
 
 export function LoginForm() {
   // Formulario unificado
@@ -69,15 +53,6 @@ export function LoginForm() {
 
   const logo = PlaceHolderImages.find((img) => img.id === 'login-logo');
   const bgImage = PlaceHolderImages.find((img) => img.id === 'login-background');
-
-  // Redirección por rol
-  const redirectUserByRole = (role: string) => {
-    if (role === 'proveedor') {
-      router.push('/proveedores/dashboard');
-    } else {
-      router.push('/dashboard');
-    }
-  };
 
   // Manejo de login unificado
   const handleLogin = async (e: React.FormEvent) => {
@@ -108,7 +83,7 @@ export function LoginForm() {
         email,
         password,
         userType: tipoUsuario,
-        empresaId: empresaSeleccionada,
+        empresaCode: empresaSeleccionada, // Código numérico: '01', '06', etc.
         userAgent: navigator.userAgent,
       });
 
@@ -119,11 +94,11 @@ export function LoginForm() {
       }
 
       if (result?.ok) {
-        const empresaObj = EMPRESAS_SISTEMA.find((e) => e.tenantId === empresaSeleccionada);
+        const empresaObj = EMPRESAS_SISTEMA.find((e) => e.codigo === empresaSeleccionada);
 
         toast({
           title: 'Inicio de sesión exitoso',
-          description: `Bienvenido a ${empresaObj?.tenantName || 'la aplicación'}`,
+          description: `Bienvenido a ${empresaObj?.nombre || 'la aplicación'}`,
         });
 
         // Forzar recarga o redirección
@@ -216,10 +191,10 @@ export function LoginForm() {
                 </SelectTrigger>
                 <SelectContent>
                   {EMPRESAS_SISTEMA.map((empresa) => (
-                    <SelectItem key={empresa.tenantId} value={empresa.tenantId}>
+                    <SelectItem key={empresa.codigo} value={empresa.codigo}>
                       <div className="flex items-center gap-2">
                         <Building2 className="h-4 w-4" />
-                        <span>{empresa.tenantName}</span>
+                        <span>{empresa.nombre}</span>
                       </div>
                     </SelectItem>
                   ))}

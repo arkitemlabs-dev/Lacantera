@@ -398,7 +398,39 @@ WHERE pnu.IDUsuarioTipo = 4 -- Tipo Proveedor
 
 ---
 
-## 🔑 COMANDOS ÚTILES
+## 🧪 EXCEPCIONES Y PRUEBAS (Testers)
+
+Para facilitar el desarrollo y soporte, ciertos correos electrónicos tienen **Acceso Total** (Excepción de Tester), lo que les permite ver todas las empresas (01-10) incluso si no tienen mappings explícitos en la base de datos.
+
+**Correos con Excepción:**
+- `ediaz@arkitem.com`
+- `admin@lacantera.com`
+- `viviana.diaz@arkitem.com`
+- `lmontero@arkitem.com`
+- `luis.montero@arkitem.com`
+
+---
+
+## �️ MIDDLEWARE DE TENANT RESILIENTE
+
+Se implementó una validación de doble capa en `src/middleware/tenant.ts` para evitar errores 403 innecesarios:
+
+1. **Capa 1 (Sesión):** Si la empresa solicitada ya está en la lista de `empresasDisponibles` del usuario (generada en el login), se permite el acceso sin consultar la BD.
+2. **Capa 2 (Base de Datos):** Si no está en la sesión, se realiza una consulta manual a `portal_proveedor_mapping` como último recurso.
+
+---
+
+## 📂 GESTIÓN RESILIENTE DE DOCUMENTOS
+
+Para evitar errores 404 al visualizar o descargar archivos:
+
+1. **Mapeo Flexible de Nombres:** El API en `/api/proveedor/documentos` usa reglas de coincidencia inteligente (Ej: "Op Cum" -> "Opinión de cumplimiento").
+2. **Fallback de Mapeo de Proveedor:** Si el `proveedorCode` no se encuentra en la sesión, el API lo recupera automáticamente desde la base de datos del Portal usando el ID del usuario.
+3. **Anexos sin Clasificar:** Los archivos en el ERP que no coinciden con ningún requisito estándar se muestran en una sección de "Otros archivos" para asegurar visibilidad total.
+
+---
+
+## �🔑 COMANDOS ÚTILES
 
 ```bash
 # Verificar build
@@ -413,7 +445,7 @@ npm run typecheck
 
 ---
 
-**Última actualización:** 2025-12-16
+**Última actualización:** 2026-02-12
 **Base de Datos:** PP (cloud.arkitem.com)
 **Sistema:** Portal de Proveedores - La Cantera
-**Autor:** Claude Code
+**Autor:** Antigravity (AI Assistant)

@@ -1,12 +1,11 @@
+// src/lib/auth.config.ts
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcrypt';
 import sql from 'mssql';
 import { getPortalConnection } from '@/lib/database/multi-tenant-connection';
 import { getUserTenants } from '@/lib/database/hybrid-queries';
-import { TENANT_CONFIGS } from '@/lib/database/tenant-configs';
-
-
+import { ERP_DATABASES, validateEmpresaCode } from '@/lib/database/tenant-configs';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -15,164 +14,124 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
-        userType: { label: 'User Type', type: 'text' },
-        empresaId: { label: 'Empresa ID', type: 'text' },
+        empresaCode: { label: 'Empresa Code', type: 'text' }, // Código 01-10
         userAgent: { label: 'User Agent', type: 'text' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Email y contraseña son requeridos');
+        if (!credentials?.email || !credentials?.password || !credentials?.empresaCode) {
+          throw new Error('Email, contraseña y empresa son requeridos');
         }
 
+        const empresaSeleccionada = credentials.empresaCode;
+        validateEmpresaCode(empresaSeleccionada);
+
         try {
-          console.log(`[AUTH] Intentando autenticar: ${credentials.email}`);
+          console.log(`[AUTH] Intentando autenticar: ${credentials.email} para empresa ${empresaSeleccionada}`);
           const pool = await getPortalConnection();
 
-          // 🔥 PASO 1: Intentar buscar en WebUsuario (tabla principal de usuarios web)
-          console.log(`[AUTH] Buscando en WebUsuario...`);
+          // 1. Buscar en WebUsuario (Fuente Única de Verdad)
           const webUserResult = await pool
             .request()
             .input('email', sql.VarChar(100), credentials.email)
             .query(`
               SELECT
-                UsuarioWeb,
-                Nombre,
-                eMail,
-                Contrasena,
-                Rol,
-                Estatus,
-                Empresa,
-                Proveedor,
-                Cliente
+                UsuarioWeb, Nombre, eMail, Contrasena,
+                Rol, Estatus, Empresa, Proveedor
               FROM WebUsuario
               WHERE eMail = @email AND Estatus = 'ACTIVO'
             `);
 
+          let userData: any = null;
+
           if (webUserResult.recordset.length > 0) {
-            // Usuario encontrado en WebUsuario
             const webUser = webUserResult.recordset[0];
-            console.log(`[AUTH] Usuario encontrado en WebUsuario: ${webUser.eMail}, Rol: ${webUser.Rol}, Estatus: ${webUser.Estatus}`);
 
-            // Verificar contraseña (bcrypt)
-            console.log(`[AUTH] Verificando contraseña...`);
-            const isValidPassword = await bcrypt.compare(
-              credentials.password,
-              webUser.Contrasena
-            );
-
+            // Validar bcrypt
+            const isValidPassword = await bcrypt.compare(credentials.password, webUser.Contrasena);
             if (!isValidPassword) {
               console.log(`[AUTH] Contraseña inválida para ${webUser.eMail}`);
               throw new Error('Credenciales inválidas');
             }
 
-            console.log(`[AUTH] Usuario web autenticado: ${webUser.eMail} (Rol: ${webUser.Rol})`);
-
-            // Registrar inicio de sesión exitoso (importación dinámica para evitar problemas de dependencia)
-            import('@/app/actions/seguridad').then(({ registrarInicioSesion }) => {
-              registrarInicioSesion({
-                usuarioId: String(webUser.UsuarioWeb),
-                ip: 'Desde servidor',
-                userAgent: credentials.userAgent || '',
-                exitoso: true,
-              }).catch(err => console.error('[AUTH] Error registrando sesión:', err));
-            }).catch(err => console.error('[AUTH] Error importando módulo de seguridad:', err));
-
-            // Determinar userType basado en el rol
-            let userType = 'Usuario';
-            let role = webUser.Rol || 'user';
-
-            if (role === 'super-admin' || role === 'admin') {
-              userType = 'Administrador';
-            } else if (webUser.Proveedor) {
-              userType = 'Proveedor';
-              role = 'proveedor';
-            } else if (webUser.Cliente) {
-              userType = 'Cliente';
-            }
-
-            return {
-              id: String(webUser.UsuarioWeb),
+            userData = {
+              id: webUser.UsuarioWeb,
               email: webUser.eMail,
               name: webUser.Nombre,
-              role: role,
-              userType: userType,
-              empresa: webUser.Empresa,
-              proveedor: webUser.Proveedor,
-              empresaId: credentials.empresaId,
-              requiresPasswordChange: false,
+              role: webUser.Rol,
+              empresaDefault: webUser.Empresa,
+              proveedorCode: webUser.Proveedor,
             };
+          } else {
+            // 2. Sistema Legacy (pNetUsuario)
+            const legacyUserResult = await pool
+              .request()
+              .input('email', sql.VarChar(50), credentials.email)
+              .query(`
+                SELECT u.IDUsuario, u.Usuario, u.eMail, u.Nombre, u.IDUsuarioTipo, p.PasswordHash
+                FROM pNetUsuario u
+                INNER JOIN pNetUsuarioPassword p ON u.IDUsuario = p.IDUsuario
+                WHERE u.eMail = @email AND (u.Estatus = 'ACTIVO' OR u.Estatus = '1')
+              `);
+
+            if (legacyUserResult.recordset.length > 0) {
+              const legacyUser = legacyUserResult.recordset[0];
+              const isValidPassword = await bcrypt.compare(credentials.password, legacyUser.PasswordHash);
+              if (!isValidPassword) throw new Error('Credenciales inválidas');
+
+              userData = {
+                id: String(legacyUser.IDUsuario),
+                email: legacyUser.eMail,
+                name: legacyUser.Nombre,
+                role: legacyUser.IDUsuarioTipo === 1 ? 'admin' : 'proveedor',
+                proveedorCode: legacyUser.Usuario,
+              };
+            }
           }
 
-          // 🔥 PASO 2: Si no está en portal_usuarios, buscar en pNetUsuario (usuarios antiguos)
-          const userResult = await pool
-            .request()
-            .input('email', sql.VarChar(50), credentials.email)
-            .query(`
-              SELECT
-                u.IDUsuario,
-                u.Usuario,
-                u.IDUsuarioTipo,
-                u.eMail,
-                u.Nombre,
-                u.Estatus,
-                u.Empresa,
-                t.Descripcion as TipoUsuario
-              FROM pNetUsuario u
-              INNER JOIN pNetUsuarioTipo t ON u.IDUsuarioTipo = t.IDUsuarioTipo
-              WHERE u.eMail = @email AND (u.Estatus = 'ACTIVO' OR u.Estatus = '1')
-            `);
-
-          const user = userResult.recordset[0];
-
-          if (!user) {
+          if (!userData) {
             throw new Error('Credenciales inválidas');
           }
 
-          // Verificar contraseña
-          const passwordResult = await pool
-            .request()
-            .input('userId', sql.Int, user.IDUsuario)
-            .query(`
-              SELECT PasswordHash
-              FROM pNetUsuarioPassword
-              WHERE IDUsuario = @userId
-            `);
+          // 3. Obtener empresas disponibles
+          const tenants = await getUserTenants(userData.id, userData.role, userData.email);
+          const empresasDisponibles = tenants.map((t: any) => t.codigo);
 
-          if (passwordResult.recordset.length === 0) {
-            throw new Error('Usuario sin contraseña configurada');
+          // 4. VALIDACIÓN CRÍTICA: Solo códigos numéricos
+          if (!empresasDisponibles.includes(empresaSeleccionada)) {
+            // Excepción: super-admin tiene acceso a todo (01-10)
+            if (userData.role !== 'super-admin') {
+              throw new Error("No tiene acceso a esta empresa");
+            }
           }
 
-          const isValidPassword = await bcrypt.compare(
-            credentials.password,
-            passwordResult.recordset[0].PasswordHash
-          );
+          console.log(`[AUTH] Login exitoso para ${userData.email} en empresa ${empresaSeleccionada}`);
 
-          if (!isValidPassword) {
-            throw new Error('Credenciales inválidas');
+          // Determinar userType
+          let userType = 'Usuario';
+          if (userData.role === 'super-admin' || userData.role === 'admin') {
+            userType = 'Administrador';
+          } else if (userData.role === 'proveedor') {
+            userType = 'Proveedor';
           }
 
-          // Determinar rol basado en el tipo de usuario
-          let role = 'user';
-          if (user.IDUsuarioTipo === 1) {
-            // Intelisis = Admin
-            role = 'admin';
-          } else if (user.IDUsuarioTipo === 4) {
-            // Proveedor
-            role = 'proveedor';
-          }
+          const dbConfig = ERP_DATABASES[empresaSeleccionada];
 
           return {
-            id: String(user.IDUsuario),
-            email: user.eMail,
-            name: user.Nombre,
-            role: role,
-            userType: user.TipoUsuario,
-            empresa: user.Empresa,
-            proveedor: user.Usuario, // La clave del proveedor
-            empresaId: credentials.empresaId, // 🔥 NUEVO: Empresa seleccionada en login
+            id: userData.id,
+            email: userData.email,
+            name: userData.name,
+            role: userData.role,
+            userType: userType,
+            empresaActual: empresaSeleccionada,
+            erpDatabase: dbConfig.db,
+            erpEmpresa: dbConfig.empresa, // Legacy compat
+            erpEmpresaCode: dbConfig.empresa,
+            empresasDisponibles: empresasDisponibles,
+            proveedor: userData.proveedorCode,
           };
+
         } catch (error: any) {
-          console.error('Error en authorize:', error);
+          console.error('Error en authorize:', error.message);
           throw error;
         }
       },
@@ -180,84 +139,36 @@ export const authOptions: NextAuthOptions = {
   ],
 
   callbacks: {
-    async jwt({ token, user, trigger, session }) {
-      // Login inicial: cargar datos del usuario
+    async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
-        token.role = user.role;
-        token.userType = user.userType;
-        token.empresa = user.empresa;
-        token.proveedor = user.proveedor;
+        const u = user as any;
+        token.id = u.id;
+        token.role = u.role;
+        token.userType = u.userType;
+        token.empresaActual = u.empresaActual;
+        token.empresasDisponibles = u.empresasDisponibles;
+        token.proveedor = u.proveedor;
 
-        // 🔥 MULTI-TENANT: Obtener empresas disponibles
-        try {
-          // Pasar el rol del usuario para determinar acceso a empresas
-          const tenants = await getUserTenants(user.id, user.role);
-
-          if (tenants.length === 0) {
-            console.warn(`[AUTH] Usuario ${user.id} sin empresas asignadas`);
-            token.empresasDisponibles = [];
-            token.empresaActual = undefined;
-          } else {
-            token.empresasDisponibles = tenants;
-
-            // 🔥 NUEVO: Si viene empresaId desde el login, usarlo
-            // De lo contrario, seleccionar la primera empresa
-            if (user.empresaId) {
-              const hasAccess = tenants.some(t => t.tenantId === user.empresaId);
-              if (hasAccess) {
-                token.empresaActual = user.empresaId;
-                const tenantInfo = tenants.find(t => t.tenantId === user.empresaId);
-                const tenantConfig = (TENANT_CONFIGS as any)[user.empresaId];
-                // Mapeo de código empresa a BD destino
-                const BD_MAP: Record<string, string> = {
-                  '01': 'Cantera', '02': 'Peralillo', '03': 'Galbd', '04': 'Galbd', '05': 'Icrear',
-                  '06': 'Cantera_Ajustes', '07': 'Peralillo_Ajustes', '08': 'Galbd_Pruebas', '09': 'Galbd_Pruebas', '10': 'Icrear_Pruebas',
-                };
-                const erpCode = tenantConfig?.erpEmpresa || '?';
-                const bdDestino = BD_MAP[erpCode] || 'Desconocida';
-                console.log(`\n========================================`);
-                console.log(`[AUTH] LOGIN EXITOSO`);
-                console.log(`  Usuario: ${user.id} (${user.role})`);
-                console.log(`  Empresa: ${tenantInfo?.tenantName || user.empresaId}`);
-                console.log(`  Tenant ID: ${user.empresaId}`);
-                console.log(`  Codigo ERP: ${erpCode}`);
-                console.log(`  BD destino: ${bdDestino}`);
-                console.log(`========================================\n`);
-              } else {
-                console.warn(`[AUTH] Usuario ${user.id} intentó seleccionar empresa sin acceso: ${user.empresaId}`);
-                token.empresaActual = tenants[0].tenantId;
-              }
-            } else {
-              // Por defecto, seleccionar la primera empresa
-              token.empresaActual = tenants[0].tenantId;
-            }
-
-            console.log(`[AUTH] Usuario ${user.id} (rol: ${user.role}) tiene acceso a ${tenants.length} empresa(s)`);
-          }
-        } catch (error) {
-          console.error('[AUTH] Error obteniendo empresas:', error);
-          token.empresasDisponibles = [];
-          token.empresaActual = undefined;
+        // Resolución de empresa ERP (Basado en ERP_DATABASES)
+        const config = ERP_DATABASES[u.empresaActual];
+        if (config) {
+          token.erpDatabase = config.db;
+          token.erpEmpresaCode = config.empresa;
         }
       }
-
-      // Empresa se fija en el login. Para cambiar de empresa, hacer logout.
-
       return token;
     },
 
-    async session({ session, token }) {
+    async session({ session, token }: any) {
       if (session.user) {
-        session.user.id = token.id as string;
-        session.user.role = token.role as string;
-        session.user.userType = token.userType as string;
-        session.user.empresa = token.empresa as string;
-        session.user.proveedor = token.proveedor as string;
-
-        // 🔥 MULTI-TENANT: Agregar empresas al session
-        session.user.empresaActual = token.empresaActual as string | undefined;
-        session.user.empresasDisponibles = token.empresasDisponibles as any;
+        session.user.id = token.id;
+        session.user.role = token.role;
+        session.user.userType = token.userType;
+        session.user.empresaActual = token.empresaActual;
+        session.user.erpDatabase = token.erpDatabase;
+        session.user.erpEmpresaCode = token.erpEmpresaCode;
+        session.user.empresasDisponibles = token.empresasDisponibles;
+        session.user.proveedor = token.proveedor;
       }
       return session;
     },
@@ -269,7 +180,7 @@ export const authOptions: NextAuthOptions = {
 
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 días
+    maxAge: 7 * 24 * 60 * 60, // 7 días
   },
 
   secret: process.env.NEXTAUTH_SECRET,

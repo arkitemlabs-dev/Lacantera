@@ -9,13 +9,16 @@ declare module 'next-auth' {
     userType: string;
     empresa?: string;
     proveedor?: string;
-    // Multi-tenant
+    // Multi-tenant (código numérico)
+    empresaId?: string;
     empresaActual?: string;
+    erpDatabase?: string;
+    erpEmpresa?: string;
+    erpEmpresaCode?: string;
     empresasDisponibles?: Array<{
-      tenantId: string;
-      tenantName: string;
-      empresaCodigo: string;
-      proveedorCodigo: string;
+      codigo: string;
+      nombre: string;
+      proveedorCodigo: string | null;
     }>;
   }
 
@@ -28,13 +31,15 @@ declare module 'next-auth' {
       userType: string;
       empresa?: string;
       proveedor?: string;
-      // Multi-tenant
+      // Multi-tenant (código numérico)
       empresaActual?: string;
+      erpDatabase?: string;
+      erpEmpresa?: string;
+      erpEmpresaCode?: string;
       empresasDisponibles?: Array<{
-        tenantId: string;
-        tenantName: string;
-        empresaCodigo: string;
-        proveedorCodigo: string;
+        codigo: string;
+        nombre: string;
+        proveedorCodigo: string | null;
       }>;
     };
   }
@@ -47,13 +52,15 @@ declare module 'next-auth/jwt' {
     userType: string;
     empresa?: string;
     proveedor?: string;
-    // Multi-tenant
+    // Multi-tenant (código numérico)
     empresaActual?: string;
+    erpDatabase?: string;
+    erpEmpresa?: string;
+    erpEmpresaCode?: string;
     empresasDisponibles?: Array<{
-      tenantId: string;
-      tenantName: string;
-      empresaCodigo: string;
-      proveedorCodigo: string;
+      codigo: string;
+      nombre: string;
+      proveedorCodigo: string | null;
     }>;
   }
 }

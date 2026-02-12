@@ -6,7 +6,8 @@
  */
 
 import sql from 'mssql';
-import { getERPConnection, getTenantConfig } from './multi-tenant-connection';
+import { getERPConnection } from './multi-tenant-connection';
+import { validateEmpresaCode, ERP_DATABASES } from './tenant-configs';
 import type {
   ProveedorSPParams,
   ConsultaProveedorParams,
@@ -22,62 +23,6 @@ class DebugStore {
 }
 
 export { DebugStore };
-
-// =============================================================================
-// MAPEO DE CÓDIGOS DE EMPRESA A TENANT IDs
-// =============================================================================
-
-/**
- * Mapeo de códigos de empresa (usados en el ERP) a tenant IDs (usados en el portal)
- *
- * Códigos ERP: '01', '02', '03', '04', '05'
- * Tenant IDs: 'la-cantera', 'peralillo', 'plaza-galerena', etc.
- */
-const EMPRESA_TO_TENANT: Record<string, string> = {
-  '01': 'la-cantera-prod',
-  '02': 'peralillo-prod',
-  '03': 'plaza-galerena-prod',
-  '04': 'inmobiliaria-galerena-prod',
-  '05': 'icrear-prod',
-  '06': 'la-cantera-test',
-  '07': 'peralillo-test',
-  '08': 'plaza-galerena-test',
-  '09': 'inmobiliaria-galerena-test',
-  '10': 'icrear-test',
-  'LCDM': 'la-cantera-prod',
-  'PERA': 'peralillo-prod',
-  'PLAZ': 'plaza-galerena-prod',
-  'INMO': 'inmobiliaria-galerena-prod',
-  'ICRE': 'icrear-prod',
-  // Tenant IDs directos (nuevos con sufijo)
-  'la-cantera-prod': 'la-cantera-prod',
-  'la-cantera-test': 'la-cantera-test',
-  'peralillo-prod': 'peralillo-prod',
-  'peralillo-test': 'peralillo-test',
-  'plaza-galerena-prod': 'plaza-galerena-prod',
-  'plaza-galerena-test': 'plaza-galerena-test',
-  'inmobiliaria-galerena-prod': 'inmobiliaria-galerena-prod',
-  'inmobiliaria-galerena-test': 'inmobiliaria-galerena-test',
-  'icrear-prod': 'icrear-prod',
-  'icrear-test': 'icrear-test',
-  // Legacy (sin sufijo) → fallback a test
-  'la-cantera': 'la-cantera-test',
-  'peralillo': 'peralillo-test',
-  'plaza-galerena': 'plaza-galerena-test',
-  'inmobiliaria-galerena': 'inmobiliaria-galerena-test',
-  'icrear': 'icrear-test',
-};
-
-/**
- * Convierte un código de empresa a tenant ID
- */
-function empresaToTenant(empresaCode: string): string {
-  const tenantId = EMPRESA_TO_TENANT[empresaCode];
-  if (!tenantId) {
-    throw new Error(`Código de empresa no reconocido: ${empresaCode}. Valores válidos: ${Object.keys(EMPRESA_TO_TENANT).join(', ')}`);
-  }
-  return tenantId;
-}
 
 // =============================================================================
 // TIPOS
@@ -189,30 +134,31 @@ function getFirstRecord<T = unknown>(result: sql.IProcedureResult<T>, index: num
 export class StoredProcedures {
 
   /**
-   * Obtiene la conexión al ERP según el código de empresa
-   * REGLA: Siempre usamos Cantera_Ajustes (la-cantera-test) como entrada para los SPs
+   * Obtiene la conexión al ERP según el código de empresa.
+   * FIX CRÍTICO: Antes estaba hardcodeado a Cantera_Ajustes.
+   * Ahora conecta a la BD correcta según ERP_DATABASES.
    */
-  private async getPool(empresaCode: string = 'la-cantera'): Promise<sql.ConnectionPool> {
-    // El usuario especifica que siempre llamamos desde Cantera_Ajustes
-    return await getERPConnection('la-cantera-test');
+  private async getPool(empresaCode: string): Promise<sql.ConnectionPool> {
+    if (!empresaCode) {
+      throw new Error('[SP SECURITY] El código de empresa es OBLIGATORIO para obtener pool.');
+    }
+    const code = validateEmpresaCode(empresaCode);
+    console.log(`[SP] getPool: ${empresaCode} → BD ${ERP_DATABASES[code].db}`);
+    return await getERPConnection(code);
   }
 
   /**
-   * Helper para obtener el código de empresa del ERP basado en tenant o parámetro
+   * Helper para obtener el parámetro @Empresa que reciben los SPs.
+   * Resuelve cualquier formato (numérico, slug) al valor correcto.
    */
   private getEmpresaERP(empresa: string | null | undefined): string {
     if (!empresa) {
-      // STRICT SCENARIO: Never default to Production '01' without explicit instruction.
       throw new Error('[SP SECURITY] El código de empresa es OBLIGATORIO. No se permite defaulting a Producción.');
     }
-    try {
-      const config = getTenantConfig(empresa);
-      console.log(`[SP] getEmpresaERP: ${empresa} -> ${config.erpEmpresa}`);
-      return config.erpEmpresa;
-    } catch (e) {
-      console.log(`[SP] getEmpresaERP: ${empresa} no encontrado en config, retornando como está`);
-      return empresa;
-    }
+    const code = validateEmpresaCode(empresa);
+    const erpEmpresa = ERP_DATABASES[code].empresa;
+    console.log(`[SP] getEmpresaERP: ${empresa} → code ${code} → @Empresa='${erpEmpresa}' (BD: ${ERP_DATABASES[code].db})`);
+    return erpEmpresa;
   }
 
   /**
@@ -634,7 +580,6 @@ export class StoredProcedures {
     } = params;
 
     try {
-      const config = getTenantConfig(empresa);
       const pool = await this.getPool(empresa);
 
       // Debug: verificar conexión exacta
@@ -710,8 +655,8 @@ export class StoredProcedures {
         const execSQL = `EXEC spDatosProveedor
   @Empresa = '${this.getEmpresaERP(empresa)}',
   @Operacion = '${operacion}',
-  @Rfc = '${operacion === 'C' ? '' : rfc}',
-  @Proveedor = '${operacion === 'C' ? '' : proveedor}',
+  @Rfc = '${rfc}',
+  @Proveedor = '${proveedor}',
   @CveProv = '${cveProv}',
   @Nombre = '${s(fullParams.nombre)}',
   @NombreC = '${s(fullParams.nombreC)}',
@@ -762,8 +707,8 @@ export class StoredProcedures {
         console.log('[SP RESULT DATA (Record 0)]', result.recordset[0]);
       }
 
-      if (result.recordsets && result.recordsets.length > 1 && result.recordsets[1].length > 0) {
-        console.log('[SP RESULT DATA (Recordset 1, Record 0)]', result.recordsets[1][0]);
+      if (result.recordsets && (result.recordsets as any).length > 1 && (result.recordsets as any)[1].length > 0) {
+        console.log('[SP RESULT DATA (Recordset 1, Record 0)]', (result.recordsets as any)[1][0]);
       }
 
       // Para consultas, devolver los datos del recordset
@@ -849,11 +794,10 @@ export class StoredProcedures {
     try {
       const pool = await this.getPool(empresa);
       const empresaERP = this.getEmpresaERP(empresa);
+      const numericCode = validateEmpresaCode(empresa);
 
-      // Determine if we are in Production or Test based on the Company Code
-      // Prod: 01, 02, 03, 04, 05
-      // Test: 06, 07, 08, 09, 10
-      const isTestEmpresa = ['06', '07', '08', '09', '10'].includes(empresaERP);
+      // Determine if we are in Production or Test based on the numeric code
+      const isTestEmpresa = parseInt(numericCode) >= 6;
 
       console.log(`[SP] spGeneraRemisionCompra - Empresa: ${empresaERP}, IsTest: ${isTestEmpresa}, MovId: ${movId}, Factura: ${factura}`);
 

@@ -13,19 +13,34 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Eye, EyeOff } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Eye, EyeOff, Building2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { signIn } from 'next-auth/react';
 import { useAuth } from '@/app/providers';
 import { useToast } from '@/hooks/use-toast';
+import { getEmpresasProduccion } from '@/lib/database/tenant-configs';
+
+// Solo mostrar empresas de producción para registro
+const EMPRESAS_REGISTRO = getEmpresasProduccion().map(config => ({
+  codigo: config.code,
+  nombre: config.nombre,
+}));
 
 export default function RegistroProveedorPage() {
   const [razonSocial, setRazonSocial] = useState('');
   const [rfc, setRfc] = useState('');
   const [contactName, setContactName] = useState('');
   const [email, setEmail] = useState('');
+  const [empresaCode, setEmpresaCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -49,6 +64,11 @@ export default function RegistroProveedorPage() {
     e.preventDefault();
     setError(null);
 
+    if (!empresaCode) {
+      setError("Por favor, seleccione una empresa.");
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Las contraseñas no coinciden.");
       return;
@@ -62,7 +82,6 @@ export default function RegistroProveedorPage() {
     setLoading(true);
 
     try {
-      // Llamar al API endpoint de registro
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
@@ -74,6 +93,7 @@ export default function RegistroProveedorPage() {
           nombre: contactName,
           rfc,
           razonSocial,
+          empresaCode, // Código numérico de la empresa
         }),
       });
 
@@ -86,14 +106,15 @@ export default function RegistroProveedorPage() {
       }
 
       toast({
-        title: "¡Registro exitoso!",
-        description: result.message || "Tu cuenta está pendiente de aprobación.",
+        title: "Registro exitoso",
+        description: result.message || "Tu cuenta ha sido creada.",
       });
 
       // Login automático después de registrar
       const signInResult = await signIn('credentials', {
         email,
         password,
+        empresaCode: empresaCode,
         redirect: false,
       });
 
@@ -150,6 +171,31 @@ export default function RegistroProveedorPage() {
         <CardContent>
           <form className="space-y-4" onSubmit={handleRegister}>
             {error && <p className="text-red-500 text-center font-medium">{error}</p>}
+
+            {/* Selector de Empresa */}
+            <div className="space-y-2">
+              <Label htmlFor="empresa">Empresa</Label>
+              <Select
+                value={empresaCode}
+                onValueChange={setEmpresaCode}
+                disabled={loading}
+              >
+                <SelectTrigger id="empresa">
+                  <SelectValue placeholder="Seleccione la empresa donde es proveedor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {EMPRESAS_REGISTRO.map((empresa) => (
+                    <SelectItem key={empresa.codigo} value={empresa.codigo}>
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4" />
+                        <span>{empresa.nombre}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="razonSocial">Razón Social</Label>
               <Input
@@ -165,12 +211,12 @@ export default function RegistroProveedorPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label htmlFor="rfc">RFC</Label>
-                    <Input 
-                      id="rfc" 
-                      type="text" 
-                      placeholder="SUE010101ABC" 
-                      required 
-                      value={rfc} 
+                <Input
+                  id="rfc"
+                  type="text"
+                  placeholder="SUE010101ABC"
+                  required
+                  value={rfc}
                       onChange={(e) => setRfc(e.target.value)}
                       disabled={loading}
                       maxLength={13}
@@ -178,12 +224,12 @@ export default function RegistroProveedorPage() {
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="contactName">Nombre del Contacto</Label>
-                    <Input 
-                      id="contactName" 
-                      type="text" 
-                      placeholder="Juan Pérez" 
-                      required 
-                      value={contactName} 
+                <Input
+                  id="contactName"
+                  type="text"
+                  placeholder="Juan Pérez"
+                  required
+                  value={contactName}
                       onChange={(e) => setContactName(e.target.value)}
                       disabled={loading}
                     />

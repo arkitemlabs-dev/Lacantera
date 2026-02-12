@@ -30,14 +30,8 @@ export async function GET(
     }
 
     const { docId } = await params;
-    const portalProveedor = session.user.proveedor;
-
-    if (!portalProveedor) {
-      return NextResponse.json(
-        { success: false, error: 'No se encontró código de proveedor en la sesión' },
-        { status: 400 }
-      );
-    }
+    const userId = session.user.id;
+    let portalProveedor = session.user.proveedor;
 
     // Obtener empresa de la sesión
     const empresaActual = session.user.empresaActual;
@@ -48,10 +42,38 @@ export async function GET(
       );
     }
 
-    // Obtener código ERP del proveedor via mapping
+    // 2. Obtener el código de proveedor (desde sesión o desde la BD como fallback)
     const portalPool = await getPortalConnection();
+
+    // Si no está en la sesión, intentamos recuperarlo de los mappings o del usuario
+    if (!portalProveedor) {
+      console.log(`⚠️ [ARCHIVO] Proveedor no en sesión para usuario ${userId}, buscando fallback...`);
+      const fallbackResult = await portalPool.request()
+        .input('userId', sql.NVarChar(50), userId)
+        .input('empresa', sql.VarChar(50), empresaActual)
+        .query(`
+          SELECT TOP 1 erp_proveedor_code 
+          FROM portal_proveedor_mapping 
+          WHERE portal_user_id = @userId AND (empresa_code = @empresa OR activo = 1)
+          ORDER BY (CASE WHEN empresa_code = @empresa THEN 0 ELSE 1 END)
+        `);
+
+      if (fallbackResult.recordset.length > 0) {
+        portalProveedor = fallbackResult.recordset[0].erp_proveedor_code;
+        console.log(`✅ [ARCHIVO] Fallback encontrado: ${portalProveedor}`);
+      }
+    }
+
+    if (!portalProveedor) {
+      return NextResponse.json(
+        { success: false, error: 'No se pudo determinar el código de proveedor' },
+        { status: 400 }
+      );
+    }
+
+    // 3. Obtener el mapping específico para esta empresa (para asegurar el código correcto en el ERP)
     const mappingResult = await portalPool.request()
-      .input('userId', sql.NVarChar(50), session.user.id)
+      .input('userId', sql.NVarChar(50), userId)
       .input('empresa', sql.VarChar(50), empresaActual)
       .query(`
         SELECT erp_proveedor_code
