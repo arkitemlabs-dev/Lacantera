@@ -68,7 +68,7 @@ export interface TipoDocumento {
 export interface Notificacion {
   id: string;
   notificacionID: string;
-  idUsuario: number;
+  idUsuario: string | number;
   usuarioNombre: string;
   empresa: string;
   tipo: string;

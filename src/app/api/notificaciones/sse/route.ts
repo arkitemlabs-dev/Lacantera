@@ -55,7 +55,7 @@ export const GET = withTenantContext(async (request, { tenant, user }) => {
 });
 
 // Función para enviar notificación a un usuario específico
-export function sendNotificationToUser(userId: number, empresa: string, notification: any) {
+export function sendNotificationToUser(userId: string | number, empresa: string, notification: any) {
   const connectionId = `${userId}-${empresa}`;
   const controller = connections.get(connectionId);
   
@@ -74,7 +74,7 @@ export function sendNotificationToUser(userId: number, empresa: string, notifica
 }
 
 // Función para enviar actualización de contador
-export function sendNotificationCountUpdate(userId: number, empresa: string, count: number) {
+export function sendNotificationCountUpdate(userId: string | number, empresa: string, count: number) {
   const connectionId = `${userId}-${empresa}`;
   const controller = connections.get(connectionId);
   

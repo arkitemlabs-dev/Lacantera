@@ -130,14 +130,18 @@ export async function crearConversacion(data: {
       updatedAt: conversacionActualizada.updatedAt
     });
 
-    // Crear notificación para el destinatario usando el servicio de notificaciones
-    await NotificationService.enviarNotificacionMensaje({
-      destinatarioId: parseInt(data.destinatarioId),
-      remitenteNombre: data.remitenteNombre,
-      asunto: data.asunto,
-      empresaId: data.empresaId,
-      conversacionId: conversacion.id
-    });
+    // Crear notificación (no bloquea el envío del mensaje si falla)
+    try {
+      await NotificationService.enviarNotificacionMensaje({
+        destinatarioId: data.destinatarioId,
+        remitenteNombre: data.remitenteNombre,
+        asunto: data.asunto,
+        empresaId: data.empresaId,
+        conversacionId: conversacion.id
+      });
+    } catch (notifError: any) {
+      console.warn('[mensajes] Notificación no enviada:', notifError.message);
+    }
 
     revalidatePath('/mensajeria');
     revalidatePath('/proveedores/mensajeria');
@@ -234,18 +238,22 @@ export async function enviarMensaje(data: {
       updatedAt: new Date()
     });
 
-    // Crear notificación para el destinatario usando el servicio de notificaciones
-    await NotificationService.enviarNotificacionMensaje({
-      destinatarioId: parseInt(destinatarioId),
-      remitenteNombre: data.remitenteNombre,
-      asunto: 'Nuevo mensaje',
-      empresaId: conversacion.empresaId || '',
-      conversacionId: data.conversacionId
-    });
+    // Crear notificación (no bloquea el envío del mensaje si falla)
+    try {
+      await NotificationService.enviarNotificacionMensaje({
+        destinatarioId: destinatarioId,
+        remitenteNombre: data.remitenteNombre,
+        asunto: 'Nuevo mensaje',
+        empresaId: conversacion.empresaId || '',
+        conversacionId: data.conversacionId
+      });
+    } catch (notifError: any) {
+      console.warn('[mensajes] Notificación no enviada:', notifError.message);
+    }
 
     revalidatePath('/mensajeria');
     revalidatePath('/proveedores/mensajeria');
-    
+
     return { success: true, data: mensaje };
   } catch (error: any) {
     console.error('Error enviando mensaje:', error);

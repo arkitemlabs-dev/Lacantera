@@ -3,7 +3,7 @@ import { extendedDb } from '@/lib/database/sqlserver-extended';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface NotificationData {
-  usuarioId: number;
+  usuarioId: string | number;
   usuarioNombre?: string;
   empresaId: string;
   tipo: string;
@@ -76,7 +76,7 @@ export class NotificationService {
    * Envía notificación de nuevo mensaje
    */
   static async enviarNotificacionMensaje(data: {
-    destinatarioId: number;
+    destinatarioId: string | number;
     remitenteNombre: string;
     asunto: string;
     empresaId: string;
@@ -101,7 +101,7 @@ export class NotificationService {
    * Envía notificación de orden de compra
    */
   static async enviarNotificacionOrdenCompra(data: {
-    proveedorId: number;
+    proveedorId: string | number;
     ordenId: string;
     monto: number;
     empresaId: string;
@@ -134,7 +134,7 @@ export class NotificationService {
    * Envía notificación de factura
    */
   static async enviarNotificacionFactura(data: {
-    proveedorId: number;
+    proveedorId: string | number;
     facturaId: string;
     folio: string;
     empresaId: string;
@@ -189,7 +189,7 @@ export class NotificationService {
   /**
    * Obtiene el contador de notificaciones no leídas
    */
-  static async getContadorNoLeidas(usuarioId: number, empresaId: string): Promise<number> {
+  static async getContadorNoLeidas(usuarioId: string | number, empresaId: string): Promise<number> {
     try {
       return await extendedDb.contarNotificacionesNoLeidas(usuarioId, empresaId);
     } catch (error) {
@@ -201,7 +201,7 @@ export class NotificationService {
   /**
    * Marca una notificación como leída
    */
-  static async marcarComoLeida(notificacionId: string, usuarioId: number, empresaId: string): Promise<void> {
+  static async marcarComoLeida(notificacionId: string, usuarioId: string | number, empresaId: string): Promise<void> {
     try {
       await extendedDb.marcarNotificacionLeida(notificacionId);
       
