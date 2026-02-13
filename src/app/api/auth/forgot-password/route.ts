@@ -4,7 +4,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql from 'mssql';
 import crypto from 'crypto';
-import { getConnection } from '@/lib/sql-connection';
 import { getPortalConnection } from '@/lib/database/multi-tenant-connection';
 import { sendEmail } from '@/lib/email-service';
 import { getRecuperarPasswordEmail } from '@/lib/email-templates/notificacion';
@@ -39,42 +38,23 @@ export async function POST(request: NextRequest) {
                       request.headers.get('x-real-ip') ||
                       'Desconocida';
 
-    // Buscar el usuario en ambas tablas (proveedores y admins)
+    // Buscar el usuario en WebUsuario (tabla única de usuarios)
     let usuario = null;
-    let tipoUsuario: 'proveedor' | 'admin' = 'proveedor';
+    let tipoUsuario: string = 'usuario';
 
-    // 1. Buscar en pNetUsuario (proveedores)
-    const pool = await getConnection();
-    const proveedorResult = await pool.request()
+    const portalPool = await getPortalConnection();
+    const userResult = await portalPool.request()
       .input('email', sql.VarChar(100), email)
       .query(`
-        SELECT IDUsuario, Nombre, eMail, Estatus
-        FROM pNetUsuario
+        SELECT UsuarioWeb, Nombre, eMail, Estatus, Rol
+        FROM WebUsuario
         WHERE eMail = @email AND Estatus = 'ACTIVO'
       `);
 
-    if (proveedorResult.recordset.length > 0) {
-      usuario = proveedorResult.recordset[0];
-      tipoUsuario = 'proveedor';
-      console.log(`📍 Usuario encontrado en pNetUsuario: ${usuario.Nombre}`);
-    }
-
-    // 2. Si no está en proveedores, buscar en WebUsuario (admins)
-    if (!usuario) {
-      const portalPool = await getPortalConnection();
-      const adminResult = await portalPool.request()
-        .input('email', sql.VarChar(100), email)
-        .query(`
-          SELECT UsuarioWeb, Nombre, eMail, Estatus
-          FROM WebUsuario
-          WHERE eMail = @email AND Estatus = 'ACTIVO'
-        `);
-
-      if (adminResult.recordset.length > 0) {
-        usuario = adminResult.recordset[0];
-        tipoUsuario = 'admin';
-        console.log(`📍 Usuario encontrado en WebUsuario: ${usuario.Nombre}`);
-      }
+    if (userResult.recordset.length > 0) {
+      usuario = userResult.recordset[0];
+      tipoUsuario = usuario.Rol || 'usuario';
+      console.log(`[FORGOT-PASSWORD] Usuario encontrado en WebUsuario: ${usuario.Nombre} (${tipoUsuario})`);
     }
 
     // Si no se encuentra el usuario, responder con éxito para no revelar información
@@ -93,8 +73,6 @@ export async function POST(request: NextRequest) {
     const expiresAt = new Date(Date.now() + TOKEN_EXPIRATION_MINUTES * 60 * 1000);
 
     // Guardar token en la base de datos
-    const portalPool = await getPortalConnection();
-
     // Primero, invalidar tokens anteriores para este email
     await portalPool.request()
       .input('email', sql.VarChar(100), email)

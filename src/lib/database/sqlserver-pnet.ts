@@ -31,103 +31,82 @@ export class SqlServerPNetDatabase implements Database {
   // ==================== AUTENTICACIÓN ====================
 
   /**
-   * Busca un usuario por email y verifica su contraseña
+   * Busca un usuario por email y verifica su contraseña (WebUsuario)
    */
   async authenticateUser(
     email: string,
     password: string
   ): Promise<{ user: ProveedorUser; userType: string } | null> {
-    const pool = await getConnection();
+    const pool = await getPortalConnection();
 
-    // Buscar usuario en pNetUsuario
+    // Buscar usuario en WebUsuario (tabla única de usuarios)
     const userResult = await pool
       .request()
-      .input('email', sql.VarChar(50), email)
+      .input('email', sql.VarChar(100), email)
       .query(`
         SELECT
-          u.IDUsuario,
-          u.Usuario,
-          u.IDUsuarioTipo,
-          u.eMail,
-          u.Nombre,
-          u.UrlImagen,
-          u.Estatus,
-          u.Telefono,
-          u.PrimeraVez,
-          u.Empresa,
-          t.Descripcion as TipoUsuario,
-          t.Tabla as TablaTipo
-        FROM pNetUsuario u
-        INNER JOIN pNetUsuarioTipo t ON u.IDUsuarioTipo = t.IDUsuarioTipo
-        WHERE u.eMail = @email AND (u.Estatus = 'ACTIVO' OR u.Estatus = '1')
+          UsuarioWeb,
+          Nombre,
+          eMail,
+          Contrasena,
+          Rol,
+          Estatus,
+          Empresa,
+          Proveedor,
+          Telefono,
+          Alta as FechaRegistro
+        FROM WebUsuario
+        WHERE eMail = @email AND Estatus = 'ACTIVO'
       `);
 
     if (userResult.recordset.length === 0) {
-      return null; // Usuario no encontrado
+      return null;
     }
 
     const userRecord = userResult.recordset[0];
 
     // Verificar contraseña
-    const passwordResult = await pool
-      .request()
-      .input('userId', sql.Int, userRecord.IDUsuario)
-      .query(`
-        SELECT PasswordHash
-        FROM pNetUsuarioPassword
-        WHERE IDUsuario = @userId
-      `);
-
-    if (passwordResult.recordset.length === 0) {
-      return null; // No tiene contraseña configurada
-    }
-
-    const isPasswordValid = await bcrypt.compare(
-      password,
-      passwordResult.recordset[0].PasswordHash
-    );
-
+    const isPasswordValid = await bcrypt.compare(password, userRecord.Contrasena);
     if (!isPasswordValid) {
-      return null; // Contraseña incorrecta
+      return null;
     }
 
-    // Si el usuario es tipo Proveedor, obtener datos de la tabla Prov
+    // Si el usuario es proveedor, obtener datos de la tabla Prov del ERP
     let proveedorData = null;
-    if (userRecord.IDUsuarioTipo === 4) {
-      // Tipo 4 = Proveedor
-      const provResult = await pool
-        .request()
-        .input('proveedor', sql.VarChar(10), userRecord.Usuario)
-        .query(`
-          SELECT
-            Proveedor,
-            Nombre,
-            RFC,
-            Direccion,
-            DireccionNumero,
-            Colonia,
-            Poblacion,
-            Estado,
-            CodigoPostal,
-            Estatus
-          FROM Prov
-          WHERE Proveedor = @proveedor
-        `);
+    if (userRecord.Rol === 'proveedor' && userRecord.Proveedor) {
+      try {
+        const erpPool = await getERPConnection('la-cantera');
+        const provResult = await erpPool
+          .request()
+          .input('proveedor', sql.VarChar(20), userRecord.Proveedor.trim())
+          .query(`
+            SELECT
+              Proveedor, Nombre, RFC,
+              Direccion, DireccionNumero, Colonia,
+              Poblacion, Estado, CodigoPostal, Estatus
+            FROM Prov
+            WHERE Proveedor = @proveedor
+          `);
 
-      if (provResult.recordset.length > 0) {
-        proveedorData = provResult.recordset[0];
+        if (provResult.recordset.length > 0) {
+          proveedorData = provResult.recordset[0];
+        }
+      } catch (e: any) {
+        console.warn('[authenticateUser] No se pudo obtener datos ERP:', e.message);
       }
     }
 
+    const userType = userRecord.Rol === 'proveedor' ? 'Proveedor' : 'Administrador';
+
     // Mapear a ProveedorUser
     const user: ProveedorUser = {
-      uid: String(userRecord.IDUsuario),
+      uid: String(userRecord.UsuarioWeb),
       email: userRecord.eMail,
       displayName: userRecord.Nombre,
-      role: 'proveedor',
-      userType: userRecord.TipoUsuario,
+      role: userRecord.Rol,
+      userType,
       empresa: userRecord.Empresa || '',
-      isActive: userRecord.Estatus === 'ACTIVO' || userRecord.Estatus === '1',
+      isActive: true,
       rfc: proveedorData?.RFC || '',
       razonSocial: proveedorData?.Nombre || userRecord.Nombre,
       telefono: userRecord.Telefono || '',
@@ -138,26 +117,18 @@ export class SqlServerPNetDatabase implements Database {
             estado: proveedorData.Estado || '',
             cp: proveedorData.CodigoPostal || '',
           }
-        : {
-            calle: '',
-            ciudad: '',
-            estado: '',
-            cp: '',
-          },
+        : { calle: '', ciudad: '', estado: '', cp: '' },
       status: proveedorData?.Estatus === 'ALTA' ? 'activo' : 'pendiente_validacion',
       documentosValidados: false,
-      registradoEnPortal: true, // Si llegamos aquí, está registrado
-      createdAt: new Date(), // TODO: Usar fecha real de FechaRegistro
+      registradoEnPortal: true,
+      createdAt: userRecord.FechaRegistro || new Date(),
     };
 
-    return {
-      user,
-      userType: userRecord.TipoUsuario,
-    };
+    return { user, userType };
   }
 
   /**
-   * Crea un nuevo usuario proveedor con contraseña
+   * Crea un nuevo usuario proveedor con contraseña (en WebUsuario)
    */
   async createProveedorUser(data: {
     email: string;
@@ -165,71 +136,43 @@ export class SqlServerPNetDatabase implements Database {
     nombre: string;
     proveedor: string; // Clave del proveedor en tabla Prov
   }): Promise<string> {
-    const pool = await getConnection();
-    const transaction = pool.transaction();
+    const pool = await getPortalConnection();
+    const passwordHash = await bcrypt.hash(data.password, 10);
 
-    try {
-      await transaction.begin();
+    const result = await pool
+      .request()
+      .input('nombre', sql.VarChar(100), data.nombre)
+      .input('email', sql.VarChar(100), data.email)
+      .input('contrasena', sql.VarChar(255), passwordHash)
+      .input('proveedor', sql.VarChar(20), data.proveedor)
+      .query(`
+        INSERT INTO WebUsuario (
+          Nombre, eMail, Contrasena, Rol, Estatus, Alta, UltimoCambio, Proveedor
+        )
+        OUTPUT INSERTED.UsuarioWeb
+        VALUES (
+          @nombre, @email, @contrasena, 'proveedor', 'ACTIVO', GETDATE(), GETDATE(), @proveedor
+        )
+      `);
 
-      // 1. Crear usuario en pNetUsuario
-      const userResult = await transaction
-        .request()
-        .input('usuario', sql.VarChar(10), data.proveedor)
-        .input('idUsuarioTipo', sql.Int, 4) // Tipo 4 = Proveedor
-        .input('email', sql.VarChar(50), data.email)
-        .input('nombre', sql.VarChar(100), data.nombre)
-        .input('estatus', sql.VarChar(15), 'ACTIVO')
-        .query(`
-          INSERT INTO pNetUsuario (
-            Usuario, IDUsuarioTipo, eMail, Nombre,
-            Estatus, FechaRegistro, PrimeraVez
-          )
-          OUTPUT INSERTED.IDUsuario
-          VALUES (
-            @usuario, @idUsuarioTipo, @email, @nombre,
-            @estatus, GETDATE(), 1
-          )
-        `);
-
-      const userId = userResult.recordset[0].IDUsuario;
-
-      // 2. Crear hash de contraseña
-      const passwordHash = await bcrypt.hash(data.password, 10);
-
-      // 3. Guardar contraseña
-      await transaction
-        .request()
-        .input('userId', sql.Int, userId)
-        .input('hash', sql.VarChar(255), passwordHash)
-        .query(`
-          INSERT INTO pNetUsuarioPassword (IDUsuario, PasswordHash)
-          VALUES (@userId, @hash)
-        `);
-
-      await transaction.commit();
-
-      return String(userId);
-    } catch (error) {
-      await transaction.rollback();
-      throw error;
-    }
+    return String(result.recordset[0].UsuarioWeb);
   }
 
   /**
-   * Actualiza la contraseña de un usuario
+   * Actualiza la contraseña de un usuario (en WebUsuario)
    */
   async updatePassword(userId: string, newPassword: string): Promise<void> {
-    const pool = await getConnection();
+    const pool = await getPortalConnection();
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
     await pool
       .request()
-      .input('userId', sql.Int, parseInt(userId))
+      .input('userId', sql.VarChar(50), userId)
       .input('hash', sql.VarChar(255), passwordHash)
       .query(`
-        UPDATE pNetUsuarioPassword
-        SET PasswordHash = @hash, UpdatedAt = GETDATE()
-        WHERE IDUsuario = @userId
+        UPDATE WebUsuario
+        SET Contrasena = @hash, UltimoCambio = GETDATE()
+        WHERE UsuarioWeb = @userId
       `);
   }
 
@@ -247,7 +190,7 @@ export class SqlServerPNetDatabase implements Database {
       const portalPool = await getConnection();
       const portalResult = await portalPool
         .request()
-        .input('userId', sql.Int, parseInt(uid))
+        .input('userId', sql.VarChar(50), uid)
         .query(`
           SELECT
             wu.UsuarioWeb,
@@ -263,8 +206,8 @@ export class SqlServerPNetDatabase implements Database {
         `);
 
       if (portalResult.recordset.length === 0) {
-        // Intentar buscar en pNetUsuario (sistema antiguo)
-        return await this.getProveedorFromPNetUsuario(uid);
+        console.warn(`[getProveedor] Usuario ${uid} no encontrado en WebUsuario`);
+        return null;
       }
 
       const portalUsuario = portalResult.recordset[0];
@@ -395,88 +338,16 @@ export class SqlServerPNetDatabase implements Database {
     });
   }
 
-  /**
-   * Busca un proveedor en el sistema antiguo pNetUsuario
-   */
-  private async getProveedorFromPNetUsuario(uid: string): Promise<ProveedorUser | null> {
-    const pool = await getConnection();
-    const result = await pool
-      .request()
-      .input('userId', sql.Int, parseInt(uid))
-      .query(`
-        SELECT
-          u.IDUsuario,
-          u.Usuario,
-          u.eMail,
-          u.Nombre,
-          u.Telefono,
-          u.Estatus,
-          u.Empresa,
-          u.FechaRegistro
-        FROM pNetUsuario u
-        WHERE u.IDUsuario = @userId AND u.IDUsuarioTipo = 4
-      `);
-
-    if (result.recordset.length === 0) return null;
-
-    const usuario = result.recordset[0];
-    const codigoERP = usuario.Usuario?.trim();
-
-    if (!codigoERP) return null;
-
-    // Obtener datos del ERP
-    const erpPool = await getERPConnection('la-cantera');
-    const erpResult = await erpPool
-      .request()
-      .input('proveedor', sql.VarChar(20), codigoERP)
-      .query(`
-        SELECT
-          p.Proveedor,
-          p.Nombre as ProveedorNombre,
-          p.NombreCorto,
-          p.RFC,
-          p.Direccion,
-          p.DireccionNumero,
-          p.Colonia,
-          p.Poblacion,
-          p.Estado,
-          p.CodigoPostal,
-          p.Telefonos as ProveedorTelefono,
-          p.eMail1 as ProveedorEmail,
-          p.Categoria,
-          p.Condicion as CondicionPago,
-          p.Estatus as ProveedorEstatus,
-          p.Alta as FechaAltaERP,
-          p.ProvBancoSucursal as Banco,
-          p.ProvCuenta as CuentaBancaria
-        FROM Prov p
-        WHERE p.Proveedor = @proveedor
-      `);
-
-    if (erpResult.recordset.length === 0) return null;
-
-    return this.mapRowToProveedorUserFromERP({
-      ...erpResult.recordset[0],
-      IDUsuario: usuario.IDUsuario,
-      eMail: usuario.eMail,
-      UsuarioNombre: usuario.Nombre,
-      UsuarioEstatus: usuario.Estatus,
-      UsuarioTelefono: usuario.Telefono,
-      FechaRegistro: usuario.FechaRegistro,
-      RegistradoEnPortal: 1,
-    });
-  }
-
   async updateProveedor(uid: string, data: Partial<ProveedorUser>): Promise<void> {
-    const pool = await getConnection();
+    const pool = await getPortalConnection();
     const transaction = pool.transaction();
 
     try {
       await transaction.begin();
 
-      // Actualizar pNetUsuario si hay cambios
+      // Actualizar WebUsuario si hay cambios de nombre/teléfono
       const userFields: string[] = [];
-      const userRequest = transaction.request().input('userId', sql.Int, parseInt(uid));
+      const userRequest = transaction.request().input('userId', sql.VarChar(50), uid);
 
       if (data.displayName !== undefined) {
         userFields.push('Nombre = @nombre');
@@ -488,27 +359,29 @@ export class SqlServerPNetDatabase implements Database {
       }
 
       if (userFields.length > 0) {
+        userFields.push('UltimoCambio = GETDATE()');
         await userRequest.query(`
-          UPDATE pNetUsuario
+          UPDATE WebUsuario
           SET ${userFields.join(', ')}
-          WHERE IDUsuario = @userId
+          WHERE UsuarioWeb = @userId
         `);
       }
 
-      // Actualizar Prov si hay cambios
+      // Actualizar Prov en ERP si hay cambios de RFC/dirección
       if (data.rfc || data.direccion) {
-        // Primero obtener la clave del proveedor
+        // Obtener la clave del proveedor desde WebUsuario
         const userResult = await transaction
           .request()
-          .input('userId', sql.Int, parseInt(uid))
-          .query('SELECT Usuario FROM pNetUsuario WHERE IDUsuario = @userId');
+          .input('userId', sql.VarChar(50), uid)
+          .query('SELECT Proveedor FROM WebUsuario WHERE UsuarioWeb = @userId');
 
-        if (userResult.recordset.length > 0) {
-          const proveedor = userResult.recordset[0].Usuario;
+        if (userResult.recordset.length > 0 && userResult.recordset[0].Proveedor) {
+          const proveedor = userResult.recordset[0].Proveedor.trim();
+          const erpPool = await getERPConnection('la-cantera');
           const provFields: string[] = [];
-          const provRequest = transaction
+          const provRequest = erpPool
             .request()
-            .input('proveedor', sql.VarChar(10), proveedor);
+            .input('proveedor', sql.VarChar(20), proveedor);
 
           if (data.rfc !== undefined) {
             provFields.push('RFC = @rfc');
@@ -737,22 +610,23 @@ export class SqlServerPNetDatabase implements Database {
       rechazado: 'BAJA',
     };
 
-    const pool = await getConnection();
+    const pool = await getPortalConnection();
 
-    // Obtener la clave del proveedor
+    // Obtener la clave del proveedor desde WebUsuario
     const userResult = await pool
       .request()
-      .input('userId', sql.Int, parseInt(uid))
-      .query('SELECT Usuario FROM pNetUsuario WHERE IDUsuario = @userId');
+      .input('userId', sql.VarChar(50), uid)
+      .query('SELECT Proveedor FROM WebUsuario WHERE UsuarioWeb = @userId');
 
-    if (userResult.recordset.length === 0) return;
+    if (userResult.recordset.length === 0 || !userResult.recordset[0].Proveedor) return;
 
-    const proveedor = userResult.recordset[0].Usuario;
+    const proveedor = userResult.recordset[0].Proveedor.trim();
 
-    // Actualizar estatus en Prov
-    await pool
+    // Actualizar estatus en Prov (ERP)
+    const erpPool = await getERPConnection('la-cantera');
+    await erpPool
       .request()
-      .input('proveedor', sql.VarChar(10), proveedor)
+      .input('proveedor', sql.VarChar(20), proveedor)
       .input('estatus', sql.VarChar(15), statusMap[status])
       .query('UPDATE Prov SET Estatus = @estatus WHERE Proveedor = @proveedor');
   }

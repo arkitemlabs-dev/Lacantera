@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import sql from 'mssql';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
-import { getConnection } from '@/lib/sql-connection';
 import { getPortalConnection } from '@/lib/database/multi-tenant-connection';
 import { sendEmail } from '@/lib/email-service';
 import { getCambioPasswordEmail } from '@/lib/email-templates/notificacion';
@@ -75,70 +74,32 @@ export async function POST(request: NextRequest) {
     // Crear hash de la nueva contraseña
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Actualizar contraseña según el tipo de usuario
-    let nombreUsuario = '';
+    // Actualizar contraseña en WebUsuario (tabla única de usuarios)
+    const userResult = await portalPool.request()
+      .input('email', sql.VarChar(100), email)
+      .query(`
+        SELECT UsuarioWeb, Nombre FROM WebUsuario WHERE eMail = @email
+      `);
 
-    if (tokenData.TipoUsuario === 'proveedor') {
-      // Actualizar en pNetUsuario/pNetUsuarioPassword
-      const pool = await getConnection();
-
-      // Obtener datos del usuario
-      const userResult = await pool.request()
-        .input('email', sql.VarChar(100), email)
-        .query(`
-          SELECT IDUsuario, Nombre FROM pNetUsuario WHERE eMail = @email
-        `);
-
-      if (userResult.recordset.length === 0) {
-        return NextResponse.json(
-          { error: 'Usuario no encontrado' },
-          { status: 404 }
-        );
-      }
-
-      const userId = userResult.recordset[0].IDUsuario;
-      nombreUsuario = userResult.recordset[0].Nombre;
-
-      // Actualizar contraseña
-      await pool.request()
-        .input('userId', sql.Int, userId)
-        .input('hash', sql.VarChar(255), passwordHash)
-        .query(`
-          UPDATE pNetUsuarioPassword
-          SET PasswordHash = @hash, UltimoCambio = GETDATE()
-          WHERE IDUsuario = @userId
-        `);
-
-      console.log(`✅ Contraseña actualizada para proveedor: ${email}`);
-
-    } else if (tokenData.TipoUsuario === 'admin') {
-      // Actualizar en WebUsuario
-      const userResult = await portalPool.request()
-        .input('email', sql.VarChar(100), email)
-        .query(`
-          SELECT UsuarioWeb, Nombre FROM WebUsuario WHERE eMail = @email
-        `);
-
-      if (userResult.recordset.length === 0) {
-        return NextResponse.json(
-          { error: 'Usuario no encontrado' },
-          { status: 404 }
-        );
-      }
-
-      nombreUsuario = userResult.recordset[0].Nombre;
-
-      await portalPool.request()
-        .input('email', sql.VarChar(100), email)
-        .input('hash', sql.VarChar(255), passwordHash)
-        .query(`
-          UPDATE WebUsuario
-          SET Contrasena = @hash, UltimoCambio = GETDATE()
-          WHERE eMail = @email
-        `);
-
-      console.log(`✅ Contraseña actualizada para admin: ${email}`);
+    if (userResult.recordset.length === 0) {
+      return NextResponse.json(
+        { error: 'Usuario no encontrado' },
+        { status: 404 }
+      );
     }
+
+    const nombreUsuario = userResult.recordset[0].Nombre;
+
+    await portalPool.request()
+      .input('email', sql.VarChar(100), email)
+      .input('hash', sql.VarChar(255), passwordHash)
+      .query(`
+        UPDATE WebUsuario
+        SET Contrasena = @hash, UltimoCambio = GETDATE()
+        WHERE eMail = @email
+      `);
+
+    console.log(`[RESET-PASSWORD] Contraseña actualizada para: ${email}`);
 
     // Marcar token como usado
     await portalPool.request()

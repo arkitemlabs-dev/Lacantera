@@ -41,56 +41,27 @@ export const authOptions: NextAuthOptions = {
               WHERE eMail = @email AND Estatus = 'ACTIVO'
             `);
 
-          let userData: any = null;
-
-          if (webUserResult.recordset.length > 0) {
-            const webUser = webUserResult.recordset[0];
-
-            // Validar bcrypt
-            const isValidPassword = await bcrypt.compare(credentials.password, webUser.Contrasena);
-            if (!isValidPassword) {
-              console.log(`[AUTH] Contraseña inválida para ${webUser.eMail}`);
-              throw new Error('Credenciales inválidas');
-            }
-
-            userData = {
-              id: webUser.UsuarioWeb,
-              email: webUser.eMail,
-              name: webUser.Nombre,
-              role: webUser.Rol,
-              empresaDefault: webUser.Empresa,
-              proveedorCode: webUser.Proveedor,
-            };
-          } else {
-            // 2. Sistema Legacy (pNetUsuario)
-            const legacyUserResult = await pool
-              .request()
-              .input('email', sql.VarChar(50), credentials.email)
-              .query(`
-                SELECT u.IDUsuario, u.Usuario, u.eMail, u.Nombre, u.IDUsuarioTipo, p.PasswordHash
-                FROM pNetUsuario u
-                INNER JOIN pNetUsuarioPassword p ON u.IDUsuario = p.IDUsuario
-                WHERE u.eMail = @email AND (u.Estatus = 'ACTIVO' OR u.Estatus = '1')
-              `);
-
-            if (legacyUserResult.recordset.length > 0) {
-              const legacyUser = legacyUserResult.recordset[0];
-              const isValidPassword = await bcrypt.compare(credentials.password, legacyUser.PasswordHash);
-              if (!isValidPassword) throw new Error('Credenciales inválidas');
-
-              userData = {
-                id: String(legacyUser.IDUsuario),
-                email: legacyUser.eMail,
-                name: legacyUser.Nombre,
-                role: legacyUser.IDUsuarioTipo === 1 ? 'admin' : 'proveedor',
-                proveedorCode: legacyUser.Usuario,
-              };
-            }
-          }
-
-          if (!userData) {
+          if (webUserResult.recordset.length === 0) {
             throw new Error('Credenciales inválidas');
           }
+
+          const webUser = webUserResult.recordset[0];
+
+          // Validar bcrypt
+          const isValidPassword = await bcrypt.compare(credentials.password, webUser.Contrasena);
+          if (!isValidPassword) {
+            console.log(`[AUTH] Contraseña inválida para ${webUser.eMail}`);
+            throw new Error('Credenciales inválidas');
+          }
+
+          const userData = {
+            id: webUser.UsuarioWeb,
+            email: webUser.eMail,
+            name: webUser.Nombre,
+            role: webUser.Rol,
+            empresaDefault: webUser.Empresa,
+            proveedorCode: webUser.Proveedor,
+          };
 
           // 3. Obtener empresas disponibles
           const tenants = await getUserTenants(userData.id, userData.role, userData.email);

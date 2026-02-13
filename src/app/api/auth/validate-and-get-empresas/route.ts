@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserTenants } from '@/lib/database/hybrid-queries';
 import bcrypt from 'bcrypt';
 import sql from 'mssql';
-import { getConnection } from '@/lib/sql-connection';
+import { getPortalConnection } from '@/lib/database/multi-tenant-connection';
 
 /**
  * POST /api/auth/validate-and-get-empresas
@@ -26,24 +26,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Buscar usuario por email en la BD PP
-    const pool = await getConnection('PP');
+    // 1. Buscar usuario por email en WebUsuario (BD PP)
+    const pool = await getPortalConnection();
 
     const userResult = await pool.request()
-      .input('email', sql.VarChar, email)
+      .input('email', sql.VarChar(100), email)
       .query(`
         SELECT
-          u.IDUsuario,
-          u.Usuario,
-          u.eMail,
-          u.Nombre,
-          u.IDUsuarioTipo,
-          ut.Descripcion as RolDescripcion,
-          u.Estatus
-        FROM pNetUsuario u
-        INNER JOIN pNetUsuarioTipo ut ON u.IDUsuarioTipo = ut.IDUsuarioTipo
-        WHERE u.eMail = @email
-          AND (u.Estatus = 'ACTIVO' OR u.Estatus = '1')
+          UsuarioWeb,
+          Nombre,
+          eMail,
+          Contrasena,
+          Rol,
+          Estatus
+        FROM WebUsuario
+        WHERE eMail = @email AND Estatus = 'ACTIVO'
       `);
 
     if (userResult.recordset.length === 0) {
@@ -55,26 +52,8 @@ export async function POST(request: NextRequest) {
 
     const user = userResult.recordset[0];
 
-    // 2. Verificar password
-    const passwordResult = await pool.request()
-      .input('userId', sql.Int, user.IDUsuario)
-      .query(`
-        SELECT PasswordHash
-        FROM pNetUsuarioPassword
-        WHERE IDUsuario = @userId
-      `);
-
-    if (passwordResult.recordset.length === 0) {
-      return NextResponse.json(
-        { error: 'Usuario no tiene contraseña configurada. Contacte al administrador.' },
-        { status: 401 }
-      );
-    }
-
-    const storedHash = passwordResult.recordset[0].PasswordHash;
-
-    // Verificar password con bcrypt
-    const passwordMatch = await bcrypt.compare(password, storedHash);
+    // 2. Verificar password con bcrypt
+    const passwordMatch = await bcrypt.compare(password, user.Contrasena);
 
     if (!passwordMatch) {
       return NextResponse.json(
@@ -84,7 +63,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Obtener empresas disponibles para este usuario
-    const userId = user.IDUsuario.toString();
+    const userId = String(user.UsuarioWeb);
     const empresas = await getUserTenants(userId);
 
     if (empresas.length === 0) {

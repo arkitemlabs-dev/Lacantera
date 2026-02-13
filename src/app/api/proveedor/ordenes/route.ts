@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     const userId = session.user.id;
     const empresaActual = session.user.empresaActual;
-    // El código de proveedor viene directamente de la sesión (de pNetUsuario o WebUsuario)
+    // El código de proveedor viene directamente de la sesión (WebUsuario.Proveedor)
     const proveedorFromSession = (session.user as any).proveedor;
 
     console.log(`📍 Usuario: ${userId}, Empresa: ${empresaActual}, Proveedor (sesión): ${proveedorFromSession}`);

@@ -425,10 +425,9 @@ export async function getUsuariosParaConversacion(usuarioId: string, empresaId: 
 
       const { hybridDB } = await import('@/lib/database/multi-tenant-connection');
 
-      // 🔥 COMBINAR: Buscar en WebUsuario Y pNetUsuario simultáneamente
-      console.log('🔍 Buscando proveedores en WebUsuario y pNetUsuario...');
+      // Buscar proveedores en WebUsuario (tabla única de usuarios)
+      console.log('[mensajes] Buscando proveedores en WebUsuario...');
 
-      // Buscar en WebUsuario (sistema nuevo) - proveedores con campo Proveedor no vacío
       const webUsuarioResult = await hybridDB.queryPortal(`
         SELECT
           CAST(UsuarioWeb AS NVARCHAR(100)) as id,
@@ -441,30 +440,13 @@ export async function getUsuariosParaConversacion(usuarioId: string, empresaId: 
         WHERE Proveedor IS NOT NULL
           AND Proveedor != ''
           AND Estatus = 'ACTIVO'
+          AND Rol = 'proveedor'
           AND Nombre IS NOT NULL
           AND Nombre != ''
       `);
 
-      // Buscar en pNetUsuario (sistema antiguo) - proveedores tipo 4
-      const pNetResult = await hybridDB.queryPortal(`
-        SELECT
-          CAST(u.IDUsuario AS NVARCHAR(100)) as id,
-          u.Nombre as nombre,
-          u.eMail as email,
-          u.Usuario as codigoProveedor,
-          'Proveedor' as rol,
-          'pNetUsuario' as origen
-        FROM pNetUsuario u
-        WHERE u.IDUsuarioTipo = 4
-          AND (u.Estatus = 'ALTA' OR u.Estatus = 'ACTIVO')
-          AND u.Nombre IS NOT NULL
-          AND u.Nombre != ''
-      `);
-
-      // Combinar resultados evitando duplicados por email
       const proveedoresMap = new Map<string, any>();
 
-      // Agregar proveedores de WebUsuario (tienen prioridad)
       if (webUsuarioResult.recordset) {
         for (const prov of webUsuarioResult.recordset) {
           const emailKey = (prov.email || '').toLowerCase();
@@ -472,18 +454,7 @@ export async function getUsuariosParaConversacion(usuarioId: string, empresaId: 
             proveedoresMap.set(emailKey, prov);
           }
         }
-        console.log('📦 Proveedores de WebUsuario:', webUsuarioResult.recordset.length);
-      }
-
-      // Agregar proveedores de pNetUsuario (si no hay duplicado por email)
-      if (pNetResult.recordset) {
-        for (const prov of pNetResult.recordset) {
-          const emailKey = (prov.email || '').toLowerCase();
-          if (emailKey && !proveedoresMap.has(emailKey)) {
-            proveedoresMap.set(emailKey, prov);
-          }
-        }
-        console.log('📦 Proveedores de pNetUsuario:', pNetResult.recordset.length);
+        console.log('[mensajes] Proveedores encontrados en WebUsuario:', webUsuarioResult.recordset.length);
       }
 
       // Enriquecer con nombre de empresa del ERP usando portal_proveedor_mapping
@@ -729,102 +700,15 @@ export async function debugFixConversacion(conversacionId: string, oldUserId: st
 // ==================== SINCRONIZAR PROVEEDORES PARA MENSAJERÍA ====================
 
 /**
- * Sincroniza proveedores de pNetUsuario a WebUsuario para que aparezcan en mensajería.
- * Ejecutar esta función una vez para migrar proveedores existentes.
+ * @deprecated Ya no es necesaria. Todos los usuarios ahora viven en WebUsuario.
+ * Se mantiene para compatibilidad por si algún endpoint la llama.
  */
 export async function sincronizarProveedoresParaMensajeria() {
-  try {
-    console.log('🔄 Iniciando sincronización de proveedores para mensajería...');
-
-    const { hybridDB } = await import('@/lib/database/multi-tenant-connection');
-    const bcrypt = await import('bcrypt');
-
-    // Obtener todos los proveedores de pNetUsuario que NO están en WebUsuario
-    const proveedoresResult = await hybridDB.queryPortal(`
-      SELECT
-        u.IDUsuario,
-        u.Usuario as CodigoProveedor,
-        u.Nombre,
-        u.eMail,
-        pp.PasswordHash
-      FROM pNetUsuario u
-      LEFT JOIN pNetUsuarioPassword pp ON u.IDUsuario = pp.IDUsuario
-      WHERE u.IDUsuarioTipo = 4
-        AND (u.Estatus = 'ALTA' OR u.Estatus = 'ACTIVO')
-        AND u.eMail IS NOT NULL
-        AND u.eMail != ''
-        AND NOT EXISTS (
-          SELECT 1 FROM WebUsuario w WHERE w.eMail = u.eMail
-        )
-    `);
-
-    if (!proveedoresResult.recordset || proveedoresResult.recordset.length === 0) {
-      console.log('✅ No hay proveedores para sincronizar');
-      return { success: true, message: 'No hay proveedores para sincronizar', sincronizados: 0 };
-    }
-
-    console.log(`📦 Proveedores a sincronizar: ${proveedoresResult.recordset.length}`);
-
-    let sincronizados = 0;
-    let errores: string[] = [];
-
-    for (const prov of proveedoresResult.recordset) {
-      try {
-        // Usar el IDUsuario como UsuarioWeb para mantener consistencia
-        const passwordHash = prov.PasswordHash || await bcrypt.hash('temporal123', 10);
-
-        await hybridDB.queryPortal(`
-          INSERT INTO WebUsuario (
-            UsuarioWeb,
-            Nombre,
-            eMail,
-            Contrasena,
-            Rol,
-            Estatus,
-            Alta,
-            UltimoCambio,
-            Proveedor
-          )
-          VALUES (
-            @usuarioWeb,
-            @nombre,
-            @email,
-            @contrasena,
-            'proveedor',
-            'ACTIVO',
-            GETDATE(),
-            GETDATE(),
-            @proveedor
-          )
-        `, {
-          usuarioWeb: String(prov.IDUsuario),
-          nombre: prov.Nombre || 'Sin nombre',
-          email: prov.eMail,
-          contrasena: passwordHash,
-          proveedor: prov.CodigoProveedor || ''
-        });
-
-        sincronizados++;
-        console.log(`✅ Proveedor sincronizado: ${prov.eMail} (ID: ${prov.IDUsuario})`);
-      } catch (error: any) {
-        errores.push(`${prov.eMail}: ${error.message}`);
-        console.error(`❌ Error sincronizando ${prov.eMail}:`, error.message);
-      }
-    }
-
-    console.log(`🎉 Sincronización completada: ${sincronizados}/${proveedoresResult.recordset.length} proveedores`);
-
-    return {
-      success: true,
-      message: `Sincronización completada`,
-      sincronizados,
-      total: proveedoresResult.recordset.length,
-      errores: errores.length > 0 ? errores : undefined
-    };
-  } catch (error: any) {
-    console.error('💥 Error en sincronización:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: true,
+    message: 'Todos los usuarios ya están unificados en WebUsuario. No se requiere sincronización.',
+    sincronizados: 0,
+  };
 }
 
 // ==================== DESCARGAR ARCHIVO DE MENSAJE ====================

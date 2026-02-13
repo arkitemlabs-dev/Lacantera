@@ -327,18 +327,18 @@ export async function getProveedorPorId(
       return await getProveedorSoloERP(codigoERP, empresaCode);
     }
 
-    // 2. Buscar en el portal por ID
+    // 2. Buscar en el portal por ID (WebUsuario)
     const portalResult = await hybridDB.queryPortal(`
       SELECT
-        u.IDUsuario,
-        u.eMail,
-        u.Nombre,
-        u.Estatus,
-        u.FechaRegistro,
-        u.Telefono,
-        u.Usuario
-      FROM pNetUsuario u
-      WHERE u.IDUsuario = @userId AND u.IDUsuarioTipo = 4
+        UsuarioWeb as IDUsuario,
+        eMail,
+        Nombre,
+        Estatus,
+        Alta as FechaRegistro,
+        Telefono,
+        Proveedor as Usuario
+      FROM WebUsuario
+      WHERE UsuarioWeb = @userId AND Rol = 'proveedor'
     `, { userId: id });
 
     if (portalResult.recordset.length === 0) {
