@@ -257,37 +257,39 @@ export function MensajeriaInterface({
                     className={`p-3 rounded-lg cursor-pointer transition-colors ${
                       esActiva
                         ? 'bg-accent'
-                        : 'hover:bg-accent/50'
+                        : noLeidos > 0
+                          ? 'bg-primary/5 hover:bg-primary/10 border-l-2 border-l-primary'
+                          : 'hover:bg-accent/50'
                     }`}
                     onClick={() => seleccionarConversacion(conversacion.id)}
                   >
                     <div className="flex items-start space-x-3">
-                      <Avatar className="h-10 w-10">
+                      <Avatar className={`h-10 w-10 ${noLeidos > 0 ? 'ring-2 ring-primary ring-offset-1' : ''}`}>
                         <AvatarFallback>
                           {getIniciales(otroParticipante?.nombre || 'Usuario')}
                         </AvatarFallback>
                       </Avatar>
-                      
+
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium truncate">
+                          <p className={`text-sm truncate ${noLeidos > 0 ? 'font-bold text-foreground' : 'font-medium'}`}>
                             {otroParticipante?.nombre || 'Usuario'}
                           </p>
-                          <span className="text-xs text-muted-foreground">
+                          <span className={`text-xs ${noLeidos > 0 ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>
                             {formatearFecha(conversacion.ultimoMensajeFecha)}
                           </span>
                         </div>
-                        
-                        <p className="text-sm text-muted-foreground truncate">
+
+                        <p className={`text-sm truncate ${noLeidos > 0 ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
                           {conversacion.asunto}
                         </p>
-                        
-                        <p className="text-xs text-muted-foreground truncate mt-1">
+
+                        <p className={`text-xs truncate mt-1 ${noLeidos > 0 ? 'text-foreground/80 font-medium' : 'text-muted-foreground'}`}>
                           {conversacion.ultimoMensajeRemitente === usuarioNombre && 'Tú: '}
                           {conversacion.ultimoMensaje}
                         </p>
                       </div>
-                      
+
                       {noLeidos > 0 && (
                         <Badge variant="default" className="h-5 min-w-[20px] text-xs">
                           {noLeidos}
