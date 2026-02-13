@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/sidebar';
 import { Building } from 'lucide-react';
 import { useAuth } from '@/app/providers';
+import { MensajeriaBadge } from '@/components/mensajeria-badge';
 
 const LaCanteraLogo = () => (
     <Building className="h-6 w-6 text-primary" />
@@ -54,9 +55,12 @@ export function Nav() {
                 isActive={pathname.startsWith(item.href)}
                 tooltip={{ children: item.title, side: 'right' }}
               >
-                <Link href={item.href}>
+                <Link href={item.href} className="relative">
                   <item.icon />
                   <span>{item.title}</span>
+                  {item.href === '/mensajeria' && (
+                    <MensajeriaBadge className="ml-auto" />
+                  )}
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -66,3 +70,4 @@ export function Nav() {
     </Sidebar>
   );
 }
+

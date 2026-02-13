@@ -14,6 +14,7 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Home, User, ShoppingCart, FileText, MessageSquare, Bell, Shield, Building, CreditCard } from 'lucide-react';
+import { MensajeriaBadge } from '@/components/mensajeria-badge';
 
 
 const navItems = [
@@ -22,7 +23,7 @@ const navItems = [
     { href: '/proveedores/ordenes-de-compra', icon: ShoppingCart, title: 'Órdenes de compra' },
     { href: '/proveedores/facturacion', icon: FileText, title: 'Facturación' },
     { href: '/proveedores/pagos', icon: CreditCard, title: 'Pagos' },
-    { href: '/proveedores/mensajeria', icon: MessageSquare, title: 'Mensajería' },
+  { href: '/proveedores/mensajeria', icon: MessageSquare, title: 'Mensajería', showBadge: true },
     { href: '/proveedores/notificaciones', icon: Bell, title: 'Notificaciones' },
     { href: '/proveedores/seguridad', icon: Shield, title: 'Seguridad' },
 ];
@@ -51,9 +52,12 @@ export function Nav() {
                 isActive={pathname === item.href || (item.href !== '/proveedores/dashboard' && pathname.startsWith(item.href))}
                 tooltip={{ children: item.title, side: 'right' }}
               >
-                <Link href={item.href}>
+                <Link href={item.href} className="relative">
                   <item.icon />
                   <span>{item.title}</span>
+                  {item.showBadge && (
+                    <MensajeriaBadge className="ml-auto" />
+                  )}
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -63,3 +67,4 @@ export function Nav() {
     </Sidebar>
   );
 }
+

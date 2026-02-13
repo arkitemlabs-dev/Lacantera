@@ -115,7 +115,7 @@ export interface Database {
   getEstadisticasMensajeria(usuarioId: string, empresaId?: string): Promise<any>;
 
   // ==================== NOTIFICACIONES ====================
-  createNotificacion(data: { usuarioId: string; tipo: string; titulo: string; mensaje: string; link?: string; leida?: boolean; emailEnviado?: boolean; empresaId?: string }): Promise<string>;
+  createNotificacion(data: { usuarioId: string; usuarioNombre?: string; tipo: string; titulo: string; mensaje: string; link?: string; datosJSON?: string; leida?: boolean; emailEnviado?: boolean; prioridad?: string; empresaId?: string }): Promise<string>;
   getNotificacionesByUsuario(usuarioId: string, limit?: number): Promise<Notificacion[]>;
   marcarNotificacionComoLeida(id: string): Promise<void>;
   marcarTodasNotificacionesComoLeidas(usuarioId: string): Promise<void>;

@@ -5,11 +5,14 @@ import { Nav as AdminNav } from '@/components/nav';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { UserNav } from '@/components/user-nav';
 import { NotificacionesDropdown } from '@/components/notificaciones-dropdown';
+import { MensajeriaHeaderBadge } from '@/components/mensajeria-badge';
 import { Nav as SupplierNav } from '@/components/proveedores/nav';
-import { Building2 } from 'lucide-react';
+import { Building2, MessageSquare } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useAuth } from '../providers';
 import { getNombreEmpresa } from '@/lib/database/tenant-configs';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -61,9 +64,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   }, [userRole, pathname, router, isLoggingOut]);
   
 
-
   const isSupplierPortal = userRole.name === 'Proveedor';
   const NavComponent = isSupplierPortal ? SupplierNav : AdminNav;
+  const mensajeriaHref = isSupplierPortal ? '/proveedores/mensajeria' : '/mensajeria';
   
   return (
     <SidebarProvider>
@@ -76,6 +79,14 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
               <span className="font-medium">{nombreEmpresa}</span>
             </div>
             <div className="flex items-center gap-2">
+              {/* Botón de mensajería con badge de no leídos */}
+              <Button variant="ghost" size="icon" className="relative" asChild>
+                <Link href={mensajeriaHref}>
+                  <MessageSquare className="h-5 w-5" />
+                  <MensajeriaHeaderBadge />
+                  <span className="sr-only">Mensajería</span>
+                </Link>
+              </Button>
               {empresaActualId && (
                 <NotificacionesDropdown empresa={empresaActualId} />
               )}

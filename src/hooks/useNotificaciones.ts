@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { NotificacionPortal } from '@/lib/types';
 
 export function useNotificaciones(empresa: string, autoRefresh = true) {
-  const [notificaciones, setNotificaciones] = useState<NotificacionPortal[]>([]);
+  const [notificaciones, setNotificaciones] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [noLeidasCount, setNoLeidasCount] = useState(0);
@@ -22,7 +21,7 @@ export function useNotificaciones(empresa: string, autoRefresh = true) {
       setNotificaciones(data.notificaciones);
 
       // Contar no leídas
-      const count = data.notificaciones.filter((n: NotificacionPortal) => !n.leida).length;
+      const count = data.notificaciones.filter((n: any) => !n.leida).length;
       setNoLeidasCount(count);
 
       setError(null);
@@ -58,7 +57,7 @@ export function useNotificaciones(empresa: string, autoRefresh = true) {
     }
   }, []);
 
-  const crearNotificacion = useCallback(async (notificacion: Partial<NotificacionPortal>) => {
+  const crearNotificacion = useCallback(async (notificacion: Partial<any>) => {
     try {
       const response = await fetch('/api/notificaciones', {
         method: 'POST',

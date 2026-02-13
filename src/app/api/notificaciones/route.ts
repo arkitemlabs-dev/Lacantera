@@ -1,42 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withTenantContext } from '@/middleware/tenant';
-import { extendedDb } from '@/lib/database/sqlserver-extended';
-import { v4 as uuidv4 } from 'uuid';
+import { database } from '@/lib/database';
 
 /**
  * GET /api/notificaciones
  * Obtiene notificaciones del usuario para la empresa actual
- *
- * Query params:
- * - noLeidas: boolean (solo mostrar no leídas)
  */
 export const GET = withTenantContext(async (request, { tenant, user }) => {
   try {
     const searchParams = request.nextUrl.searchParams;
     const soloNoLeidas = searchParams.get('noLeidas') === 'true';
 
-    // Convertir user.id (string) a número
-    const idUsuario = parseInt(user.id);
+    const usuarioId = String(user.id);
 
-    if (isNaN(idUsuario)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'ID de usuario inválido'
-        },
-        { status: 400 }
-      );
-    }
-
-    // Obtener notificaciones filtradas por usuario y empresa actual
-    const notificaciones = await extendedDb.getNotificacionesUsuario(
-      idUsuario,
-      tenant.empresaCodigo // Usa el código de empresa del tenant actual
-    );
+    // Obtener notificaciones de WebNotificacion
+    const notificaciones = await database.getNotificacionesByUsuario(usuarioId);
 
     // Filtrar solo no leídas si se solicita
     const resultado = soloNoLeidas
-      ? notificaciones.filter(n => !n.leida)
+      ? notificaciones.filter((n: any) => !n.leida)
       : notificaciones;
 
     return NextResponse.json({
@@ -64,18 +46,6 @@ export const GET = withTenantContext(async (request, { tenant, user }) => {
 /**
  * POST /api/notificaciones
  * Crear una nueva notificación para la empresa actual
- *
- * Body:
- * {
- *   usuario: number (IDUsuario destino),
- *   usuarioNombre: string,
- *   tipo: string,
- *   titulo: string,
- *   mensaje: string,
- *   link?: string,
- *   datosJSON?: any,
- *   prioridad?: 'baja' | 'normal' | 'alta'
- * }
  */
 export const POST = withTenantContext(async (request, { tenant, user }) => {
   try {
@@ -92,30 +62,26 @@ export const POST = withTenantContext(async (request, { tenant, user }) => {
     } = body;
 
     // Validaciones
-    if (!usuario || !usuarioNombre || !tipo || !titulo || !mensaje) {
+    if (!usuario || !tipo || !titulo || !mensaje) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Datos incompletos. Se requiere: usuario, usuarioNombre, tipo, titulo, mensaje'
+          error: 'Datos incompletos. Se requiere: usuario, tipo, titulo, mensaje'
         },
         { status: 400 }
       );
     }
 
-    // Crear notificación asociada a la empresa actual del tenant
-    const notificacionID = await extendedDb.createNotificacion({
-      notificacionID: uuidv4(),
-      idUsuario: parseInt(usuario),
-      usuarioNombre,
-      empresa: tenant.empresaCodigo, // Usa la empresa actual del tenant
+    // Crear notificación en WebNotificacion
+    const notificacionID = await database.createNotificacion({
+      usuarioId: String(usuario),
       tipo,
       titulo,
       mensaje,
       link,
-      datosJSON,
       leida: false,
       emailEnviado: false,
-      prioridad: prioridad || 'normal',
+      empresaId: tenant.empresaCodigo
     });
 
     return NextResponse.json({
@@ -143,11 +109,6 @@ export const POST = withTenantContext(async (request, { tenant, user }) => {
 /**
  * PATCH /api/notificaciones
  * Marcar notificación como leída
- *
- * Body:
- * {
- *   notificacionID: string
- * }
  */
 export const PATCH = withTenantContext(async (request, { tenant, user }) => {
   try {
@@ -164,9 +125,7 @@ export const PATCH = withTenantContext(async (request, { tenant, user }) => {
       );
     }
 
-    // TODO: Validar que la notificación pertenezca al usuario actual
-    // antes de marcarla como leída
-    await extendedDb.marcarNotificacionLeida(notificacionID);
+    await database.marcarNotificacionComoLeida(notificacionID);
 
     return NextResponse.json({
       success: true,

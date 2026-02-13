@@ -1,12 +1,12 @@
 import { NextRequest } from 'next/server';
 import { withTenantContext } from '@/middleware/tenant';
-import { extendedDb } from '@/lib/database/sqlserver-extended';
+import { database } from '@/lib/database';
 
 // Mapa para mantener las conexiones SSE activas
 const connections = new Map<string, ReadableStreamDefaultController>();
 
 export const GET = withTenantContext(async (request, { tenant, user }) => {
-  const userId = parseInt(user.id);
+  const userId = String(user.id);
   const empresaCode = tenant.empresaCodigo;
   const connectionId = `${userId}-${empresaCode}`;
 
@@ -17,16 +17,16 @@ export const GET = withTenantContext(async (request, { tenant, user }) => {
       connections.set(connectionId, controller);
 
       // Enviar evento inicial
-      controller.enqueue(`data: ${JSON.stringify({ 
-        type: 'connected', 
-        userId, 
-        empresa: empresaCode 
+      controller.enqueue(`data: ${JSON.stringify({
+        type: 'connected',
+        userId,
+        empresa: empresaCode
       })}\n\n`);
 
       // Enviar notificaciones no leídas iniciales
-      extendedDb.getNotificacionesUsuario(userId, empresaCode, 10)
+      database.getNotificacionesByUsuario(userId)
         .then(notificaciones => {
-          const noLeidas = notificaciones.filter(n => !n.leida);
+          const noLeidas = notificaciones.filter((n: any) => !n.leida);
           if (noLeidas.length > 0) {
             controller.enqueue(`data: ${JSON.stringify({
               type: 'initial_notifications',
@@ -58,7 +58,7 @@ export const GET = withTenantContext(async (request, { tenant, user }) => {
 export function sendNotificationToUser(userId: string | number, empresa: string, notification: any) {
   const connectionId = `${userId}-${empresa}`;
   const controller = connections.get(connectionId);
-  
+
   if (controller) {
     try {
       controller.enqueue(`data: ${JSON.stringify({
@@ -77,7 +77,7 @@ export function sendNotificationToUser(userId: string | number, empresa: string,
 export function sendNotificationCountUpdate(userId: string | number, empresa: string, count: number) {
   const connectionId = `${userId}-${empresa}`;
   const controller = connections.get(connectionId);
-  
+
   if (controller) {
     try {
       controller.enqueue(`data: ${JSON.stringify({

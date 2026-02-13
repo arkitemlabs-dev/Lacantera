@@ -1,6 +1,5 @@
 // src/lib/services/notification-service.ts
-import { extendedDb } from '@/lib/database/sqlserver-extended';
-import { v4 as uuidv4 } from 'uuid';
+import { database } from '@/lib/database';
 
 export interface NotificationData {
   usuarioId: string | number;
@@ -20,12 +19,10 @@ export class NotificationService {
    */
   static async enviarNotificacion(data: NotificationData): Promise<string> {
     try {
-      // 1. Crear notificación en la base de datos
-      const notificacionId = await extendedDb.createNotificacion({
-        notificacionID: uuidv4(),
-        idUsuario: data.usuarioId,
-        usuarioNombre: data.usuarioNombre || 'Usuario',
-        empresa: data.empresaId,
+      // 1. Crear notificación en WebNotificacion (sin FK constraints)
+      const notificacionId = await database.createNotificacion({
+        usuarioId: String(data.usuarioId),
+        usuarioNombre: data.usuarioNombre || '',
         tipo: data.tipo,
         titulo: data.titulo,
         mensaje: data.mensaje,
@@ -33,29 +30,38 @@ export class NotificationService {
         datosJSON: data.datos ? JSON.stringify(data.datos) : undefined,
         leida: false,
         emailEnviado: false,
-        prioridad: data.prioridad || 'normal'
+        prioridad: data.prioridad || 'normal',
+        empresaId: data.empresaId
       });
 
       // 2. Enviar notificación SSE en tiempo real
       try {
         const { sendNotificationToUser } = await import('@/app/api/notificaciones/sse/route');
-        
+
         const notificationPayload = {
           id: notificacionId,
-          notificacionID: uuidv4(),
+          notificacionID: notificacionId,
+          notificacionId: notificacionId,
+          usuario: String(data.usuarioId),
+          usuarioId: String(data.usuarioId),
+          usuarioNombre: data.usuarioNombre || '',
+          empresa: data.empresaId,
+          empresaId: data.empresaId,
           titulo: data.titulo,
           mensaje: data.mensaje,
           tipo: data.tipo,
           link: data.link,
+          datosJSON: data.datos ? JSON.stringify(data.datos) : null,
           leida: false,
-          createdAt: new Date(),
-          prioridad: data.prioridad || 'normal'
+          emailEnviado: false,
+          prioridad: data.prioridad || 'normal',
+          createdAt: new Date().toISOString(),
         };
 
         sendNotificationToUser(data.usuarioId, data.empresaId, notificationPayload);
-        console.log(`📨 Notificación SSE enviada a usuario ${data.usuarioId}`);
+        console.log(`Notificación SSE enviada a usuario ${data.usuarioId}`);
       } catch (sseError) {
-        console.log('⚠️ SSE no disponible, notificación guardada en BD:', sseError);
+        console.log('SSE no disponible, notificación guardada en BD:', sseError);
       }
 
       // 3. Programar envío de email si es necesario
@@ -63,11 +69,11 @@ export class NotificationService {
         await this.programarEnvioEmail(data);
       }
 
-      console.log(`✅ Notificación creada: ${data.titulo} para usuario ${data.usuarioId}`);
+      console.log(`Notificación creada: ${data.titulo} para usuario ${data.usuarioId}`);
       return notificacionId;
 
     } catch (error) {
-      console.error('❌ Error enviando notificación:', error);
+      console.error('Error enviando notificación:', error);
       throw error;
     }
   }
@@ -183,7 +189,7 @@ export class NotificationService {
    */
   private static async programarEnvioEmail(data: NotificationData): Promise<void> {
     // TODO: Implementar integración con servicio de email
-    console.log(`📧 Email programado para usuario ${data.usuarioId}: ${data.titulo}`);
+    console.log(`Email programado para usuario ${data.usuarioId}: ${data.titulo}`);
   }
 
   /**
@@ -191,7 +197,7 @@ export class NotificationService {
    */
   static async getContadorNoLeidas(usuarioId: string | number, empresaId: string): Promise<number> {
     try {
-      return await extendedDb.contarNotificacionesNoLeidas(usuarioId, empresaId);
+      return await database.getNotificacionesNoLeidas(String(usuarioId));
     } catch (error) {
       console.error('Error obteniendo contador de notificaciones:', error);
       return 0;
@@ -203,8 +209,8 @@ export class NotificationService {
    */
   static async marcarComoLeida(notificacionId: string, usuarioId: string | number, empresaId: string): Promise<void> {
     try {
-      await extendedDb.marcarNotificacionLeida(notificacionId);
-      
+      await database.marcarNotificacionComoLeida(notificacionId);
+
       // Actualizar contador SSE
       try {
         const { sendNotificationCountUpdate } = await import('@/app/api/notificaciones/sse/route');

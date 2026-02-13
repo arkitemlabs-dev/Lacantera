@@ -952,15 +952,37 @@ export class SqlServerPNetDatabase implements Database {
       CREATE TABLE WebNotificacion (
         ID INT IDENTITY(1,1) PRIMARY KEY,
         UsuarioId NVARCHAR(100) NOT NULL,
+        UsuarioNombre NVARCHAR(200),
         Tipo NVARCHAR(50) NOT NULL,
         Titulo NVARCHAR(200) NOT NULL,
         Mensaje NVARCHAR(MAX),
         Link NVARCHAR(500),
+        DatosJSON NVARCHAR(MAX),
         Leida BIT DEFAULT 0,
+        FechaLectura DATETIME,
         EmailEnviado BIT DEFAULT 0,
+        FechaEnvioEmail DATETIME,
+        Prioridad NVARCHAR(20) DEFAULT 'normal',
         EmpresaId NVARCHAR(50),
         CreatedAt DATETIME DEFAULT GETDATE()
       )
+    `);
+
+    // Agregar columnas faltantes si la tabla ya existe (migración)
+    await pool.request().query(`
+      IF EXISTS (SELECT * FROM sysobjects WHERE name='WebNotificacion' AND xtype='U')
+      BEGIN
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('WebNotificacion') AND name = 'UsuarioNombre')
+          ALTER TABLE WebNotificacion ADD UsuarioNombre NVARCHAR(200);
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('WebNotificacion') AND name = 'DatosJSON')
+          ALTER TABLE WebNotificacion ADD DatosJSON NVARCHAR(MAX);
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('WebNotificacion') AND name = 'Prioridad')
+          ALTER TABLE WebNotificacion ADD Prioridad NVARCHAR(20) DEFAULT 'normal';
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('WebNotificacion') AND name = 'FechaLectura')
+          ALTER TABLE WebNotificacion ADD FechaLectura DATETIME;
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('WebNotificacion') AND name = 'FechaEnvioEmail')
+          ALTER TABLE WebNotificacion ADD FechaEnvioEmail DATETIME;
+      END
     `);
   }
 
@@ -1251,12 +1273,15 @@ export class SqlServerPNetDatabase implements Database {
 
   async createNotificacion(data: {
     usuarioId: string;
+    usuarioNombre?: string;
     tipo: string;
     titulo: string;
     mensaje: string;
     link?: string;
+    datosJSON?: string;
     leida?: boolean;
     emailEnviado?: boolean;
+    prioridad?: string;
     empresaId?: string;
   }): Promise<string> {
     await this.ensureMensajeriaTables();
@@ -1264,25 +1289,28 @@ export class SqlServerPNetDatabase implements Database {
 
     const result = await pool.request()
       .input('usuarioId', sql.NVarChar(100), data.usuarioId)
+      .input('usuarioNombre', sql.NVarChar(200), data.usuarioNombre || '')
       .input('tipo', sql.NVarChar(50), data.tipo)
       .input('titulo', sql.NVarChar(200), data.titulo)
       .input('mensaje', sql.NVarChar(sql.MAX), data.mensaje)
       .input('link', sql.NVarChar(500), data.link || '')
+      .input('datosJSON', sql.NVarChar(sql.MAX), data.datosJSON || null)
       .input('leida', sql.Bit, data.leida ? 1 : 0)
       .input('emailEnviado', sql.Bit, data.emailEnviado ? 1 : 0)
+      .input('prioridad', sql.NVarChar(20), data.prioridad || 'normal')
       .input('empresaId', sql.NVarChar(50), data.empresaId || '')
       .query(`
         INSERT INTO WebNotificacion
-          (UsuarioId, Tipo, Titulo, Mensaje, Link, Leida, EmailEnviado, EmpresaId, CreatedAt)
+          (UsuarioId, UsuarioNombre, Tipo, Titulo, Mensaje, Link, DatosJSON, Leida, EmailEnviado, Prioridad, EmpresaId, CreatedAt)
         OUTPUT INSERTED.ID
         VALUES
-          (@usuarioId, @tipo, @titulo, @mensaje, @link, @leida, @emailEnviado, @empresaId, GETDATE())
+          (@usuarioId, @usuarioNombre, @tipo, @titulo, @mensaje, @link, @datosJSON, @leida, @emailEnviado, @prioridad, @empresaId, GETDATE())
       `);
 
     return String(result.recordset[0].ID);
   }
 
-  async getNotificacionesByUsuario(usuarioId: string, limit: number = 20): Promise<Notificacion[]> {
+  async getNotificacionesByUsuario(usuarioId: string, limit: number = 20): Promise<any[]> {
     await this.ensureMensajeriaTables();
     const pool = await getConnection();
 
@@ -1297,15 +1325,23 @@ export class SqlServerPNetDatabase implements Database {
 
     return result.recordset.map(row => ({
       id: String(row.ID),
+      notificacionID: String(row.ID),
       notificacionId: String(row.ID),
+      usuario: row.UsuarioId,
       usuarioId: row.UsuarioId,
+      usuarioNombre: row.UsuarioNombre || '',
+      empresa: row.EmpresaId || '',
+      empresaId: row.EmpresaId || '',
       tipo: row.Tipo,
       titulo: row.Titulo,
       mensaje: row.Mensaje,
-      link: row.Link,
-      leida: row.Leida,
-      emailEnviado: row.EmailEnviado,
-      empresaId: row.EmpresaId,
+      link: row.Link || '',
+      datosJSON: row.DatosJSON || null,
+      leida: !!row.Leida,
+      fechaLectura: row.FechaLectura || null,
+      emailEnviado: !!row.EmailEnviado,
+      fechaEnvioEmail: row.FechaEnvioEmail || null,
+      prioridad: row.Prioridad || 'normal',
       createdAt: row.CreatedAt
     }));
   }
@@ -1315,7 +1351,7 @@ export class SqlServerPNetDatabase implements Database {
 
     await pool.request()
       .input('id', sql.Int, parseInt(id))
-      .query(`UPDATE WebNotificacion SET Leida = 1 WHERE ID = @id`);
+      .query(`UPDATE WebNotificacion SET Leida = 1, FechaLectura = GETDATE() WHERE ID = @id`);
   }
 
   async marcarTodasNotificacionesComoLeidas(usuarioId: string): Promise<void> {
