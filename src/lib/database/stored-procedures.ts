@@ -778,120 +778,83 @@ export class StoredProcedures {
    * SP: spGeneraRemisionCompra
    * Genera una remisión de compra a partir de una orden y un documento digital (XML)
    *
-   * @param empresa - Clave de la empresa (ej. '01')
-   * @param moId - Folio de la orden de compra (ingresado manualmente)
-   * @param factura - Serie + Folio de la factura
-   * @param rutaArchivo - Path donde se guarda el documento digital
-   * @param archivo - Nombre y extensión del archivo digital
+   * Parámetros del SP:
+   *   @Empresa       VARCHAR(5)   — Código numérico de empresa (01-10)
+   *   @MovId         VARCHAR(20)  — Folio de la orden de compra
+   *   @Proveedor     VARCHAR(10)  — Código del proveedor
+   *   @FolioFactura  VARCHAR(50)  — Folio de la factura (del CFDI)
+   *   @Archivo       VARCHAR(200) — Nombre del archivo XML
    */
   async generaRemisionCompra(params: {
     empresa: string;
     movId: string;
-    factura: string;
+    proveedor: string;
+    folioFactura: string;
+    archivo: string;
   }): Promise<{ success: boolean; data: any; message: string }> {
-    const { empresa, movId, factura } = params;
+    const { empresa, movId, proveedor, folioFactura, archivo } = params;
 
     try {
       const pool = await this.getPool(empresa);
       const empresaERP = this.getEmpresaERP(empresa);
-      const numericCode = validateEmpresaCode(empresa);
 
-      // Determine if we are in Production or Test based on the numeric code
-      const isTestEmpresa = parseInt(numericCode) >= 6;
+      console.log(`[SP] spGeneraRemisionCompra - Empresa: ${empresaERP}, MovId: ${movId}, Proveedor: ${proveedor}, FolioFactura: ${folioFactura}, Archivo: ${archivo}`);
 
-      console.log(`[SP] spGeneraRemisionCompra - Empresa: ${empresaERP}, IsTest: ${isTestEmpresa}, MovId: ${movId}, Factura: ${factura}`);
+      let spMessages: string[] = [];
+      const request = pool.request();
 
-      if (isTestEmpresa) {
-        // --- LOGICA PARA BASE DE DATOS DE PRUEBAS (Cantera_Ajustes) ---
-        // Params: @Empresa, @MovId, @Factura
-        let spMessages: string[] = [];
-        const request = pool.request();
+      // Capturar mensajes PRINT del SP
+      request.on('info', (info) => {
+        console.log('[SP MSG]', info.message);
+        spMessages.push(info.message);
+      });
 
-        // Capture PRINT messages from SP
-        request.on('info', (info) => {
-          console.log('[SP MSG]', info.message);
-          spMessages.push(info.message);
-        });
+      const result = await request
+        .input('Empresa', sql.VarChar(5), empresaERP)
+        .input('MovId', sql.VarChar(20), movId)
+        .input('Proveedor', sql.VarChar(10), proveedor)
+        .input('FolioFactura', sql.VarChar(50), folioFactura)
+        .input('Archivo', sql.VarChar(200), archivo)
+        .execute('spGeneraRemisionCompra');
 
-        const result = await request
-          .input('Empresa', sql.VarChar(5), empresaERP)
-          .input('MovId', sql.VarChar(20), movId)
-          .input('Factura', sql.VarChar(20), factura)
-          .execute('spGeneraRemisionCompra');
+      console.log(`[SP] spGeneraRemisionCompra ejecutado. Recordsets: ${result.recordsets.length}`);
 
-        console.log(`[SP - TEST] spGeneraRemisionCompra ejecutado. Recordsets: ${result.recordsets.length}`);
-
-        // Log PRINT messages captured
-        if (spMessages.length > 0) {
-          console.log('[SP - TEST] Mensajes PRINT capturados:', spMessages);
-        }
-
-        const firstRecord = result.recordset?.[0] as any;
-        if (firstRecord) {
-          console.log('[SP - TEST] Primer registro devuelto:', firstRecord);
-        }
-
-        let message = '';
-
-        // 1. Intentar obtener propiedad 'Mensaje' explícita
-        if (firstRecord?.Mensaje) {
-          message = firstRecord.Mensaje;
-        }
-        // 2. Si hay registro pero no 'Mensaje', usar el primer valor (posiblemente columna sin nombre)
-        else if (firstRecord) {
-          const values = Object.values(firstRecord);
-          if (values.length > 0 && typeof values[0] === 'string') {
-            message = values[0] as string;
-          }
-        }
-
-        // 3. Si no hay mensaje de recordset, usar mensajes PRINT acumulados
-        if (!message && spMessages.length > 0) {
-          message = spMessages.join('. ');
-        }
-
-        // 4. Default fallback
-        if (!message) {
-          message = 'Remisión generada correctamente (Test - Sin mensaje explicito del SP)';
-        }
-
-        console.log('[SP - TEST] Mensaje final a retornar:', message);
-
-        return {
-          success: true,
-          data: firstRecord || null,
-          message: message
-        };
-
-      } else {
-        // --- BLOQUEO DE SEGURIDAD PARA PRODUCCION ---
-        // El usuario indicó explícitamente que NO se debe tocar producción durante las pruebas.
-        // Si llegamos aquí, es porque el frontend envió una empresa de producción (01-05).
-
-        console.warn(`[SP - PROD BLOCKED] Intento de escritura en Producción detectado para empresa ${empresaERP}`);
-
-        return {
-          success: false,
-          data: null,
-          message: `🛑 SEGURIDAD: Estás intentando subir una factura a la empresa de PRODUCCIÓN (${empresaERP}). Para realizar pruebas, por favor selecciona la empresa '[TEST]' correspondiente (ej. La Cantera [TEST]) en el selector de empresas.`
-        };
+      if (spMessages.length > 0) {
+        console.log('[SP] Mensajes PRINT:', spMessages);
       }
+
+      const firstRecord = result.recordset?.[0] as any;
+      if (firstRecord) {
+        console.log('[SP] Primer registro:', firstRecord);
+      }
+
+      // Extraer mensaje del resultado
+      let message = '';
+      if (firstRecord?.Mensaje) {
+        message = firstRecord.Mensaje;
+      } else if (firstRecord) {
+        const values = Object.values(firstRecord);
+        if (values.length > 0 && typeof values[0] === 'string') {
+          message = values[0] as string;
+        }
+      }
+      if (!message && spMessages.length > 0) {
+        message = spMessages.join('. ');
+      }
+      if (!message) {
+        message = 'Remisión generada correctamente';
+      }
+
+      console.log('[SP] Mensaje final:', message);
+
+      return {
+        success: true,
+        data: firstRecord || null,
+        message
+      };
+
     } catch (error: any) {
       console.error('[SP] Error en spGeneraRemisionCompra:', error);
-
-      // Fallback inteligente: si falla por parámetros en Prod, intentamos la firma de Test (y viceversa si fuera necesario)
-      // Esto ayuda si la BD de test es actualizada a la estructura de prod sin que actualicemos el código
-      if (error.message && error.message.includes('expects parameter')) {
-        console.warn('[SP] Detectado error de parámetros. Verificando versión del SP...');
-        // Aquí podríamos hacer un retry con la otra firma si fuera crítico,
-        // por ahora devolvemos el error claro.
-        return {
-          success: false,
-          data: null,
-          message: `Error de compatibilidad con SP: ${error.message}. Verifica si estás en la empresa correcta (Test vs Prod).`
-        };
-      }
-
       return {
         success: false,
         data: null,

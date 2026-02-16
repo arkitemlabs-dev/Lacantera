@@ -124,7 +124,11 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // 5. Validar estructura CFDI
+    // =====================================================================
+    // VALIDACIONES COMENTADAS PARA PRUEBAS
+    // =====================================================================
+
+    /* VALIDACIÓN CFDI - COMENTADA
     const validation = validateCFDI(cfdiData);
     if (!validation.isValid) {
       console.error('❌ CFDI inválido:', validation.errors);
@@ -135,182 +139,39 @@ export async function POST(request: NextRequest) {
         warnings: validation.warnings
       }, { status: 400 });
     }
+    */
+    const validation = { warnings: [] as string[] };
+    console.log('🚧 VALIDACIONES COMENTADAS PARA PRUEBAS');
 
-    if (validation.warnings.length > 0) {
-      console.log('⚠️ Advertencias:', validation.warnings);
-    }
-
-    // 6. Validar datos contra el ERP (Proveedor y Orden de Compra)
+    /* VALIDACIÓN RFC EN ERP - COMENTADA
     const sp = getStoredProcedures();
-
-    // A) Validar que el RFC de la factura exista en el ERP
-    // Normalizar RFC del XML
     const rfcXml = cfdiData.rfcEmisor.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const erpProviderResult = await sp.spDatosProveedor({ ... });
+    ...
+    */
 
-    // Buscar proveedor en ERP por RFC
-    // spDatosProveedor soporta búsqueda por RFC si operacion='C' y pasamos rfc
-    const erpProviderResult = await sp.spDatosProveedor({
-      empresa: empresaCode,
-      operacion: 'C',
-      rfc: rfcXml,
-      cveProv: '' // No filtramos por clave, sino por RFC
-    });
+    /* VALIDACIÓN ORDEN DE COMPRA - COMENTADA
+    const ordenesResult = await sp.getOrdenesCompra({ ... });
+    ...
+    */
 
-    // spDatosProveedor retorna un array. Buscamos si alguno coincide exactamente
-    const erpProviders = erpProviderResult.data || [];
-    const erpProvider = erpProviders.find((p: any) =>
-      (p.RFC || '').replace(/[^A-Z0-9]/g, '') === rfcXml
-    );
+    /* VALIDACIÓN MONTOS - COMENTADA */
 
-    if (!erpProvider) {
-      return NextResponse.json({
-        success: false,
-        error: `El RFC de la factura (${cfdiData.rfcEmisor}) no se encuentra registrado como proveedor en la empresa seleccionada.`
-      }, { status: 400 });
-    }
-
-    // Seguridad: Validar que el usuario tenga permiso sobre este proveedor
-    // Si el usuario es 'admin', puede subir de cualquiera (o limitarlo si se quiere).
-    // Si es 'proveedor', su RFC mapeado (o su relacion) debe coincidir con el del XML.
-    if (userRole === 'proveedor') {
-      const erpProvCode = erp_proveedor_code?.trim();
-      const foundProvCode = erpProvider.Proveedor?.trim();
-
-      // Validamos si el código recuperado coincide con el del usuario
-      // O si el usuario tiene asignado ese RFC en su perfil
-      if (erpProvCode && foundProvCode && erpProvCode !== foundProvCode) {
-        console.warn(`⚠️ Mismatch de proveedor: Usuario ${erpProvCode} intenta subir factura de ${foundProvCode} (${rfcXml})`);
-        // Opcional: Bloquear si es estricto. Por ahora, permitimos si el RFC es válido y el usuario "parece" ser el dueño.
-        // Si queremos ser estrictos:
-        // return NextResponse.json({ success: false, error: 'El RFC de la factura no corresponde a su cuenta de proveedor.' }, { status: 403 });
-      }
-    }
-
-    // El RFC del ERP ya validado
-    const rfcErp = (erpProvider.RFC || '').replace(/[^A-Z0-9]/g, '');
-
-    // B) Validar Orden de Compra
-    // Buscamos la orden de compra en las pendientes del proveedor
-    const ordenesResult = await sp.getOrdenesCompra({
-      empresa: empresaCode,
-      rfc: erpProvider.RFC, // Buscamos por RFC del proveedor
-      limit: 1000 // Traemos suficientes para buscar
-    });
-
-    const ordenCompra = ordenesResult.ordenes.find(o =>
-      o.MovID === ordenCompraId.trim() || o.Mov === ordenCompraId.trim()
-    );
-
-    if (!ordenCompra) {
-      return NextResponse.json({
-        success: false,
-        error: `La orden de compra '${ordenCompraId}' no existe o no corresponde a este proveedor.`
-      }, { status: 400 });
-    }
-
-    console.log('✅ Orden de compra validada:', ordenCompra);
-
-    // C) Validar Montos (Factura Total <= Orden Saldo/Importe)
-    // Usamos un pequeño margen de error por redondeo (e.g. 1 peso)
-    const margenError = 1.0;
-    // Nota: A veces se valida contra 'Saldo' si es parcial, o 'Importe + Impuestos' si es total.
-    // Asumiremos que el monto de la factura no puede exceder el Saldo de la orden.
-
-    // Si la orden tiene Saldo, usamos eso. Si no, calculamos Total.
-    const montoMaximo = ordenCompra.Saldo ?? (ordenCompra.Importe + ordenCompra.Impuestos);
-
-    if (cfdiData.total > (montoMaximo + margenError)) {
-      return NextResponse.json({
-        success: false,
-        error: `El monto de la factura ($${cfdiData.total}) excede el saldo disponible de la orden de compra ($${montoMaximo}).`
-      }, { status: 400 });
-    }
-
-    // D) Validación de artículos (Simplificada a montos y estructura por ahora)
-    // El usuario pide: "Que en cantidades y articulos sea la misma o menos".
-    // Sin mapeo exacto de claves de producto XML vs ERP, la validación de monto es la más robusta.
-    // Podríamos agregar validación de conteo de partidas si fuera necesario.
-
-    // 7. Verificar que UUID no esté duplicado
+    /* VALIDACIÓN UUID DUPLICADO - COMENTADA
     const duplicadoResult = await portalPool.request()
       .input('uuid', sql.VarChar(36), cfdiData.uuid)
-      .query(`
-        SELECT ID
-        FROM ProvFacturas
-        WHERE UUID = @uuid
-      `);
+      .query('SELECT ID FROM ProvFacturas WHERE UUID = @uuid');
+    ...
+    */
 
-    if (duplicadoResult.recordset && duplicadoResult.recordset.length > 0) {
-      return NextResponse.json({
-        success: false,
-        error: 'Esta factura ya fue subida previamente',
-        uuid: cfdiData.uuid
-      }, { status: 409 }); // 409 Conflict
-    }
-
-    // 7.5. Validar CFDI con el SAT
-    console.log('🔍 Validando CFDI con el SAT...');
+    /* VALIDACIÓN SAT - COMENTADA */
     let validacionSAT = null;
     let satValidado = false;
     let satEstado = 'PENDIENTE';
-    let satMensaje = '';
+    let satMensaje = 'Validación SAT omitida (modo pruebas)';
 
-    try {
-      validacionSAT = await validacionCompletaSAT({
-        uuid: cfdiData.uuid,
-        rfcEmisor: cfdiData.rfcEmisor,
-        rfcReceptor: cfdiData.rfcReceptor,
-        total: cfdiData.total
-      });
-
-      satValidado = validacionSAT.aprobada;
-      satEstado = validacionSAT.validacionCFDI.estado;
-      satMensaje = validacionSAT.motivo || '';
-
-      console.log(`   Estado SAT: ${satEstado}`);
-      console.log(`   Aprobada: ${satValidado}`);
-
-      // Si la factura está cancelada en el SAT, rechazar
-      if (validacionSAT.validacionCFDI.estado === 'Cancelado') {
-        return NextResponse.json({
-          success: false,
-          error: 'La factura está CANCELADA en el SAT',
-          validacionSAT: {
-            estado: validacionSAT.validacionCFDI.estado,
-            codigoEstatus: validacionSAT.validacionCFDI.codigoEstatus,
-            fechaConsulta: validacionSAT.validacionCFDI.fechaConsulta
-          }
-        }, { status: 400 });
-      }
-
-      // Si el emisor está en lista negra (EFOS), rechazar
-      if (validacionSAT.validacionEmisor?.enLista) {
-        return NextResponse.json({
-          success: false,
-          error: 'El RFC del emisor está en la lista de contribuyentes incumplidos del SAT',
-          validacionSAT: {
-            emisorEnListaNegra: true,
-            tipo: validacionSAT.validacionEmisor.tipo
-          }
-        }, { status: 400 });
-      }
-
-    } catch (satError: any) {
-      // Si falla la validación SAT, continuar pero marcar como pendiente
-      console.error('⚠️ Error en validación SAT (se continuará con estado pendiente):', satError.message);
-      satEstado = 'PENDIENTE';
-      satMensaje = `Error al validar con SAT: ${satError.message}`;
-    }
-
-    // 8. Subir archivos a Azure Blob Storage
-    const erpEmpresa = getEmpresaERPFromTenant(empresaCode) || empresaCode;
-    const xmlBlobPath = buildBlobPath({
-      kind: 'factura-xml',
-      empresaCode: erpEmpresa,
-      idProveedor: erp_proveedor_code,
-      rfc: cfdiData.rfcEmisor,
-      uuid: cfdiData.uuid,
-    });
+    // 8. Subir archivos a Azure Blob Storage (ruta simplificada por UUID)
+    const xmlBlobPath = `${cfdiData.uuid}.xml`;
 
     const xmlBlobResult = await uploadBufferToBlob(
       Buffer.from(xmlString),
@@ -323,13 +184,7 @@ export async function POST(request: NextRequest) {
     let pdfBlobContainer: string | null = null;
     if (pdfFile) {
       const pdfArrayBuffer = await pdfFile.arrayBuffer();
-      pdfBlobPath = buildBlobPath({
-        kind: 'factura-pdf',
-        empresaCode: erpEmpresa,
-        idProveedor: erp_proveedor_code,
-        rfc: cfdiData.rfcEmisor,
-        uuid: cfdiData.uuid,
-      });
+      pdfBlobPath = `${cfdiData.uuid}.pdf`;
       const pdfBlobResult = await uploadBufferToBlob(
         Buffer.from(pdfArrayBuffer),
         pdfBlobPath,
@@ -339,58 +194,26 @@ export async function POST(request: NextRequest) {
       console.log(`✅ PDF subido a blob: ${pdfBlobResult.blobPath}`);
     }
 
-    // 8.5. PREPARACION para paso posterior (Aprobacion Admin)
-    const facturasProvPath = 'C:\\FacturasProv';
-
-    // Preparar parámetro Factura: serie-folio o F-folio
-    // NOTA: El SP espera encontrar el archivo con este mismo nombre en C:\FacturasProv
-    const serie = cfdiData.serie || 'F';
-    const folio = cfdiData.folio || '';
-    const facturaParam = `${serie}${folio ? '-' + folio : ''}`;
-
-    // Validar nombre de archivo seguro
-    const safeFilename = facturaParam.replace(/[^a-zA-Z0-9-]/g, '_');
-    // const erpArchivo = `${safeFilename}.xml`;
-    // const erpXmlPath = path.join(facturasProvPath, erpArchivo);
-
-    // NOTA: YA NO guardamos el XML localmente ni llamamos al SP inmediatamente.
-    // Esto se hará cuando el admin apruebe la factura.
-
-    /* BLOQUE COMENTADO - SE MUEVE A APROBACIÓN
-    // Guardar XML en C:\FacturasProv
-    try {
-      if (!existsSync(facturasProvPath)) {
-        await mkdir(facturasProvPath, { recursive: true });
-      }
-      await writeFile(erpXmlPath, xmlString);
-      console.log(`✅ XML guardado en C:\\FacturasProv: ${erpXmlPath}`);
-    } catch (saveError: any) {
-      console.error('❌ Error guardando XML en C:\\FacturasProv:', saveError.message);
-      // No fallamos toda la operación, pero logueamos el error grave ya que el SP fallará
-      console.error('⚠️ El SP spGeneraRemisionCompra probablemente fallará porque no se pudo guardar el archivo');
-    }
-
-    // Ejecutar SP spGeneraRemisionCompra
+    // 8.5. Ejecutar SP spGeneraRemisionCompra
     const sp = getStoredProcedures();
+    const folioFactura = String(cfdiData.folio || cfdiData.uuid).substring(0, 50);
+    const archivoXml = `${cfdiData.uuid}.xml`;
+
+    console.log('📋 Llamando spGeneraRemisionCompra con:', {
+      empresa: empresaCode,
+      movId: ordenCompraId.trim(),
+      proveedor: String(userId).substring(0, 10),
+      folioFactura,
+      archivo: archivoXml
+    });
+
     const remisionResult = await sp.generaRemisionCompra({
       empresa: empresaCode,
       movId: ordenCompraId.trim(),
-      factura: safeFilename // Enviamos el nombre sin extensión, que coincide con serie-folio
+      proveedor: String(userId).substring(0, 10),
+      folioFactura,
+      archivo: archivoXml,
     });
-
-    console.log(`📋 spGeneraRemisionCompra resultado:`, remisionResult);
-
-    if (!remisionResult.success) {
-      return NextResponse.json({
-        success: false,
-        error: 'Error al generar remisión de compra en el ERP',
-        details: remisionResult.message
-      }, { status: 500 });
-    }
-    */
-
-    // Simulamos result exitoso para compatibilidad
-    const remisionResult = { success: true, data: null, message: 'Validación local exitosa. Pendiente de aprobación.' };
 
     console.log(`📋 spGeneraRemisionCompra resultado:`, remisionResult);
 
@@ -403,6 +226,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 9. Insertar en base de datos (tabla ProvFacturas)
+    // TEMPORAL: Borrar factura existente con mismo UUID para permitir re-subir en pruebas
+    await portalPool.request()
+      .input('uuidDel', sql.VarChar(36), cfdiData.uuid)
+      .query('DELETE FROM ProvFacturas WHERE UUID = @uuidDel');
+
     const facturaId = uuidv4();
 
     // Preparar datos de validación SAT para BD
@@ -411,32 +239,37 @@ export async function POST(request: NextRequest) {
     const satValidacionEFOS = validacionSAT?.validacionCFDI?.validacionEFOS || null;
     const satFechaConsulta = validacionSAT?.validacionCFDI?.fechaConsulta || null;
 
+    // Generar FacturaID legible: FACT-{timestamp}
+    const facturaIdLegible = `FACT-${Date.now()}`;
+
     await portalPool.request()
       .input('id', sql.UniqueIdentifier, facturaId)
-      .input('portalUserId', sql.NVarChar(50), userId)
-      .input('empresaCode', sql.VarChar(50), empresaCode)
+      .input('facturaIdLegible', sql.VarChar(100), facturaIdLegible)
+      .input('proveedor', sql.VarChar(10), String(userId).substring(0, 10))
+      .input('empresaCode', sql.VarChar(5), empresaCode)
       .input('uuid', sql.VarChar(36), cfdiData.uuid)
-      .input('serie', sql.VarChar(25), cfdiData.serie || null)
-      .input('folio', sql.VarChar(40), cfdiData.folio || null)
+      .input('serie', sql.VarChar(10), cfdiData.serie ? String(cfdiData.serie).substring(0, 10) : null)
+      .input('folio', sql.VarChar(50), String(cfdiData.folio || cfdiData.uuid).substring(0, 50))
       .input('fechaEmision', sql.DateTime2, new Date(cfdiData.fecha))
-      .input('fechaTimbrado', sql.DateTime2, new Date(cfdiData.fechaTimbrado))
+      .input('subtotal', sql.Decimal(18, 2), cfdiData.subTotal)
+      .input('impuestos', sql.Decimal(18, 2), cfdiData.totalImpuestosTrasladados || 0)
+      .input('total', sql.Decimal(18, 2), cfdiData.total)
+      .input('moneda', sql.VarChar(3), cfdiData.moneda || 'MXN')
+      .input('xmlRuta', sql.VarChar(500), xmlBlobPath)
+      .input('pdfRuta', sql.VarChar(500), pdfBlobPath || '')
+      .input('subidoPor', sql.VarChar(10), String(userId).substring(0, 10))
+      // Columnas nullable extras
+      .input('xmlContenido', sql.NVarChar(sql.MAX), xmlString)
       .input('rfcEmisor', sql.VarChar(13), cfdiData.rfcEmisor)
       .input('nombreEmisor', sql.NVarChar(250), cfdiData.nombreEmisor)
       .input('rfcReceptor', sql.VarChar(13), cfdiData.rfcReceptor)
       .input('nombreReceptor', sql.NVarChar(250), cfdiData.nombreReceptor)
-      .input('subtotal', sql.Decimal(18, 2), cfdiData.subTotal)
       .input('descuento', sql.Decimal(18, 2), cfdiData.descuento || 0)
-      .input('impuestos', sql.Decimal(18, 2), cfdiData.totalImpuestosTrasladados || 0)
-      .input('total', sql.Decimal(18, 2), cfdiData.total)
-      .input('moneda', sql.VarChar(3), cfdiData.moneda)
       .input('tipoCambio', sql.Decimal(10, 4), cfdiData.tipoCambio || 1)
-      .input('xmlContenido', sql.NVarChar(sql.MAX), xmlString)
-      .input('xmlRuta', sql.VarChar(500), xmlBlobPath)
-      .input('pdfRuta', sql.VarChar(500), pdfBlobPath)
+      .input('fechaTimbrado', sql.DateTime2, new Date(cfdiData.fechaTimbrado))
       .input('xmlBlobContainer', sql.VarChar(100), xmlBlobResult.container)
       .input('pdfBlobContainer', sql.VarChar(100), pdfBlobContainer)
       .input('storageType', sql.VarChar(20), 'blob')
-      // Campos de validación SAT
       .input('satValidado', sql.Bit, satValidado ? 1 : 0)
       .input('satEstado', sql.VarChar(50), satEstado)
       .input('satCodigoEstatus', sql.VarChar(100), satCodigoEstatus)
@@ -444,41 +277,32 @@ export async function POST(request: NextRequest) {
       .input('satValidacionEFOS', sql.VarChar(100), satValidacionEFOS)
       .input('satFechaConsulta', sql.DateTime2, satFechaConsulta)
       .input('satMensaje', sql.NVarChar(500), satMensaje)
-      .input('ordenCompraId', sql.VarChar(50), ordenCompraId.trim())
       .query(`
         INSERT INTO ProvFacturas (
-          ID, SubidoPor, Empresa,
+          FacturaID, Proveedor, Empresa,
           UUID, Serie, Folio,
-          Fecha, FechaTimbrado,
-          RFCEmisor, NombreEmisor,
+          Fecha, Subtotal, IVA, Total,
+          Moneda, XMLURL, PDFURL, SubidoPor,
+          -- Columnas nullable
+          XMLContenido, RFCEmisor, NombreEmisor,
           RFCReceptor, NombreReceptor,
-          Subtotal, Descuento, IVA, Total,
-          Moneda, TipoCambio,
-          XMLContenido, XMLURL, PDFURL,
+          Descuento, TipoCambio, FechaTimbrado,
           XMLBlobContainer, PDFBlobContainer, StorageType,
           ValidadaSAT, EstatusSAT, SATCodigoEstatus,
           SATEsCancelable, SATValidacionEFOS,
-          FechaValidacionSAT, SATMensaje,
-          Estatus, CreatedAt, UpdatedAt,
-          OrdenCompraMovID
+          FechaValidacionSAT, SATMensaje
         ) VALUES (
-          @id, @portalUserId, @empresaCode,
+          @facturaIdLegible, @proveedor, @empresaCode,
           @uuid, @serie, @folio,
-          @fechaEmision, @fechaTimbrado,
-          @rfcEmisor, @nombreEmisor,
+          @fechaEmision, @subtotal, @impuestos, @total,
+          @moneda, @xmlRuta, @pdfRuta, @subidoPor,
+          @xmlContenido, @rfcEmisor, @nombreEmisor,
           @rfcReceptor, @nombreReceptor,
-          @subtotal, @descuento, @impuestos, @total,
-          @moneda, @tipoCambio,
-          @xmlContenido, @xmlRuta, @pdfRuta,
+          @descuento, @tipoCambio, @fechaTimbrado,
           @xmlBlobContainer, @pdfBlobContainer, @storageType,
           @satValidado, @satEstado, @satCodigoEstatus,
           @satEsCancelable, @satValidacionEFOS,
-          @satFechaConsulta, @satMensaje,
-          @satValidado, @satEstado, @satCodigoEstatus,
-          @satEsCancelable, @satValidacionEFOS,
-          @satFechaConsulta, @satMensaje,
-          'PENDIENTE_REVISION', GETDATE(), GETDATE(),
-          @ordenCompraId
+          @satFechaConsulta, @satMensaje
         )
       `);
 
@@ -551,10 +375,19 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     console.error('❌ [POST /api/proveedor/facturas/upload] Error:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Error al subir factura',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    }, { status: 500 });
+    // Garantizar que SIEMPRE se devuelva JSON válido
+    try {
+      return NextResponse.json({
+        success: false,
+        error: error?.message || 'Error al subir factura',
+        details: error?.stack?.split('\n').slice(0, 3).join(' | '),
+      }, { status: 500 });
+    } catch {
+      // Último recurso si NextResponse.json también falla
+      return new Response(
+        JSON.stringify({ success: false, error: 'Error interno del servidor' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
   }
 }

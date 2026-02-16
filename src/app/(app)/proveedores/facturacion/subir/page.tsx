@@ -64,7 +64,18 @@ export default function SubirFacturaPage() {
         body: formData,
       });
 
-      const data = await response.json();
+      // Manejar respuestas no-JSON (servidor crasheó o devolvió HTML)
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        console.error('Respuesta no-JSON del servidor:', response.status, text.substring(0, 500));
+        data = {
+          success: false,
+          error: `Error del servidor (${response.status}): ${text.substring(0, 200) || 'Respuesta vacía'}`,
+        };
+      }
 
       setResult(data);
 
