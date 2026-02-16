@@ -2,6 +2,9 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
+import { approveFacturaAndSendToERP, updateFacturaStatus } from '@/app/actions/facturas';
+import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Calendar as CalendarIcon, ListFilter, Eye, FileDown, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -147,6 +150,77 @@ export default function FacturasPage() {
       setLoading(false);
     }
   }, [currentPage, status, invoiceNumber, dateRange]);
+
+  const { data: session } = useSession();
+  const { toast } = useToast();
+  const [processing, setProcessing] = useState(false);
+
+  // Función para aprobar factura
+  const handleApprove = async () => {
+    if (!selectedInvoice || !session?.user) return;
+
+    setProcessing(true);
+    try {
+      // @ts-ignore
+      const adminId = session.user.id;
+      const result = await approveFacturaAndSendToERP(selectedInvoice.id.toString(), adminId);
+
+      if (result.success) {
+        toast({
+          title: "Factura Aprobada",
+          description: "La factura ha sido enviada al ERP correctamente.",
+          variant: "default",
+        });
+        setIsDialogOpen(false);
+        fetchFacturas(); // Recargar lista
+      } else {
+        toast({
+          title: "Error al aprobar",
+          description: result.error,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Error",
+        description: "Ocurrió un error inesperado",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Función para rechazar factura
+  const handleReject = async () => {
+    if (!selectedInvoice) return;
+
+    setProcessing(true);
+    try {
+      const result = await updateFacturaStatus(selectedInvoice.id.toString(), 'rechazada', 'Rechazada por administrador');
+
+      if (result.success) {
+        toast({
+          title: "Factura Rechazada",
+          description: "El estatus se ha actualizado.",
+          variant: "default",
+        });
+        setIsDialogOpen(false);
+        fetchFacturas();
+      } else {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   // Cargar facturas cuando cambian los filtros o la página
   useEffect(() => {
@@ -550,10 +624,29 @@ export default function FacturasPage() {
                   </div>
                 </div>
               </div>
-              <DialogFooter className="gap-2">
-                 <Button variant="outline" onClick={handleDialogClose}>
+              <DialogFooter className="gap-2 sm:justify-between">
+                <Button variant="outline" onClick={handleDialogClose} disabled={processing}>
                     Cerrar
                 </Button>
+                {selectedInvoice.estado === 'En Revisión' && (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="destructive"
+                      onClick={handleReject}
+                      disabled={processing}
+                    >
+                      Rechazar
+                    </Button>
+                    <Button
+                      onClick={handleApprove}
+                      disabled={processing}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Aprobar y Enviar a ERP
+                    </Button>
+                  </div>
+                )}
               </DialogFooter>
             </DialogContent>
           )}

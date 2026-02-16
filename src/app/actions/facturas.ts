@@ -6,6 +6,12 @@ import type { Factura, StatusFactura } from '@/types/backend';
 import type { FacturaFilters } from '@/lib/database';
 import { revalidatePath } from 'next/cache';
 import { validacionCompletaSAT } from '@/lib/sat-validator';
+import { getPortalConnection } from '@/lib/database/multi-tenant-connection';
+import { getStoredProcedures } from '@/lib/database/stored-procedures';
+import sql from 'mssql';
+import { writeFile, mkdir } from 'fs/promises';
+import { existsSync } from 'fs';
+import path from 'path';
 
 // ==================== OBTENER FACTURAS ====================
 
@@ -218,8 +224,106 @@ export async function asociarFacturaAOrdenCompra(facturaId: string, ordenCompraI
       success: true,
       data: { message: 'Factura asociada a orden de compra' },
     };
+    return {
+      success: true,
+      data: { message: 'Factura asociada a orden de compra' },
+    };
   } catch (error: any) {
     console.error('Error asociando factura:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ==================== APROBACIÓN ADMIN ====================
+
+export async function approveFacturaAndSendToERP(id: string, adminId: string) {
+  try {
+    const pool = await getPortalConnection();
+
+    // 1. Obtener la factura de la BD
+    const result = await pool.request()
+      .input('id', sql.UniqueIdentifier, id)
+      .query(`
+        SELECT ID, Empresa, UUID, Serie, Folio, XMLContenido, OrdenCompraMovID
+        FROM ProvFacturas
+        WHERE ID = @id
+      `);
+
+    if (!result.recordset || result.recordset.length === 0) {
+      return { success: false, error: 'Factura no encontrada' };
+    }
+
+    const factura = result.recordset[0];
+
+    if (!factura.XMLContenido) {
+      return { success: false, error: 'La factura no tiene contenido XML guardado' };
+    }
+
+    if (!factura.OrdenCompraMovID) {
+      return { success: false, error: 'La factura no tiene Orden de Compra asociada' };
+    }
+
+    // 2. Escribir XML a disco local (Requerido por SP legacy)
+    const facturasProvPath = 'C:\\FacturasProv';
+    const serie = factura.Serie || 'F';
+    const folio = factura.Folio || '';
+    const facturaParam = `${serie}${folio ? '-' + folio : ''}`;
+    // Limpieza de nombre archivo (mismo logic que en upload)
+    const safeFilename = facturaParam.replace(/[^a-zA-Z0-9-]/g, '_');
+    const erpArchivo = `${safeFilename}.xml`;
+    const erpXmlPath = path.join(facturasProvPath, erpArchivo);
+
+    try {
+      if (!existsSync(facturasProvPath)) {
+        await mkdir(facturasProvPath, { recursive: true });
+      }
+      await writeFile(erpXmlPath, factura.XMLContenido);
+      console.log(`✅ XML guardado para aprobación: ${erpXmlPath}`);
+    } catch (saveError: any) {
+      console.error('❌ Error escribiendo XML en disco:', saveError);
+      return {
+        success: false,
+        error: 'Error interno: No se pudo preparar el archivo XML para el ERP.'
+      };
+    }
+
+    // 3. Llamar al SP de ERP
+    const sp = getStoredProcedures();
+    const remisionResult = await sp.generaRemisionCompra({
+      empresa: factura.Empresa,
+      movId: factura.OrdenCompraMovID,
+      factura: safeFilename
+    });
+
+    if (!remisionResult.success) {
+      return {
+        success: false,
+        error: 'El ERP rechazó la generación de la remisión: ' + remisionResult.message
+      };
+    }
+
+    // 4. Actualizar estatus a APROBADA
+    await pool.request()
+      .input('id', sql.UniqueIdentifier, id)
+      .input('adminId', sql.NVarChar(50), adminId)
+      .query(`
+        UPDATE ProvFacturas
+        SET Estatus = 'APROBADA',
+            RevisadoPor = @adminId,
+            FechaRevision = GETDATE()
+        WHERE ID = @id
+      `);
+
+    revalidatePath('/proveedores/facturacion');
+    revalidatePath('/facturas'); // Ruta de admin
+
+    return {
+      success: true,
+      data: { message: 'Factura aprobada y enviada a ERP exitosamente' }
+    };
+
+  } catch (error: any) {
+    console.error('Error aprobando factura:', error);
     return { success: false, error: error.message };
   }
 }

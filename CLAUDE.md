@@ -10,7 +10,7 @@ Aplicación web full-stack para gestionar la relación con proveedores de un gru
 | Frontend | React 18, TypeScript, Tailwind CSS, Radix UI/shadcn |
 | Auth | NextAuth 4 (Credentials Provider + bcrypt) |
 | BD Principal | SQL Server (`PP` para auth, `Cantera`/`Cantera_Ajustes` para ERP) |
-| Almacenamiento | Firebase Cloud Storage (XMLs, PDFs) |
+| Almacenamiento | Azure Blob Storage (XMLs, PDFs) — `@azure/storage-blob` |
 | Email | Nodemailer (SMTP) |
 | Validación SAT | SOAP client para CFDI |
 | Gráficas | Recharts |
@@ -31,7 +31,7 @@ Aplicación web full-stack para gestionar la relación con proveedores de un gru
 ## Flujo de Comunicación
 ```
 Browser → Next.js (React) → API Routes / Server Actions → Stored Procedures → SQL Server
-                                                        → Firebase Storage (archivos)
+                                                        → Azure Blob Storage (archivos)
                                                         → Nodemailer (emails)
                                                         → SOAP SAT (validación CFDI)
 ```
@@ -96,13 +96,14 @@ Browser → Next.js (React) → API Routes / Server Actions → Stored Procedure
 | `src/lib/database/tenant-configs.ts` | Mapeo de empresas |
 | `src/lib/email-service.ts` | Servicio de email |
 | `src/lib/sat-validator.ts` | Validación CFDI ante SAT |
-| `src/lib/firebase.ts` | Firebase Storage |
+| `src/lib/blob-storage.ts` | Azure Blob Storage (upload, download, SAS URLs, delete) |
+| `src/lib/blob-path-builder.ts` | Constructor de rutas multi-tenant para blobs |
 | `src/lib/jobs/scheduler.ts` | Jobs programados (cron) |
 
 ## Patrones de Código
 - API Routes (`/api/*`) + Server Actions (`/app/actions/*`) para backend
 - Respuestas estándar: `{ success: true, data }` / `{ success: false, error }`
-- Archivos en Firebase, referencias en SQL Server
+- Archivos en Azure Blob Storage, referencias en SQL Server
 - Componentes UI en `src/components/` (shadcn + custom)
 - Contextos React en `src/contexts/` (auth, empresa)
 - Hooks custom en `src/hooks/`

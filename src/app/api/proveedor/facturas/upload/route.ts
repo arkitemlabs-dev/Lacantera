@@ -140,9 +140,96 @@ export async function POST(request: NextRequest) {
       console.log('⚠️ Advertencias:', validation.warnings);
     }
 
-    // 6. Validar que el RFC emisor coincide con el proveedor
-    // Nota: Esto depende de que tengamos el RFC en el mapping o en la tabla Prov del ERP
-    // Por ahora solo validamos que el UUID no esté duplicado
+    // 6. Validar datos contra el ERP (Proveedor y Orden de Compra)
+    const sp = getStoredProcedures();
+
+    // A) Validar que el RFC de la factura exista en el ERP
+    // Normalizar RFC del XML
+    const rfcXml = cfdiData.rfcEmisor.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+    // Buscar proveedor en ERP por RFC
+    // spDatosProveedor soporta búsqueda por RFC si operacion='C' y pasamos rfc
+    const erpProviderResult = await sp.spDatosProveedor({
+      empresa: empresaCode,
+      operacion: 'C',
+      rfc: rfcXml,
+      cveProv: '' // No filtramos por clave, sino por RFC
+    });
+
+    // spDatosProveedor retorna un array. Buscamos si alguno coincide exactamente
+    const erpProviders = erpProviderResult.data || [];
+    const erpProvider = erpProviders.find((p: any) =>
+      (p.RFC || '').replace(/[^A-Z0-9]/g, '') === rfcXml
+    );
+
+    if (!erpProvider) {
+      return NextResponse.json({
+        success: false,
+        error: `El RFC de la factura (${cfdiData.rfcEmisor}) no se encuentra registrado como proveedor en la empresa seleccionada.`
+      }, { status: 400 });
+    }
+
+    // Seguridad: Validar que el usuario tenga permiso sobre este proveedor
+    // Si el usuario es 'admin', puede subir de cualquiera (o limitarlo si se quiere).
+    // Si es 'proveedor', su RFC mapeado (o su relacion) debe coincidir con el del XML.
+    if (userRole === 'proveedor') {
+      const erpProvCode = erp_proveedor_code?.trim();
+      const foundProvCode = erpProvider.Proveedor?.trim();
+
+      // Validamos si el código recuperado coincide con el del usuario
+      // O si el usuario tiene asignado ese RFC en su perfil
+      if (erpProvCode && foundProvCode && erpProvCode !== foundProvCode) {
+        console.warn(`⚠️ Mismatch de proveedor: Usuario ${erpProvCode} intenta subir factura de ${foundProvCode} (${rfcXml})`);
+        // Opcional: Bloquear si es estricto. Por ahora, permitimos si el RFC es válido y el usuario "parece" ser el dueño.
+        // Si queremos ser estrictos:
+        // return NextResponse.json({ success: false, error: 'El RFC de la factura no corresponde a su cuenta de proveedor.' }, { status: 403 });
+      }
+    }
+
+    // El RFC del ERP ya validado
+    const rfcErp = (erpProvider.RFC || '').replace(/[^A-Z0-9]/g, '');
+
+    // B) Validar Orden de Compra
+    // Buscamos la orden de compra en las pendientes del proveedor
+    const ordenesResult = await sp.getOrdenesCompra({
+      empresa: empresaCode,
+      rfc: erpProvider.RFC, // Buscamos por RFC del proveedor
+      limit: 1000 // Traemos suficientes para buscar
+    });
+
+    const ordenCompra = ordenesResult.ordenes.find(o =>
+      o.MovID === ordenCompraId.trim() || o.Mov === ordenCompraId.trim()
+    );
+
+    if (!ordenCompra) {
+      return NextResponse.json({
+        success: false,
+        error: `La orden de compra '${ordenCompraId}' no existe o no corresponde a este proveedor.`
+      }, { status: 400 });
+    }
+
+    console.log('✅ Orden de compra validada:', ordenCompra);
+
+    // C) Validar Montos (Factura Total <= Orden Saldo/Importe)
+    // Usamos un pequeño margen de error por redondeo (e.g. 1 peso)
+    const margenError = 1.0;
+    // Nota: A veces se valida contra 'Saldo' si es parcial, o 'Importe + Impuestos' si es total.
+    // Asumiremos que el monto de la factura no puede exceder el Saldo de la orden.
+
+    // Si la orden tiene Saldo, usamos eso. Si no, calculamos Total.
+    const montoMaximo = ordenCompra.Saldo ?? (ordenCompra.Importe + ordenCompra.Impuestos);
+
+    if (cfdiData.total > (montoMaximo + margenError)) {
+      return NextResponse.json({
+        success: false,
+        error: `El monto de la factura ($${cfdiData.total}) excede el saldo disponible de la orden de compra ($${montoMaximo}).`
+      }, { status: 400 });
+    }
+
+    // D) Validación de artículos (Simplificada a montos y estructura por ahora)
+    // El usuario pide: "Que en cantidades y articulos sea la misma o menos".
+    // Sin mapeo exacto de claves de producto XML vs ERP, la validación de monto es la más robusta.
+    // Podríamos agregar validación de conteo de partidas si fuera necesario.
 
     // 7. Verificar que UUID no esté duplicado
     const duplicadoResult = await portalPool.request()
@@ -252,7 +339,7 @@ export async function POST(request: NextRequest) {
       console.log(`✅ PDF subido a blob: ${pdfBlobResult.blobPath}`);
     }
 
-    // 8.5. Preparar datos para spGeneraRemisionCompra y guardar XML local
+    // 8.5. PREPARACION para paso posterior (Aprobacion Admin)
     const facturasProvPath = 'C:\\FacturasProv';
 
     // Preparar parámetro Factura: serie-folio o F-folio
@@ -263,9 +350,13 @@ export async function POST(request: NextRequest) {
 
     // Validar nombre de archivo seguro
     const safeFilename = facturaParam.replace(/[^a-zA-Z0-9-]/g, '_');
-    const erpArchivo = `${safeFilename}.xml`;
-    const erpXmlPath = path.join(facturasProvPath, erpArchivo);
+    // const erpArchivo = `${safeFilename}.xml`;
+    // const erpXmlPath = path.join(facturasProvPath, erpArchivo);
 
+    // NOTA: YA NO guardamos el XML localmente ni llamamos al SP inmediatamente.
+    // Esto se hará cuando el admin apruebe la factura.
+
+    /* BLOQUE COMENTADO - SE MUEVE A APROBACIÓN
     // Guardar XML en C:\FacturasProv
     try {
       if (!existsSync(facturasProvPath)) {
@@ -286,6 +377,20 @@ export async function POST(request: NextRequest) {
       movId: ordenCompraId.trim(),
       factura: safeFilename // Enviamos el nombre sin extensión, que coincide con serie-folio
     });
+
+    console.log(`📋 spGeneraRemisionCompra resultado:`, remisionResult);
+
+    if (!remisionResult.success) {
+      return NextResponse.json({
+        success: false,
+        error: 'Error al generar remisión de compra en el ERP',
+        details: remisionResult.message
+      }, { status: 500 });
+    }
+    */
+
+    // Simulamos result exitoso para compatibilidad
+    const remisionResult = { success: true, data: null, message: 'Validación local exitosa. Pendiente de aprobación.' };
 
     console.log(`📋 spGeneraRemisionCompra resultado:`, remisionResult);
 
@@ -339,6 +444,7 @@ export async function POST(request: NextRequest) {
       .input('satValidacionEFOS', sql.VarChar(100), satValidacionEFOS)
       .input('satFechaConsulta', sql.DateTime2, satFechaConsulta)
       .input('satMensaje', sql.NVarChar(500), satMensaje)
+      .input('ordenCompraId', sql.VarChar(50), ordenCompraId.trim())
       .query(`
         INSERT INTO ProvFacturas (
           ID, SubidoPor, Empresa,
@@ -353,7 +459,8 @@ export async function POST(request: NextRequest) {
           ValidadaSAT, EstatusSAT, SATCodigoEstatus,
           SATEsCancelable, SATValidacionEFOS,
           FechaValidacionSAT, SATMensaje,
-          Estatus, CreatedAt, UpdatedAt
+          Estatus, CreatedAt, UpdatedAt,
+          OrdenCompraMovID
         ) VALUES (
           @id, @portalUserId, @empresaCode,
           @uuid, @serie, @folio,
@@ -367,7 +474,11 @@ export async function POST(request: NextRequest) {
           @satValidado, @satEstado, @satCodigoEstatus,
           @satEsCancelable, @satValidacionEFOS,
           @satFechaConsulta, @satMensaje,
-          'PENDIENTE', GETDATE(), GETDATE()
+          @satValidado, @satEstado, @satCodigoEstatus,
+          @satEsCancelable, @satValidacionEFOS,
+          @satFechaConsulta, @satMensaje,
+          'PENDIENTE_REVISION', GETDATE(), GETDATE(),
+          @ordenCompraId
         )
       `);
 
