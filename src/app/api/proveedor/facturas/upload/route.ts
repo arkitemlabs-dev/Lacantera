@@ -205,7 +205,7 @@ export async function POST(request: NextRequest) {
     // const moduleFolder = 'facturas';
 
     // CAMBIO SOLICITADO: Guardar todo en carpeta "Portal Proveedores" en primera capa para facilitar lectura SQL
-    const xmlBlobPath = `Portal Proveedores/PRUEBA UNO.xml`;
+    const xmlBlobPath = `Portal Proveedores/prueba dos`;
 
     const xmlBlobResult = await uploadBufferToBlob(
       Buffer.from(xmlString),
@@ -219,7 +219,7 @@ export async function POST(request: NextRequest) {
     if (pdfFile) {
       const pdfArrayBuffer = await pdfFile.arrayBuffer();
       // CAMBIO: Estructura plana para PDF también
-      pdfBlobPath = `Portal Proveedores/PRUEBA UNO.pdf`;
+      pdfBlobPath = `Portal Proveedores/prueba dos`;
 
       const pdfBlobResult = await uploadBufferToBlob(
         Buffer.from(pdfArrayBuffer),
@@ -233,7 +233,7 @@ export async function POST(request: NextRequest) {
     // 8.5. Ejecutar SP spGeneraRemisionCompra
     const sp = getStoredProcedures();
     const folioFactura = String(cfdiData.folio || cfdiData.uuid).substring(0, 50);
-    const archivoXml = `${cfdiData.uuid}.xml`;
+    const archivoXml = `prueba dos`;
 
     // CAMBIO: Usar proveedorRealCode (P00443) y empresaCode directo
     console.log('📋 Llamando spGeneraRemisionCompra con:', {
@@ -263,39 +263,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 9. Insertar en base de datos (tabla ProvFacturas)
-    // Verificar que el proveedor existe en PP.dbo.Prov antes de insertar
+    // El código ERP ya fue validado por el SP spGeneraRemisionCompra
     const provCodeParaInsert = proveedorRealCode || erp_proveedor_code;
-    console.log(`🔍 Verificando proveedor en PP.dbo.Prov: "${provCodeParaInsert}" (proveedorRealCode="${proveedorRealCode}", erp_proveedor_code="${erp_proveedor_code}")`);
-
-    const provExiste = await portalPool.request()
-      .input('provCode', sql.VarChar(10), provCodeParaInsert)
-      .query('SELECT Proveedor FROM Prov WHERE Proveedor = @provCode');
-
-    if (!provExiste.recordset || provExiste.recordset.length === 0) {
-      console.warn(`⚠️ Proveedor "${provCodeParaInsert}" NO existe en PP.dbo.Prov. Intentando con erp_proveedor_code del mapping: "${erp_proveedor_code}"`);
-
-      // Fallback: verificar si el del mapping sí existe
-      const provMappingExiste = await portalPool.request()
-        .input('provCode2', sql.VarChar(10), erp_proveedor_code)
-        .query('SELECT Proveedor FROM Prov WHERE Proveedor = @provCode2');
-
-      if (provMappingExiste.recordset && provMappingExiste.recordset.length > 0) {
-        console.log(`✅ Usando erp_proveedor_code del mapping: "${erp_proveedor_code}" (existe en PP.dbo.Prov)`);
-        proveedorRealCode = erp_proveedor_code;
-      } else {
-        console.error(`❌ Ni "${provCodeParaInsert}" ni "${erp_proveedor_code}" existen en PP.dbo.Prov`);
-        // Listar proveedores disponibles para debug
-        const provList = await portalPool.request()
-          .query('SELECT TOP 10 Proveedor, Nombre FROM Prov ORDER BY Proveedor');
-        console.log('📋 Proveedores en PP.dbo.Prov:', provList.recordset);
-
-        return NextResponse.json({
-          success: false,
-          error: `El proveedor "${provCodeParaInsert}" no está registrado en la tabla Prov del portal. Contacte al administrador.`,
-          details: { proveedorRealCode, erp_proveedor_code }
-        }, { status: 400 });
-      }
-    }
+    console.log(`📍 Proveedor para INSERT: "${provCodeParaInsert}"`);
 
     // TEMPORAL: Borrar factura existente con mismo UUID para permitir re-subir en pruebas
     await portalPool.request()

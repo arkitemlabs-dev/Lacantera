@@ -146,7 +146,7 @@ export async function uploadFactura(data: {
 
     // 4. Guardar XML en C:\FacturasProv para compatibilidad con spGeneraRemisionCompra
     const safeFilename = facturaParam.replace(/[^a-zA-Z0-9-]/g, '_');
-    const erpArchivo = `${safeFilename}.xml`;
+    const erpArchivo = `${safeFilename}`;
     const erpXmlPath = path.join(FACTURAS_PROV_PATH, erpArchivo);
 
     try {

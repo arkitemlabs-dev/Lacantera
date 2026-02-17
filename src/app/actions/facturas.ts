@@ -270,7 +270,7 @@ export async function approveFacturaAndSendToERP(id: string, adminId: string) {
     const facturaParam = `${serie}${folio ? '-' + folio : ''}`;
     // Limpieza de nombre archivo (mismo logic que en upload)
     const safeFilename = facturaParam.replace(/[^a-zA-Z0-9-]/g, '_');
-    const erpArchivo = `${safeFilename}.xml`;
+    const erpArchivo = `${safeFilename}`;
     const erpXmlPath = path.join(facturasProvPath, erpArchivo);
 
     try {
