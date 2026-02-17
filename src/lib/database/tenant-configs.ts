@@ -20,7 +20,7 @@ export const ERP_DATABASES: Record<string, ERPDatabaseConfig> = {
   "04": { db: "Galbd", empresa: "EMP01", nombre: "Inmobiliaria Galereña" },
   "05": { db: "Icrear", empresa: "EMP03", nombre: "ICREAR" },
 
-  "06": { db: "Cantera_ajustes", empresa: "01", nombre: "La Cantera (Test)" },
+  "06": { db: "Cantera_ajustes", empresa: "06", nombre: "La Cantera (Test)" },
   "07": { db: "Peralillo_ajustes", empresa: "01", nombre: "Peralillo (Test)" },
   "08": { db: "Galbd_pruebas", empresa: "EMP02", nombre: "Plaza Galereña (Test)" },
   "09": { db: "Galbd_pruebas", empresa: "EMP01", nombre: "Inmobiliaria Galereña (Test)" },

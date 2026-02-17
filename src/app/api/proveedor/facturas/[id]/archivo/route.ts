@@ -64,7 +64,7 @@ export async function GET(
     }
 
     // Blob storage — generar SAS URL
-    if (storageType === 'blob' && blobPath.startsWith('empresa/')) {
+    if (storageType === 'blob') {
       const downloadUrl = generateReadSasUrl(blobPath, blobContainer || undefined);
       return NextResponse.json({
         success: true,
