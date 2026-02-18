@@ -120,7 +120,6 @@ export async function uploadFactura(data: {
       kind: 'factura-xml',
       empresaCode: erpEmpresa,
       idProveedor: data.proveedorId,
-      rfc: essentialData.rfcEmisor || 'SIN-RFC',
       uuid: essentialData.uuid,
     });
     await uploadBufferToBlob(Buffer.from(xmlContent), xmlBlobPath, 'text/xml');
@@ -136,7 +135,6 @@ export async function uploadFactura(data: {
           kind: 'factura-pdf',
           empresaCode: erpEmpresa,
           idProveedor: data.proveedorId,
-          rfc: essentialData.rfcEmisor || 'SIN-RFC',
           uuid: essentialData.uuid,
         });
         await uploadBufferToBlob(pdfBuffer, pdfBlobPath, 'application/pdf');

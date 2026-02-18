@@ -10,7 +10,6 @@ import { buildBlobPath } from '@/lib/blob-path-builder';
 import { getEmpresaERPFromTenant } from '@/lib/database/tenant-configs';
 import sql from 'mssql';
 import { v4 as uuidv4 } from 'uuid';
-import path from 'path';
 
 const ALLOWED_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
@@ -82,7 +81,7 @@ export async function POST(request: NextRequest) {
     console.log(`[DOCUMENTO UPLOAD] Portal: ${session.user.proveedor}, ERP: ${proveedorCode}`);
 
     // Construir ruta blob
-    const ext = path.extname(file.name).replace(/^\./, '') || 'pdf';
+    const ext = file.name.split('.').pop() || 'pdf';
     const blobPath = buildBlobPath({
       kind: 'documento-proveedor',
       empresaCode: erpEmpresa,

@@ -16,7 +16,6 @@ interface BaseBlobParams {
 interface FacturaBlobParams extends BaseBlobParams {
   kind: 'factura-xml' | 'factura-pdf';
   idProveedor: string;
-  rfc: string;
   uuid: string;
 }
 
@@ -48,11 +47,13 @@ export type BlobPathParams =
 /**
  * Construye la ruta del blob según convenciones multi-tenant.
  *
+ * Estructura: empresa / {NO.Empresa} / {ID Proveedor ERP} / {módulo} / {archivo}
+ *
  * Convenciones:
- * - Factura XML:  empresa/{emp}/proveedor/{id}/facturas/{rfc}/{uuid}/factura-xml_{uuid}.xml
- * - Factura PDF:  empresa/{emp}/proveedor/{id}/facturas/{rfc}/{uuid}/factura-pdf_{uuid}.pdf
- * - Documento:    empresa/{emp}/proveedor/{id}/documentos/{tipoDoc}/documento-{tipoDoc}_{timestamp}.{ext}
- * - Comprobante:  empresa/{emp}/proveedor/{id}/pagos/{idPago}/comprobante-pago_{idPago}.{ext}
+ * - Factura XML:  empresa/{emp}/{id}/facturas/{uuid}.xml
+ * - Factura PDF:  empresa/{emp}/{id}/facturas/{uuid}.pdf
+ * - Documento:    empresa/{emp}/{id}/documentos/{tipoDocumento}.{ext}
+ * - Comprobante:  empresa/{emp}/{id}/pagos/comprobante-pago_{idPago}.{ext}
  * - Logo:         empresa/{emp}/configuracion/logo_{timestamp}.{ext}
  */
 export function buildBlobPath(params: BlobPathParams): string {
@@ -62,20 +63,18 @@ export function buildBlobPath(params: BlobPathParams): string {
   switch (kind) {
     case 'factura-xml': {
       const p = params as FacturaBlobParams;
-      requireFields(p, ['idProveedor', 'rfc', 'uuid']);
+      requireFields(p, ['idProveedor', 'uuid']);
       const id = sanitize(p.idProveedor);
-      const rfc = sanitize(p.rfc);
       const uuid = sanitize(p.uuid);
-      return `empresa/${emp}/proveedor/${id}/facturas/${rfc}/${uuid}/factura-xml_${uuid}.xml`;
+      return `empresa/${emp}/${id}/facturas/${uuid}.xml`;
     }
 
     case 'factura-pdf': {
       const p = params as FacturaBlobParams;
-      requireFields(p, ['idProveedor', 'rfc', 'uuid']);
+      requireFields(p, ['idProveedor', 'uuid']);
       const id = sanitize(p.idProveedor);
-      const rfc = sanitize(p.rfc);
       const uuid = sanitize(p.uuid);
-      return `empresa/${emp}/proveedor/${id}/facturas/${rfc}/${uuid}/factura-pdf_${uuid}.pdf`;
+      return `empresa/${emp}/${id}/facturas/${uuid}.pdf`;
     }
 
     case 'documento-proveedor': {
@@ -84,8 +83,7 @@ export function buildBlobPath(params: BlobPathParams): string {
       const id = sanitize(p.idProveedor);
       const tipo = sanitize(p.tipoDocumento);
       const ext = sanitizeExt(p.extension);
-      const ts = Date.now();
-      return `empresa/${emp}/proveedor/${id}/documentos/${tipo}/documento-${tipo}_${ts}.${ext}`;
+      return `empresa/${emp}/${id}/documentos/${tipo}.${ext}`;
     }
 
     case 'comprobante-pago': {
@@ -94,7 +92,7 @@ export function buildBlobPath(params: BlobPathParams): string {
       const id = sanitize(p.idProveedor);
       const pago = sanitize(p.idPago);
       const ext = sanitizeExt(p.extension);
-      return `empresa/${emp}/proveedor/${id}/pagos/${pago}/comprobante-pago_${pago}.${ext}`;
+      return `empresa/${emp}/${id}/pagos/comprobante-pago_${pago}.${ext}`;
     }
 
     case 'logo-empresa': {

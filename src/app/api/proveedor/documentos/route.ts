@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
         const matchingRules: { [key: string]: string[][] } = {
           'acta constitutiva': [['acta', 'constitutiva'], ['escritura']],
           'poder del representante legal': [['poder', 'representante'], ['poder', 'notarial']],
-          'ine del representante legal': [['ine', 'representante'], ['ine', 'legal'], ['ine']],
+          'ine del representante legal': [['ine', 'representante'], ['ine', 'legal']],
           'comprobante de domicilio fiscal': [['comprobante', 'domicilio'], ['domicilio']],
           'opinión de cumplimiento obligaciones sat': [['opinion', 'cumplimiento'], ['cumplimiento', 'sat'], ['op', 'cum']],
           'pago del imss': [['pago', 'imss'], ['imss']],

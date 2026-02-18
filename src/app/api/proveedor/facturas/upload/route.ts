@@ -196,16 +196,16 @@ export async function POST(request: NextRequest) {
     let satMensaje = 'Validación SAT omitida (modo pruebas)';
 
     // 8. Subir archivos a Azure Blob Storage
-    // CAMBIO: Estructura de carpetas: Empresa / ProveedorERP / Modulo / UUID.ext
-    // Ejemplo: 06/P00443/facturas/778CBD1C...xml
+    // Estructura: Portal Proveedores/empresa/{NO.Empresa}/{ID Proveedor ERP}/facturas/{archivo}
+    const erpEmpresa = getEmpresaERPFromTenant(empresaCode) || empresaCode;
+    const proveedorBlobId = proveedorRealCode || erp_proveedor_code;
 
-    // Asegurar que tenemos códigos válidos (fallback a desconocidos si algo falla muy raro)
-    // const companyFolder = empresaCode || 'general';
-    // const providerFolder = erp_proveedor_code || 'sin_proveedor';
-    // const moduleFolder = 'facturas';
-
-    // CAMBIO SOLICITADO: Guardar todo en carpeta "Portal Proveedores" en primera capa para facilitar lectura SQL
-    const xmlBlobPath = `Portal Proveedores/PRUEBA UNO.xml`;
+    const xmlBlobPath = buildBlobPath({
+      kind: 'factura-xml',
+      empresaCode: erpEmpresa,
+      idProveedor: proveedorBlobId,
+      uuid: cfdiData.uuid,
+    });
 
     const xmlBlobResult = await uploadBufferToBlob(
       Buffer.from(xmlString),
@@ -218,8 +218,12 @@ export async function POST(request: NextRequest) {
     let pdfBlobContainer: string | null = null;
     if (pdfFile) {
       const pdfArrayBuffer = await pdfFile.arrayBuffer();
-      // CAMBIO: Estructura plana para PDF también
-      pdfBlobPath = `Portal Proveedores/prueba 1.pdf`;
+      pdfBlobPath = buildBlobPath({
+        kind: 'factura-pdf',
+        empresaCode: erpEmpresa,
+        idProveedor: proveedorBlobId,
+        uuid: cfdiData.uuid,
+      });
 
       const pdfBlobResult = await uploadBufferToBlob(
         Buffer.from(pdfArrayBuffer),
