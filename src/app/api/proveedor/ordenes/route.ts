@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth.config';
-import { getPortalConnection } from '@/lib/database/multi-tenant-connection';
+import { getPortalConnection, getERPConnection } from '@/lib/database/multi-tenant-connection';
 import { storedProcedures } from '@/lib/database/stored-procedures';
 import { getEmpresaERPFromTenant } from '@/lib/database/tenant-configs';
 import sql from 'mssql';
@@ -92,22 +92,36 @@ export async function GET(request: NextRequest) {
 
     console.log(`📍 Código empresa ERP: ${empresaCode}`);
 
-    // 4. Obtener órdenes de compra usando el SP
-    console.log(`📍 Llamando sp_GetOrdenesCompraProveedor - Clave: ${clave}, Empresa: ${empresaCode}`);
+    // 4. Obtener RFC del proveedor desde la tabla Prov del ERP
+    const erpPool = await getERPConnection(empresaActual);
+    const rfcResult = await erpPool.request()
+      .input('clave', sql.VarChar(20), clave)
+      .query('SELECT TOP 1 RFC FROM Prov WHERE Proveedor = @clave');
 
-    const spResult = await storedProcedures.getOrdenesCompraProveedor(
-      clave,       // @Clave
-      empresaCode,
-      {
-        rfc: null,  // @RFC (no lo tenemos desde el mapping)
-        fechaDesde: null,
-        fechaHasta: null,
-        page: 1,
-        limit: 1000
-      }
-    );
+    const rfcProveedor = rfcResult.recordset[0]?.RFC || null;
 
-    console.log(`📦 Órdenes encontradas via SP: ${spResult.ordenes.length}`);
+    if (!rfcProveedor) {
+      return NextResponse.json({
+        success: false,
+        error: `No se encontró RFC para el proveedor ${clave} en empresa ${empresaActual}`
+      }, { status: 404 });
+    }
+
+    console.log(`📍 RFC del proveedor: ${rfcProveedor}`);
+
+    // 5. Obtener órdenes de compra usando el SP
+    console.log(`📍 Llamando sp_GetOrdenesCompra - RFC: ${rfcProveedor}, Empresa: ${empresaActual}`);
+
+    const spResult = await storedProcedures.getOrdenesCompra({
+      rfc: rfcProveedor,
+      empresa: empresaActual,
+      fechaDesde: null,
+      fechaHasta: null,
+      page: 1,
+      limit: 1000
+    });
+
+    console.log(`📦 Órdenes encontradas via SP: ${spResult.ordenes?.length ?? 0}`);
 
     // 6. Mapear las órdenes del SP al formato esperado por el frontend
     const ordenes = spResult.ordenes.map((orden: any) => {
