@@ -209,7 +209,7 @@ export function AddSupplierForm() {
                   name="taxId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>RFC / Tax ID</FormLabel>
+                      <FormLabel>RFC</FormLabel>
                       <FormControl>
                         <Input placeholder="XAXX010101000" {...field} />
                       </FormControl>
@@ -455,10 +455,7 @@ export function AddSupplierForm() {
             <Card>
                 <CardHeader>
                     <CardTitle>Documentación Complementaria</CardTitle>
-                    <CardDescription>
-                        Sube los documentos requeridos según el tipo de proveedor.
-                    </CardDescription>
-                </CardHeader>
+                    </CardHeader>
                 <CardContent>
                     <Table>
                         <TableHeader>
