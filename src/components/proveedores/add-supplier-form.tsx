@@ -62,6 +62,7 @@ const formSchema = z.object({
   contactName: z.string().min(2, 'El nombre del contacto es requerido'),
   contactEmail: z.string().email('Email inválido'),
   contactPhone: z.string().min(10, 'El teléfono debe tener al menos 10 dígitos'),
+  whatsappPhone: z.string().optional(),
 
   // Información bancaria
   bankName: z.string().min(2, 'El nombre del banco es requerido'),
@@ -104,6 +105,7 @@ export function AddSupplierForm() {
       contactName: '',
       contactEmail: '',
       contactPhone: '',
+      whatsappPhone: '',
       bankName: '',
       bankAccount: '',
     },
@@ -129,6 +131,7 @@ export function AddSupplierForm() {
         contactoPrincipal: values.contactName.trim(),
         email1: values.contactEmail.toLowerCase().trim(), // Email en minúsculas
         telefonos: values.contactPhone.trim(),
+        fax: values.whatsappPhone?.trim() || '',
         // Bancario
         banco: values.bankName.trim(),
         cuentaBancaria: values.bankAccount.trim(),
@@ -373,6 +376,19 @@ export function AddSupplierForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Teléfono de Contacto</FormLabel>
+                      <FormControl>
+                        <Input placeholder="55 1234 5678" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="whatsappPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Teléfono de Contacto con WhatsApp</FormLabel>
                       <FormControl>
                         <Input placeholder="55 1234 5678" {...field} />
                       </FormControl>

@@ -118,25 +118,46 @@ export async function GET(request: NextRequest) {
     console.log(`[API RESULT] sp_GetFacturas éxito. Registros: ${facturas.length}, Total: ${total}\n`);
 
     // 5. Mapear al pattern de respuesta existente para compatibilidad con el frontend
-    const facturasFormateadas = facturas.map((factura: any) => ({
-      id: factura.ID,
-      folio: factura.Folio || factura.MovID,
-      cfdi: factura.UUID,
-      serie: factura.Serie,
-      empresa: factura.Empresa,
-      empresaNombre: getNombreEmpresa(empresaActual),
-      fechaEmision: factura.FechaEmision,
-      total: factura.Total || 0,
-      saldo: factura.Saldo || 0,
-      // Mapear estatus del SP al formato legible del frontend
-      estado: factura.Estatus === 'EN_REVISION' ? 'En revisión' :
-        factura.Estatus === 'APROBADA' ? 'Aprobada' :
-          factura.Estatus === 'PAGADA' ? 'Pagada' :
-            factura.Estatus === 'RECHAZADA' ? 'Rechazada' : factura.Estatus,
-      ordenAsociada: factura.OrdenCompraMovID || '-',
-      urlPDF: factura.UrlPDF,
-      urlXML: factura.UrlXML
-    }));
+    // NOTA: sp_GetFacturas devuelve: Factura, NombreProveedor, Compra, FechaEmision, Estado, Importe
+    const facturasFormateadas = facturas.map((factura: any) => {
+      const estadoRaw = factura.Estado || factura.Estatus || '';
+      const estadoLegible =
+        estadoRaw === 'EN_REVISION' ? 'En revisión' :
+        estadoRaw === 'APROBADA' ? 'Aprobada' :
+        estadoRaw === 'PAGADA' ? 'Pagada' :
+        estadoRaw === 'RECHAZADA' ? 'Rechazada' :
+        estadoRaw || 'En revisión';
+
+      return {
+        id: factura.ID || factura.Factura,
+        folio: factura.Folio || factura.MovID || factura.Factura,
+        cfdi: factura.UUID,
+        serie: factura.Serie,
+        empresa: factura.Empresa,
+        empresaNombre: getNombreEmpresa(empresaActual),
+        fechaEmision: factura.FechaEmision,
+        total: factura.Total || factura.Importe || 0,
+        saldo: factura.Saldo || 0,
+        estado: estadoLegible,
+        ordenAsociada: factura.OrdenCompraMovID || factura.Compra || '-',
+        urlPDF: factura.UrlPDF,
+        urlXML: factura.UrlXML
+      };
+    });
+
+    // El SP puede no devolver segundo recordset con el total; usar facturas.length como fallback
+    const totalEfectivo = total || facturasFormateadas.length;
+
+    // Estadísticas básicas calculadas del resultado
+    const estadisticas = {
+      totalFacturas: totalEfectivo,
+      montoTotal: facturasFormateadas.reduce((sum: number, f: any) => sum + (f.total || 0), 0),
+      saldoTotal: facturasFormateadas.reduce((sum: number, f: any) => sum + (f.saldo || 0), 0),
+      porEstatus: facturasFormateadas.reduce((acc: Record<string, number>, f: any) => {
+        acc[f.estado] = (acc[f.estado] || 0) + 1;
+        return acc;
+      }, {})
+    };
 
     // 6. Retornar respuesta con el formato del portal
     return NextResponse.json({
@@ -145,11 +166,12 @@ export async function GET(request: NextRequest) {
         empresaActual,
         codigoProveedorERP: proveedorERP,
         facturas: facturasFormateadas,
+        estadisticas,
         paginacion: {
           page,
           limit,
-          total,
-          totalPages: Math.ceil(total / limit)
+          total: totalEfectivo,
+          totalPages: Math.ceil(totalEfectivo / limit) || 1
         }
       }
     });
