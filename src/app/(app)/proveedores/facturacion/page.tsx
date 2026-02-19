@@ -348,8 +348,10 @@ export default function FacturacionProveedorPage() {
                 <TableRow key={invoice.id}>
                   <TableCell className="font-medium">{invoice.folio}</TableCell>
                   <TableCell>
-                    <span className="text-xs text-muted-foreground" title={invoice.cfdi}>
-                      {invoice.cfdi.length > 20 ? `${invoice.cfdi.substring(0, 20)}...` : invoice.cfdi}
+                    <span className="text-xs text-muted-foreground" title={invoice.cfdi ?? ''}>
+                      {invoice.cfdi
+                        ? invoice.cfdi.length > 20 ? `${invoice.cfdi.substring(0, 20)}...` : invoice.cfdi
+                        : '-'}
                     </span>
                   </TableCell>
                   <TableCell>

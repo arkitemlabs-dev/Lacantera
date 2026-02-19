@@ -143,37 +143,9 @@ export async function POST(request: NextRequest) {
     const validation = { warnings: [] as string[] };
     console.log('🚧 VALIDACIONES COMENTADAS PARA PRUEBAS');
 
-    // Inicializar proveedorRealCode con el código del usuario como fallback
-    let proveedorRealCode = erp_proveedor_code;
-
-    // Intentar recuperar el proveedor real por RFC (incluso si la validación estricta está comentada, esto es útil)
-    try {
-      const sp = getStoredProcedures();
-      const rfcXml = cfdiData.rfcEmisor.toUpperCase().replace(/[^A-Z0-9]/g, '');
-
-      console.log(`🔍 Buscando proveedor por RFC: ${rfcXml} en empresa ${empresaCode}...`);
-
-      const erpProviderResult = await sp.spDatosProveedor({
-        empresa: empresaCode,
-        operacion: 'C',
-        rfc: rfcXml,
-        cveProv: ''
-      });
-
-      const erpProviders = erpProviderResult.data || [];
-      const erpProvider = erpProviders.find((p: any) =>
-        (p.RFC || '').replace(/[^A-Z0-9]/g, '') === rfcXml
-      );
-
-      if (erpProvider) {
-        proveedorRealCode = erpProvider.Proveedor;
-        console.log(`✅ Proveedor identificado por RFC: ${proveedorRealCode}`);
-      } else {
-        console.warn(`⚠️ No se encontró proveedor con RFC ${rfcXml} en ERP. Usando fallback: ${proveedorRealCode}`);
-      }
-    } catch (e) {
-      console.error('⚠️ Error al buscar proveedor por RFC:', e);
-    }
+    // Usar directamente el erp_proveedor_code del mapping del portal — es la fuente correcta
+    const proveedorRealCode = erp_proveedor_code;
+    console.log(`📋 Proveedor ERP (del mapping): ${proveedorRealCode}`);
 
     /* VALIDACIÓN ORDEN DE COMPRA - COMENTADA
     const ordenesResult = await sp.getOrdenesCompra({ ... });
@@ -237,13 +209,12 @@ export async function POST(request: NextRequest) {
     // 8.5. Ejecutar SP spGeneraRemisionCompra
     const sp = getStoredProcedures();
     const folioFactura = String(cfdiData.folio || cfdiData.uuid).substring(0, 50);
-    const archivoXml = `${cfdiData.prueba1}`;
+    const archivoXml = cfdiData.uuid;
 
-    // CAMBIO: Usar proveedorRealCode (P00443) y empresaCode directo
     console.log('📋 Llamando spGeneraRemisionCompra con:', {
       empresa: empresaCode,
       movId: ordenCompraId.trim(),
-      proveedor: proveedorRealCode || erp_proveedor_code, 
+      proveedor: proveedorRealCode,
       folioFactura,
       archivo: archivoXml
     });
@@ -251,7 +222,7 @@ export async function POST(request: NextRequest) {
     const remisionResult = await sp.generaRemisionCompra({
       empresa: empresaCode,
       movId: ordenCompraId.trim(),
-      proveedor: proveedorRealCode || erp_proveedor_code, // Usar ID real del ERP
+      proveedor: proveedorRealCode,
       folioFactura,
       archivo: archivoXml,
     });
@@ -267,39 +238,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 9. Insertar en base de datos (tabla ProvFacturas)
-    // Verificar que el proveedor existe en PP.dbo.Prov antes de insertar
-    const provCodeParaInsert = proveedorRealCode || erp_proveedor_code;
-    console.log(`🔍 Verificando proveedor en PP.dbo.Prov: "${provCodeParaInsert}" (proveedorRealCode="${proveedorRealCode}", erp_proveedor_code="${erp_proveedor_code}")`);
-
-    const provExiste = await portalPool.request()
-      .input('provCode', sql.VarChar(10), provCodeParaInsert)
-      .query('SELECT Proveedor FROM Prov WHERE Proveedor = @provCode');
-
-    if (!provExiste.recordset || provExiste.recordset.length === 0) {
-      console.warn(`⚠️ Proveedor "${provCodeParaInsert}" NO existe en PP.dbo.Prov. Intentando con erp_proveedor_code del mapping: "${erp_proveedor_code}"`);
-
-      // Fallback: verificar si el del mapping sí existe
-      const provMappingExiste = await portalPool.request()
-        .input('provCode2', sql.VarChar(10), erp_proveedor_code)
-        .query('SELECT Proveedor FROM Prov WHERE Proveedor = @provCode2');
-
-      if (provMappingExiste.recordset && provMappingExiste.recordset.length > 0) {
-        console.log(`✅ Usando erp_proveedor_code del mapping: "${erp_proveedor_code}" (existe en PP.dbo.Prov)`);
-        proveedorRealCode = erp_proveedor_code;
-      } else {
-        console.error(`❌ Ni "${provCodeParaInsert}" ni "${erp_proveedor_code}" existen en PP.dbo.Prov`);
-        // Listar proveedores disponibles para debug
-        const provList = await portalPool.request()
-          .query('SELECT TOP 10 Proveedor, Nombre FROM Prov ORDER BY Proveedor');
-        console.log('📋 Proveedores en PP.dbo.Prov:', provList.recordset);
-
-        return NextResponse.json({
-          success: false,
-          error: `El proveedor "${provCodeParaInsert}" no está registrado en la tabla Prov del portal. Contacte al administrador.`,
-          details: { proveedorRealCode, erp_proveedor_code }
-        }, { status: 400 });
-      }
-    }
+    // Usar directamente el erp_proveedor_code del mapping — ya validado al inicio
+    const provCodeParaInsert = erp_proveedor_code;
+    console.log(`📋 Proveedor ERP para insertar: "${provCodeParaInsert}"`);
 
     // TEMPORAL: Borrar factura existente con mismo UUID para permitir re-subir en pruebas
     await portalPool.request()
@@ -320,7 +261,7 @@ export async function POST(request: NextRequest) {
     await portalPool.request()
       .input('id', sql.UniqueIdentifier, facturaId)
       .input('facturaIdLegible', sql.VarChar(100), facturaIdLegible)
-      .input('proveedor', sql.VarChar(10), proveedorRealCode || erp_proveedor_code)
+      .input('proveedor', sql.VarChar(10), provCodeParaInsert)
       .input('empresaCode', sql.VarChar(5), empresaCode)
       .input('uuid', sql.VarChar(36), cfdiData.uuid)
       .input('serie', sql.VarChar(10), cfdiData.serie ? String(cfdiData.serie).substring(0, 10) : null)
