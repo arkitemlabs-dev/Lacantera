@@ -1,158 +1,131 @@
-# 🗺️ MAPEO DE BASE DE DATOS - ESPECIFICACIÓN vs PLANTILLAS EXISTENTES
+# 🗺️ MAPEO DE BASE DE DATOS - TABLAS DEL PORTAL (PP)
 
 ## 📋 RESUMEN EJECUTIVO
 
-Este documento mapea la especificación de las tablas de la app con las **plantillas pNet** existentes en la base de datos PP, reutilizando al máximo las tablas del ERP y creando solo las necesarias.
+Este documento mapea **todas las tablas reales que usa el portal** en la base de datos `PP`, basado en el código fuente actual. Las tablas del ERP (`Prov`, `Compra`, `CFDI_Comprobante`, etc.) se acceden por separado vía conexión ERP y no se documentan aquí.
+
+> **Última revisión:** Auditado contra el código fuente real (src/).
 
 ---
 
-## ✅ SECCIÓN 1: TABLAS EXISTENTES A REUTILIZAR (5 TABLAS)
+## ✅ SECCIÓN 1: TABLAS EXISTENTES EN PP (no creadas por nosotros)
 
 ### 1.1 USUARIOS Y AUTENTICACIÓN
 
-#### ✅ `pNetUsuario` → Reemplaza `users` (MASTER)
-**Tabla existente en PP** - Usar tal cual
+#### ✅ `WebUsuario` — Tabla principal de usuarios (MASTER)
+**Tabla en PP** — Fuente Única de Verdad para autenticación
 
 ```sql
--- ESTRUCTURA EXISTENTE (NO MODIFICAR)
-SELECT * FROM pNetUsuario
--- Campos: IDUsuario, Usuario, IDUsuarioTipo, eMail, Nombre, Estatus, Empresa, FechaAlta, UltimaModificacion
+SELECT
+    UsuarioWeb, Nombre, eMail, Contrasena,
+    Rol, Estatus, Empresa, Proveedor
+FROM WebUsuario
+WHERE Estatus = 'ACTIVO'
 ```
 
 **Mapeo de campos:**
-- `IDUsuario` → `users.id`
-- `eMail` → `users.email`
-- `Nombre` → `users.display_name`
-- `IDUsuarioTipo` → `users.role` (1=Admin, 4=Proveedor)
-- `Estatus` → `users.status` (ACTIVO/INACTIVO)
-- `Empresa` → `users.empresa_id` (relación con Empresa)
+- `UsuarioWeb` → `session.user.id` (ej: `PROV12345678`)
+- `eMail` → `session.user.email`
+- `Nombre` → `session.user.name`
+- `Contrasena` → hash bcrypt
+- `Rol` → `'super-admin'` / `'admin'` / `'proveedor'`
+- `Estatus` → `'ACTIVO'` / `'INACTIVO'`
+- `Empresa` → empresa por defecto
+- `Proveedor` → código ERP del proveedor (ej: `P00443`), NULL si es admin
 
-**Campos adicionales necesarios (agregar como columnas opcionales o tabla extendida):**
-- `rfc`, `razon_social`, `telefono`, `direccion_*`, `avatar_url`
-
-#### ✅ `pNetUsuarioTipo` → Reemplaza catálogo de roles
-**Tabla existente en PP** - Usar tal cual
-
-```sql
-SELECT * FROM pNetUsuarioTipo
--- Valores conocidos: 1 = Intelisis/Admin, 4 = Proveedor
-```
-
-#### ✅ `pNetUsuarioPassword` → Tabla de contraseñas
-**Tabla creada por nosotros** - Ya existe
-
-```sql
-SELECT * FROM pNetUsuarioPassword
--- Campos: IDUsuario, PasswordHash, CreatedAt, UpdatedAt
-```
+> ⚠️ **DEPRECADAS** — ya no se usan:
+> - ~~`pNetUsuario`~~ — reemplazada por `WebUsuario`
+> - ~~`pNetUsuarioTipo`~~ — roles ahora en `WebUsuario.Rol`
+> - ~~`pNetUsuarioPassword`~~ — contraseña ahora en `WebUsuario.Contrasena`
 
 ### 1.2 EMPRESAS
 
-#### ✅ `Empresa` → Reemplaza `empresas` (MASTER)
-**Tabla existente en PP** - Usar con adaptaciones
+#### ✅ `Empresa` — Catálogo de empresas
+**Tabla en PP**
 
 ```sql
--- ESTRUCTURA EXISTENTE
 SELECT
     Empresa as codigo,
     Nombre as nombre_comercial,
-    RFC as rfc,
-    Direccion as direccion,
-    Telefonos as telefono
+    RFC, Direccion, Telefonos
 FROM Empresa
 WHERE Estatus = 'ALTA'
 ```
 
-**Campos que faltan (agregar o tabla extendida):**
-- `razon_social` (puede usar Nombre)
-- `email`, `logo_url`
-- `database_name`, `connection_string_key` (para routing multi-BD)
-- `erp_connection_config`, `timezone`
+### 1.3 PROVEEDORES (ERP — solo lectura)
 
-### 1.3 PROVEEDORES
+#### ✅ `Prov` — Datos maestros de proveedores
+**Tabla del ERP** (`Cantera`, `Cantera_Ajustes`, etc.) — **NO está en PP**
 
-#### ✅ `Prov` → Reemplaza `proveedores`
-**Tabla existente en PP** - Usar con adaptaciones
+> ⚠️ Siempre se consulta vía `hybridDB.queryERP(tenantId, ...)` o `getERPConnection(empresa)`.
+> Nunca se accede desde la conexión del portal (`PP`).
 
 ```sql
-SELECT
-    Proveedor as proveedor_id,
-    RFC as rfc,
-    Nombre as razon_social,
-    -- Más campos disponibles en Prov del ERP
+-- Se ejecuta contra la BD ERP de cada empresa
+SELECT Proveedor, RFC, Nombre, Contacto1, Telefonos,
+       eMail1, eMail2, Estatus, Direccion
 FROM Prov
 WHERE Estatus = 'ALTA'
 ```
 
-**Campos del ERP que podemos usar:**
-- Contacto, Telefono, EMail
-- DireccionFiscal
-- Banco, CLABE, NumeroCuenta
-
-**Campos adicionales necesarios (tabla extendida):**
-- `categoria_proveedor`, `status_portal`, `documentos_completos`
-- `fecha_ultima_actividad`, `ultima_sincronizacion_erp`
+- `Proveedor` — código ERP (ej: `P00443`), FK usada en todos los SPs
 
 ---
 
-## 🆕 SECCIÓN 2: TABLAS NUEVAS NECESARIAS (19 TABLAS)
+## 🆕 SECCIÓN 2: TABLAS DEL PORTAL CREADAS POR NOSOTROS (PP)
 
-### 2.1 AUTENTICACIÓN Y SESIONES (3 TABLAS)
+### 2.1 AUTENTICACIÓN Y MAPEO (4 TABLAS)
 
-#### 🆕 `pNetUsuarioEmpresa` → Relación usuarios-empresas
+#### 🆕 `portal_proveedor_mapping` — Mapeo usuario portal ↔ proveedor ERP
+**Tabla CRÍTICA** — usada en prácticamente todos los endpoints de proveedor
+
+```sql
+CREATE TABLE portal_proveedor_mapping (
+    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    portal_user_id VARCHAR(50) NOT NULL,   -- FK a WebUsuario.UsuarioWeb
+    erp_proveedor_code VARCHAR(20) NOT NULL, -- FK a Prov.Proveedor en ERP
+    empresa_code VARCHAR(50) NOT NULL,      -- código de empresa (ej: 'la-cantera')
+    activo BIT NOT NULL DEFAULT 1,
+    permisos NVARCHAR(MAX) NULL,            -- JSON con permisos
+    created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+
+    INDEX IDX_portal_user (portal_user_id),
+    INDEX IDX_erp_code (erp_proveedor_code),
+    INDEX IDX_empresa (empresa_code),
+    INDEX IDX_activo (activo)
+);
+```
+
+**Propósito:** Traduce `session.user.id` (`PROV12345678`) al código ERP (`P00443`) para cada empresa. Ver `docs/PROVEEDOR-ID-MAP.md`.
+
+---
+
+#### 🆕 `pNetUsuarioEmpresa` — Relación usuarios-empresas
 ```sql
 CREATE TABLE pNetUsuarioEmpresa (
     ID INT IDENTITY(1,1) PRIMARY KEY,
-    IDUsuario INT NOT NULL, -- FK a pNetUsuario.IDUsuario
-    Empresa VARCHAR(10) NOT NULL, -- FK a Empresa.Empresa
+    UsuarioWeb VARCHAR(50) NOT NULL,        -- FK a WebUsuario.UsuarioWeb
+    Empresa VARCHAR(10) NOT NULL,           -- FK a Empresa.Empresa
     Rol VARCHAR(50) NOT NULL DEFAULT 'Proveedor',
     Activo BIT NOT NULL DEFAULT 1,
-    ProveedorID VARCHAR(50) NULL, -- FK a Prov.Proveedor (si es proveedor)
+    ProveedorID VARCHAR(50) NULL,           -- FK a Prov.Proveedor (ERP)
     DocumentosValidados BIT NOT NULL DEFAULT 0,
     FechaUltimaActividad DATETIME2 NULL,
-    ConfiguracionesJSON NVARCHAR(MAX) NULL,
     FechaAsignacion DATETIME2 NOT NULL DEFAULT GETDATE(),
 
-    CONSTRAINT FK_pNetUsuarioEmpresa_Usuario FOREIGN KEY (IDUsuario)
-        REFERENCES pNetUsuario(IDUsuario),
-    CONSTRAINT FK_pNetUsuarioEmpresa_Empresa FOREIGN KEY (Empresa)
-        REFERENCES Empresa(Empresa),
-    CONSTRAINT UQ_Usuario_Empresa UNIQUE (IDUsuario, Empresa),
-    INDEX IDX_Usuario (IDUsuario),
+    CONSTRAINT UQ_Usuario_Empresa UNIQUE (UsuarioWeb, Empresa),
+    INDEX IDX_Usuario (UsuarioWeb),
     INDEX IDX_Empresa (Empresa),
     INDEX IDX_Activo (Activo)
 );
 ```
 
-**Propósito:** Permite que usuarios accedan a múltiples empresas
-**Registros estimados:** ~3,000
+---
 
-#### 🆕 `pNetSesiones` → Control de sesiones
-```sql
-CREATE TABLE pNetSesiones (
-    ID UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    IDUsuario INT NOT NULL, -- FK a pNetUsuario.IDUsuario
-    SessionToken VARCHAR(255) NOT NULL UNIQUE,
-    ExpiresAt DATETIME2 NOT NULL,
-    IPAddress VARCHAR(45) NULL,
-    UserAgent VARCHAR(500) NULL,
-    EmpresaActiva VARCHAR(10) NULL, -- FK a Empresa.Empresa
-    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
-
-    CONSTRAINT FK_pNetSesiones_Usuario FOREIGN KEY (IDUsuario)
-        REFERENCES pNetUsuario(IDUsuario) ON DELETE CASCADE,
-    CONSTRAINT FK_pNetSesiones_Empresa FOREIGN KEY (EmpresaActiva)
-        REFERENCES Empresa(Empresa),
-    INDEX IDX_Usuario (IDUsuario),
-    INDEX IDX_Token (SessionToken),
-    INDEX IDX_Expires (ExpiresAt)
-);
-```
-
-#### 🆕 `pNetUsuarioExtension` → Datos adicionales de usuario
+#### 🆕 `pNetUsuarioExtension` — Datos adicionales del usuario
 ```sql
 CREATE TABLE pNetUsuarioExtension (
-    IDUsuario INT PRIMARY KEY, -- FK a pNetUsuario.IDUsuario
+    IDUsuario VARCHAR(50) PRIMARY KEY,      -- FK a WebUsuario.UsuarioWeb
     RFC VARCHAR(13) NULL,
     RazonSocial NVARCHAR(255) NULL,
     Telefono VARCHAR(20) NULL,
@@ -163,43 +136,53 @@ CREATE TABLE pNetUsuarioExtension (
     AvatarURL VARCHAR(500) NULL,
     EmailVerified BIT NOT NULL DEFAULT 0,
 
-    CONSTRAINT FK_pNetUsuarioExtension_Usuario FOREIGN KEY (IDUsuario)
-        REFERENCES pNetUsuario(IDUsuario) ON DELETE CASCADE,
     INDEX IDX_RFC (RFC)
 );
 ```
 
-### 2.2 DOCUMENTACIÓN (2 TABLAS)
+---
 
-#### 🆕 `ProvDocumentos` → Documentos de proveedores
+#### 🆕 `WebSesionHistorial` — Historial de sesiones/dispositivos
+```sql
+-- Se crea automáticamente si no existe (IF NOT EXISTS en seguridad.ts)
+CREATE TABLE WebSesionHistorial (
+    ID INT IDENTITY(1,1) PRIMARY KEY,
+    UsuarioId VARCHAR(50) NOT NULL,         -- FK a WebUsuario.UsuarioWeb
+    FechaHora DATETIME NOT NULL DEFAULT GETDATE(),
+    IPAddress VARCHAR(45) NULL,
+    UserAgent NVARCHAR(500) NULL,
+    Accion VARCHAR(50) NULL,                -- 'LOGIN', 'LOGOUT', etc.
+
+    INDEX IX_WebSesionHistorial_UsuarioId (UsuarioId, FechaHora DESC)
+);
+```
+
+---
+
+### 2.2 DOCUMENTACIÓN (3 TABLAS)
+
+#### 🆕 `ProvDocumentos` — Archivos de cumplimiento subidos por proveedores
 ```sql
 CREATE TABLE ProvDocumentos (
     ID UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     DocumentoID VARCHAR(100) NOT NULL UNIQUE,
-    Proveedor VARCHAR(50) NOT NULL, -- FK a Prov.Proveedor
-    IDUsuario INT NOT NULL, -- FK a pNetUsuario.IDUsuario
-    Empresa VARCHAR(10) NOT NULL, -- FK a Empresa.Empresa
-    TipoDocumento VARCHAR(50) NOT NULL, -- FK a ProvTiposDocumento.Codigo
+    Proveedor VARCHAR(50) NOT NULL,         -- FK a Prov.Proveedor (ERP)
+    UsuarioWeb VARCHAR(50) NOT NULL,        -- FK a WebUsuario.UsuarioWeb
+    Empresa VARCHAR(10) NOT NULL,           -- FK a Empresa.Empresa
+    TipoDocumento VARCHAR(50) NOT NULL,     -- FK a ProvTiposDocumento.Codigo
     NombreArchivo NVARCHAR(255) NOT NULL,
-    ArchivoURL VARCHAR(500) NOT NULL,
+    ArchivoURL VARCHAR(500) NOT NULL,       -- URL en Azure Blob Storage
     ArchivoTipo VARCHAR(100) NOT NULL,
     ArchivoTamanio BIGINT NOT NULL,
     Estatus VARCHAR(50) NOT NULL DEFAULT 'PENDIENTE',
     Comentarios NVARCHAR(1000) NULL,
     FechaVencimiento DATE NULL,
-    RevisadoPor INT NULL, -- FK a pNetUsuario.IDUsuario
+    RevisadoPor VARCHAR(50) NULL,           -- FK a WebUsuario.UsuarioWeb
     RevisadoPorNombre NVARCHAR(255) NULL,
     FechaRevision DATETIME2 NULL,
     FechaSubida DATETIME2 NOT NULL DEFAULT GETDATE(),
 
-    CONSTRAINT FK_ProvDocumentos_Proveedor FOREIGN KEY (Proveedor)
-        REFERENCES Prov(Proveedor),
-    CONSTRAINT FK_ProvDocumentos_Usuario FOREIGN KEY (IDUsuario)
-        REFERENCES pNetUsuario(IDUsuario),
-    CONSTRAINT FK_ProvDocumentos_Empresa FOREIGN KEY (Empresa)
-        REFERENCES Empresa(Empresa),
     INDEX IDX_Proveedor (Proveedor),
-    INDEX IDX_Usuario (IDUsuario),
     INDEX IDX_Empresa (Empresa),
     INDEX IDX_Estatus (Estatus),
     INDEX IDX_FechaVencimiento (FechaVencimiento),
@@ -207,15 +190,38 @@ CREATE TABLE ProvDocumentos (
 );
 ```
 
-#### 🆕 `ProvTiposDocumento` → Catálogo de tipos de documentos
+---
+
+#### 🆕 `ProvDocumentosEstado` — Estado de revisión de documentos del ERP (AnexoCta)
+**Diferente a `ProvDocumentos`** — esta tabla guarda el estado portal de documentos que vienen del ERP (`AnexoCta`), no de archivos subidos por el proveedor.
+
+```sql
+-- Se crea automáticamente si no existe (IF NOT EXISTS en documentos/route.ts)
+CREATE TABLE ProvDocumentosEstado (
+    ID INT IDENTITY(1,1) PRIMARY KEY,
+    DocumentoIDR VARCHAR(100) NOT NULL,     -- ID del documento en ERP (AnexoCta)
+    ProveedorCodigo VARCHAR(50) NOT NULL,   -- FK a Prov.Proveedor (ERP)
+    Estatus VARCHAR(50) NOT NULL DEFAULT 'PENDIENTE',
+    Observaciones NVARCHAR(1000) NULL,
+    RevisadoPor VARCHAR(50) NULL,           -- FK a WebUsuario.UsuarioWeb
+    FechaRevision DATETIME2 NULL,
+
+    INDEX IDX_DocumentoIDR (DocumentoIDR),
+    INDEX IDX_Proveedor (ProveedorCodigo)
+);
+```
+
+---
+
+#### 🆕 `ProvTiposDocumento` — Catálogo de tipos de documentos
 ```sql
 CREATE TABLE ProvTiposDocumento (
     ID INT IDENTITY(1,1) PRIMARY KEY,
     Codigo VARCHAR(50) NOT NULL UNIQUE,
     Nombre NVARCHAR(255) NOT NULL,
     Descripcion NVARCHAR(500) NULL,
-    RequeridoPara NVARCHAR(MAX) NULL, -- JSON: ["suministros","servicios"]
-    VigenciaDias INT NULL, -- NULL = no caduca
+    RequeridoPara NVARCHAR(MAX) NULL,       -- JSON: ["suministros","servicios"]
+    VigenciaDias INT NULL,                  -- NULL = no caduca
     OrdenPresentacion INT NOT NULL DEFAULT 0,
     Activo BIT NOT NULL DEFAULT 1,
 
@@ -224,101 +230,126 @@ CREATE TABLE ProvTiposDocumento (
 );
 ```
 
+---
+
 ### 2.3 MENSAJERÍA (2 TABLAS)
 
-#### 🆕 `pNetConversaciones` → Conversaciones
+#### 🆕 `WebConversacion` — Conversaciones de mensajería
 ```sql
-CREATE TABLE pNetConversaciones (
+-- Se crea automáticamente si no existe (IF NOT EXISTS en sqlserver-pnet.ts)
+CREATE TABLE WebConversacion (
     ID UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    ConversacionID VARCHAR(100) NOT NULL UNIQUE,
-    Empresa VARCHAR(10) NOT NULL, -- FK a Empresa.Empresa
-    ParticipantesJSON NVARCHAR(MAX) NOT NULL, -- JSON con IDs
-    Asunto NVARCHAR(500) NOT NULL,
+    Empresa VARCHAR(10) NULL,
+    Participantes NVARCHAR(MAX) NULL,       -- string separado por comas de UsuarioWeb IDs
+    ParticipantesInfo NVARCHAR(MAX) NULL,   -- JSON con nombres/roles
+    Asunto NVARCHAR(500) NULL,
     UltimoMensaje NVARCHAR(1000) NULL,
-    UltimoMensajeFecha DATETIME2 NULL,
-    UltimoMensajeRemitente INT NULL, -- FK a pNetUsuario.IDUsuario
-    UltimoMensajeRemitenteNombre NVARCHAR(255) NULL,
+    UltimoMensajeFecha DATETIME NULL,
     Activa BIT NOT NULL DEFAULT 1,
-    NoLeidosJSON NVARCHAR(MAX) NULL, -- JSON con conteos
-    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
-    UpdatedAt DATETIME2 NULL,
+    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME NULL,
 
-    CONSTRAINT FK_pNetConversaciones_Empresa FOREIGN KEY (Empresa)
-        REFERENCES Empresa(Empresa),
     INDEX IDX_Empresa (Empresa),
     INDEX IDX_Activa (Activa),
     INDEX IDX_Fecha (UltimoMensajeFecha DESC)
 );
 ```
 
-#### 🆕 `pNetMensajes` → Mensajes
+> ⚠️ Renombrada de ~~`pNetConversaciones`~~ → `WebConversacion`
+
+---
+
+#### 🆕 `WebMensaje` — Mensajes dentro de conversaciones
 ```sql
-CREATE TABLE pNetMensajes (
+-- Se crea automáticamente si no existe (IF NOT EXISTS en sqlserver-pnet.ts)
+CREATE TABLE WebMensaje (
     ID UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    MensajeID VARCHAR(100) NOT NULL UNIQUE,
-    ConversacionID UNIQUEIDENTIFIER NOT NULL, -- FK a pNetConversaciones.ID
-    RemitenteID INT NOT NULL, -- FK a pNetUsuario.IDUsuario
-    RemitenteNombre NVARCHAR(255) NOT NULL,
-    RemitenteRol VARCHAR(50) NOT NULL,
-    DestinatarioID INT NOT NULL, -- FK a pNetUsuario.IDUsuario
-    DestinatarioNombre NVARCHAR(255) NOT NULL,
+    ConversacionId UNIQUEIDENTIFIER NOT NULL, -- FK a WebConversacion.ID
+    RemitenteId VARCHAR(50) NOT NULL,        -- FK a WebUsuario.UsuarioWeb
+    RemitenteNombre NVARCHAR(255) NULL,
+    RemitenteRol VARCHAR(50) NULL,
+    DestinatarioId VARCHAR(50) NULL,         -- FK a WebUsuario.UsuarioWeb
+    DestinatarioNombre NVARCHAR(255) NULL,
     Mensaje NVARCHAR(MAX) NOT NULL,
     Asunto NVARCHAR(500) NULL,
-    ArchivosJSON NVARCHAR(MAX) NULL, -- JSON array
+    ArchivosJSON NVARCHAR(MAX) NULL,         -- JSON array de archivos adjuntos
     Leido BIT NOT NULL DEFAULT 0,
-    FechaLectura DATETIME2 NULL,
-    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    FechaLectura DATETIME NULL,
+    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
 
-    CONSTRAINT FK_pNetMensajes_Conversacion FOREIGN KEY (ConversacionID)
-        REFERENCES pNetConversaciones(ID) ON DELETE CASCADE,
-    INDEX IDX_Conversacion_Fecha (ConversacionID, CreatedAt),
-    INDEX IDX_Remitente (RemitenteID),
-    INDEX IDX_Leido (Leido),
-    INDEX IDX_Fecha (CreatedAt DESC)
+    INDEX IDX_Conversacion_Fecha (ConversacionId, CreatedAt),
+    INDEX IDX_Remitente (RemitenteId),
+    INDEX IDX_Destinatario (DestinatarioId),
+    INDEX IDX_Leido (Leido)
 );
 ```
 
-### 2.4 NOTIFICACIONES Y AUDITORÍA (3 TABLAS)
+> ⚠️ Renombrada de ~~`pNetMensajes`~~ → `WebMensaje`
 
-#### 🆕 `pNetNotificaciones` → Notificaciones
+---
+
+### 2.4 NOTIFICACIONES (2 TABLAS)
+
+#### 🆕 `WebNotificacion` — Notificaciones del sistema (admin/general)
 ```sql
-CREATE TABLE pNetNotificaciones (
+-- Se crea automáticamente si no existe (IF NOT EXISTS en sqlserver-pnet.ts)
+CREATE TABLE WebNotificacion (
     ID UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    NotificacionID VARCHAR(100) NOT NULL UNIQUE,
-    IDUsuario INT NOT NULL, -- FK a pNetUsuario.IDUsuario
-    UsuarioNombre NVARCHAR(255) NOT NULL,
-    Empresa VARCHAR(10) NOT NULL, -- FK a Empresa.Empresa
+    UsuarioId VARCHAR(50) NOT NULL,         -- FK a WebUsuario.UsuarioWeb
+    UsuarioNombre NVARCHAR(200) NULL,
+    Empresa VARCHAR(10) NULL,
     Tipo VARCHAR(50) NOT NULL,
     Titulo NVARCHAR(255) NOT NULL,
     Mensaje NVARCHAR(1000) NOT NULL,
     Link VARCHAR(500) NULL,
     DatosJSON NVARCHAR(MAX) NULL,
     Leida BIT NOT NULL DEFAULT 0,
-    FechaLectura DATETIME2 NULL,
-    EmailEnviado BIT NOT NULL DEFAULT 0,
-    FechaEnvioEmail DATETIME2 NULL,
-    Prioridad VARCHAR(20) NOT NULL DEFAULT 'normal',
-    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    FechaLectura DATETIME NULL,
+    FechaEnvioEmail DATETIME NULL,
+    Prioridad NVARCHAR(20) NOT NULL DEFAULT 'normal',
+    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
 
-    CONSTRAINT FK_pNetNotificaciones_Usuario FOREIGN KEY (IDUsuario)
-        REFERENCES pNetUsuario(IDUsuario),
-    CONSTRAINT FK_pNetNotificaciones_Empresa FOREIGN KEY (Empresa)
-        REFERENCES Empresa(Empresa),
-    INDEX IDX_Usuario_Leida (IDUsuario, Leida),
+    INDEX IDX_Usuario_Leida (UsuarioId, Leida),
     INDEX IDX_Empresa (Empresa),
-    INDEX IDX_Tipo (Tipo),
-    INDEX IDX_Fecha (CreatedAt DESC),
-    INDEX IDX_Prioridad (Prioridad)
+    INDEX IDX_Fecha (CreatedAt DESC)
 );
 ```
 
-#### 🆕 `pNetAuditLog` → Auditoría
+> ⚠️ Renombrada de ~~`pNetNotificaciones`~~ → `WebNotificacion`
+
+---
+
+#### 🆕 `proveedor_notificaciones` — Notificaciones específicas del flujo proveedor
+```sql
+CREATE TABLE proveedor_notificaciones (
+    -- Tabla usada en /api/proveedor/notificaciones y /api/proveedor/facturas/upload
+    -- para notificaciones del workflow de facturas (subida, aprobación, rechazo)
+    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    proveedor_user_id VARCHAR(50) NOT NULL,  -- FK a WebUsuario.UsuarioWeb
+    empresa_code VARCHAR(50) NULL,
+    tipo VARCHAR(50) NOT NULL,
+    titulo NVARCHAR(255) NOT NULL,
+    mensaje NVARCHAR(1000) NOT NULL,
+    leida BIT NOT NULL DEFAULT 0,
+    datos_json NVARCHAR(MAX) NULL,
+    created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+
+    INDEX IDX_proveedor_leida (proveedor_user_id, leida),
+    INDEX IDX_fecha (created_at DESC)
+);
+```
+
+---
+
+### 2.5 AUDITORÍA (1 TABLA)
+
+#### 🆕 `pNetAuditLog` — Registro de auditoría
 ```sql
 CREATE TABLE pNetAuditLog (
     ID UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    IDUsuario INT NOT NULL, -- FK a pNetUsuario.IDUsuario
+    UsuarioWeb VARCHAR(50) NOT NULL,        -- FK a WebUsuario.UsuarioWeb
     UsuarioNombre NVARCHAR(255) NOT NULL,
-    Empresa VARCHAR(10) NULL, -- FK a Empresa.Empresa
+    Empresa VARCHAR(10) NULL,
     Accion VARCHAR(100) NOT NULL,
     TablaAfectada VARCHAR(100) NOT NULL,
     RegistroID VARCHAR(100) NOT NULL,
@@ -328,93 +359,88 @@ CREATE TABLE pNetAuditLog (
     UserAgent VARCHAR(500) NULL,
     CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
 
-    INDEX IDX_Usuario_Fecha (IDUsuario, CreatedAt DESC),
+    INDEX IDX_Usuario_Fecha (UsuarioWeb, CreatedAt DESC),
     INDEX IDX_Tabla_Fecha (TablaAfectada, CreatedAt DESC),
     INDEX IDX_Accion (Accion),
     INDEX IDX_Fecha (CreatedAt DESC)
 );
 ```
 
-#### 🆕 `pNetTiposNotificacion` → Catálogo de notificaciones
-```sql
-CREATE TABLE pNetTiposNotificacion (
-    ID INT IDENTITY(1,1) PRIMARY KEY,
-    Codigo VARCHAR(50) NOT NULL UNIQUE,
-    Nombre NVARCHAR(100) NOT NULL,
-    Descripcion NVARCHAR(255) NULL,
-    TemplateTitulo NVARCHAR(255) NULL,
-    TemplateMensaje NVARCHAR(1000) NULL,
-    ColorBadge VARCHAR(20) NOT NULL DEFAULT '#blue',
-    Activo BIT NOT NULL DEFAULT 1,
+---
 
-    INDEX IDX_Codigo (Codigo)
+### 2.6 CONFIGURACIÓN Y TOKENS (3 TABLAS)
+
+#### 🆕 `configuracion_empresa` — Configuración por empresa
+```sql
+CREATE TABLE configuracion_empresa (
+    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    empresa_code VARCHAR(10) NOT NULL,      -- FK a Empresa.Empresa
+    -- Campos de configuración (logo, colores, email, etc.)
+    logo_url VARCHAR(500) NULL,
+    nombre_portal NVARCHAR(255) NULL,
+    email_soporte VARCHAR(100) NULL,
+    configuracion_json NVARCHAR(MAX) NULL,  -- JSON con config adicional
+    created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+    updated_at DATETIME2 NULL,
+
+    CONSTRAINT UQ_empresa_code UNIQUE (empresa_code),
+    INDEX IDX_empresa (empresa_code)
 );
 ```
 
-### 2.5 CONFIGURACIÓN Y TOKENS (4 TABLAS)
+> ⚠️ Renombrada de ~~`pNetConfiguracion`~~ → `configuracion_empresa`
 
-#### 🆕 `pNetConfiguracion` → Configuración por empresa
+---
+
+#### 🆕 `PasswordResetTokens` — Tokens de reset de contraseña
 ```sql
-CREATE TABLE pNetConfiguracion (
+CREATE TABLE PasswordResetTokens (
     ID UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    Empresa VARCHAR(10) NOT NULL, -- FK a Empresa.Empresa
-    Clave VARCHAR(100) NOT NULL,
-    Valor NVARCHAR(MAX) NOT NULL,
-    Descripcion NVARCHAR(500) NULL,
-    TipoDato VARCHAR(50) NOT NULL DEFAULT 'string',
-    Categoria VARCHAR(100) NOT NULL DEFAULT 'general',
-    Modificable BIT NOT NULL DEFAULT 1,
-    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
-    UpdatedAt DATETIME2 NULL,
-
-    CONSTRAINT FK_pNetConfiguracion_Empresa FOREIGN KEY (Empresa)
-        REFERENCES Empresa(Empresa),
-    CONSTRAINT UQ_Empresa_Clave UNIQUE (Empresa, Clave),
-    INDEX IDX_Empresa_Clave (Empresa, Clave),
-    INDEX IDX_Categoria (Categoria)
-);
-```
-
-#### 🆕 `pNetVerificationTokens` → Tokens de verificación
-```sql
-CREATE TABLE pNetVerificationTokens (
-    ID UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    IDUsuario INT NOT NULL, -- FK a pNetUsuario.IDUsuario
-    Token VARCHAR(255) NOT NULL UNIQUE,
-    TipoToken VARCHAR(50) NOT NULL DEFAULT 'email_verification',
+    Email VARCHAR(100) NOT NULL,
+    TokenHash VARCHAR(255) NOT NULL UNIQUE,
+    TipoUsuario VARCHAR(50) NULL,
     ExpiresAt DATETIME2 NOT NULL,
+    IPAddress VARCHAR(45) NULL,
     Usado BIT NOT NULL DEFAULT 0,
-    FechaUso DATETIME2 NULL,
     CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
 
-    CONSTRAINT FK_pNetVerificationTokens_Usuario FOREIGN KEY (IDUsuario)
-        REFERENCES pNetUsuario(IDUsuario),
-    INDEX IDX_Usuario (IDUsuario),
-    INDEX IDX_Token (Token),
+    INDEX IDX_Email (Email),
+    INDEX IDX_Token (TokenHash),
     INDEX IDX_Expires (ExpiresAt)
 );
 ```
 
-#### 🆕 `pNetPasswordResetTokens` → Tokens de reset de contraseña
+> ⚠️ Renombrada de ~~`pNetPasswordResetTokens`~~ → `PasswordResetTokens`
+
+---
+
+#### 🆕 `EmailChangeTokens` — Tokens para cambio de email
 ```sql
-CREATE TABLE pNetPasswordResetTokens (
+CREATE TABLE EmailChangeTokens (
     ID UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    IDUsuario INT NOT NULL, -- FK a pNetUsuario.IDUsuario
-    Token VARCHAR(255) NOT NULL UNIQUE,
+    UserId VARCHAR(50) NOT NULL,            -- FK a WebUsuario.UsuarioWeb
+    TipoUsuario VARCHAR(50) NULL,
+    EmailActual VARCHAR(100) NOT NULL,
+    EmailNuevo VARCHAR(100) NOT NULL,
+    TokenHash VARCHAR(255) NOT NULL UNIQUE,
     ExpiresAt DATETIME2 NOT NULL,
-    UsedAt DATETIME2 NULL,
-    IPSolicitud VARCHAR(45) NULL,
+    IPAddress VARCHAR(45) NULL,
+    Confirmado BIT NOT NULL DEFAULT 0,
     CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
 
-    CONSTRAINT FK_pNetPasswordResetTokens_Usuario FOREIGN KEY (IDUsuario)
-        REFERENCES pNetUsuario(IDUsuario),
-    INDEX IDX_Usuario (IDUsuario),
-    INDEX IDX_Token (Token),
+    INDEX IDX_UserId (UserId),
+    INDEX IDX_Token (TokenHash),
     INDEX IDX_Expires (ExpiresAt)
 );
 ```
 
-#### 🆕 `ProvCategoria` → Categorías de proveedores
+> ⚠️ Reemplaza a ~~`pNetVerificationTokens`~~ (funcionalidad diferente — específica para cambio de email)
+
+---
+
+### 2.7 CATEGORÍAS DE PROVEEDOR (1 TABLA)
+
+#### 🆕 `ProvCategoria` — Categorías de proveedores
 ```sql
 CREATE TABLE ProvCategoria (
     ID INT IDENTITY(1,1) PRIMARY KEY,
@@ -428,38 +454,17 @@ CREATE TABLE ProvCategoria (
 );
 ```
 
-### 2.6 PROVEEDORES EXTENDIDOS (1 TABLA)
+---
 
-#### 🆕 `ProvExtension` → Datos adicionales del portal
-```sql
-CREATE TABLE ProvExtension (
-    Proveedor VARCHAR(50) PRIMARY KEY, -- FK a Prov.Proveedor
-    Categoria VARCHAR(50) NULL, -- FK a ProvCategoria.Codigo
-    StatusPortal VARCHAR(50) NOT NULL DEFAULT 'activo',
-    DocumentosCompletos BIT NOT NULL DEFAULT 0,
-    FechaUltimaActividad DATETIME2 NULL,
-    UltimaSincronizacionERP DATETIME2 NULL,
-    ConfiguracionesJSON NVARCHAR(MAX) NULL,
+### 2.8 FACTURAS Y RELACIONES (3 TABLAS)
 
-    CONSTRAINT FK_ProvExtension_Proveedor FOREIGN KEY (Proveedor)
-        REFERENCES Prov(Proveedor),
-    INDEX IDX_Categoria (Categoria),
-    INDEX IDX_Status (StatusPortal),
-    INDEX IDX_DocsCompletos (DocumentosCompletos)
-);
-```
-
-### 2.7 FACTURAS Y COMPLEMENTOS (2 TABLAS)
-
-**NOTA:** Estas tablas se integrarán con el ERP cuando esté listo el módulo de facturación
-
-#### 🆕 `ProvFacturas` → Facturas de proveedores
+#### 🆕 `ProvFacturas` — Facturas subidas por proveedores al portal
 ```sql
 CREATE TABLE ProvFacturas (
     ID UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     FacturaID VARCHAR(100) NOT NULL UNIQUE,
-    Proveedor VARCHAR(50) NOT NULL, -- FK a Prov.Proveedor
-    Empresa VARCHAR(10) NOT NULL, -- FK a Empresa.Empresa
+    Proveedor VARCHAR(50) NOT NULL,         -- código ERP (FK a Prov en ERP)
+    Empresa VARCHAR(10) NOT NULL,           -- FK a Empresa.Empresa
     -- CFDI
     UUID VARCHAR(36) NOT NULL UNIQUE,
     Serie VARCHAR(10) NULL,
@@ -469,8 +474,8 @@ CREATE TABLE ProvFacturas (
     IVA DECIMAL(18,2) NOT NULL,
     Total DECIMAL(18,2) NOT NULL,
     Moneda VARCHAR(3) NOT NULL DEFAULT 'MXN',
-    XMLURL VARCHAR(500) NOT NULL,
-    PDFURL VARCHAR(500) NOT NULL,
+    XMLURL VARCHAR(500) NOT NULL,           -- Azure Blob Storage
+    PDFURL VARCHAR(500) NOT NULL,           -- Azure Blob Storage
     -- Validación SAT
     ValidadaSAT BIT NOT NULL DEFAULT 0,
     EstatusSAT VARCHAR(50) NULL,
@@ -478,36 +483,47 @@ CREATE TABLE ProvFacturas (
     -- Workflow
     Estatus VARCHAR(50) NOT NULL DEFAULT 'PENDIENTE',
     MotivoRechazo NVARCHAR(1000) NULL,
-    RevisadoPor INT NULL, -- FK a pNetUsuario.IDUsuario
+    RevisadoPor VARCHAR(50) NULL,           -- FK a WebUsuario.UsuarioWeb
     FechaRevision DATETIME2 NULL,
     Observaciones NVARCHAR(1000) NULL,
     -- Pago
     Pagada BIT NOT NULL DEFAULT 0,
     FechaPago DATETIME2 NULL,
-    ComplementoPagoID UNIQUEIDENTIFIER NULL,
     -- ERP
     IntelisisID VARCHAR(100) NULL,
-    CuentaContable VARCHAR(50) NULL,
     -- Metadata
-    SubidoPor INT NOT NULL, -- FK a pNetUsuario.IDUsuario
+    SubidoPor VARCHAR(50) NOT NULL,         -- FK a WebUsuario.UsuarioWeb
     CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
     UpdatedAt DATETIME2 NULL,
 
-    CONSTRAINT FK_ProvFacturas_Proveedor FOREIGN KEY (Proveedor)
-        REFERENCES Prov(Proveedor),
-    CONSTRAINT FK_ProvFacturas_Empresa FOREIGN KEY (Empresa)
-        REFERENCES Empresa(Empresa),
     INDEX IDX_UUID (UUID),
     INDEX IDX_Proveedor_Estatus (Proveedor, Estatus),
     INDEX IDX_Empresa_Estatus (Empresa, Estatus),
-    INDEX IDX_Folio (Folio),
     INDEX IDX_Fecha (Fecha DESC),
-    INDEX IDX_Estatus (Estatus),
-    INDEX IDX_SAT (EstatusSAT)
+    INDEX IDX_Estatus (Estatus)
 );
 ```
 
-#### 🆕 `ProvComplementosPago` → Complementos de pago
+---
+
+#### 🆕 `proveedor_facturas_ordenes` — Relación factura ↔ órdenes de compra
+```sql
+CREATE TABLE proveedor_facturas_ordenes (
+    -- Vincula una factura del portal con una o varias OC del ERP
+    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    factura_id VARCHAR(100) NOT NULL,       -- FK a ProvFacturas.FacturaID
+    orden_id VARCHAR(100) NOT NULL,         -- ID de la OC en el ERP
+    empresa_code VARCHAR(50) NULL,
+    created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+
+    INDEX IDX_factura (factura_id),
+    INDEX IDX_orden (orden_id)
+);
+```
+
+---
+
+#### 🆕 `ProvComplementosPago` — Complementos de pago CFDI
 ```sql
 CREATE TABLE ProvComplementosPago (
     ID UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
@@ -516,9 +532,8 @@ CREATE TABLE ProvComplementosPago (
     EmisorRazonSocial NVARCHAR(255) NOT NULL,
     ReceptorRFC VARCHAR(13) NOT NULL,
     ReceptorRazonSocial NVARCHAR(255) NOT NULL,
-    Proveedor VARCHAR(50) NOT NULL, -- FK a Prov.Proveedor
-    Empresa VARCHAR(10) NOT NULL, -- FK a Empresa.Empresa
-    -- CFDI
+    Proveedor VARCHAR(50) NOT NULL,         -- código ERP
+    Empresa VARCHAR(10) NOT NULL,
     UUID VARCHAR(36) NOT NULL UNIQUE,
     Serie VARCHAR(10) NULL,
     Folio VARCHAR(50) NOT NULL,
@@ -529,105 +544,86 @@ CREATE TABLE ProvComplementosPago (
     Monto DECIMAL(18,2) NOT NULL,
     XMLURL VARCHAR(500) NOT NULL,
     PDFURL VARCHAR(500) NULL,
-    ComprobanteURL VARCHAR(500) NULL,
-    -- Facturas relacionadas
     FacturasRelacionadasJSON NVARCHAR(MAX) NOT NULL,
-    -- Validación
     ValidadoSAT BIT NOT NULL DEFAULT 0,
     EstatusSAT VARCHAR(50) NULL,
     Estatus VARCHAR(50) NOT NULL DEFAULT 'PENDIENTE',
-    -- ERP
     IntelisisID VARCHAR(100) NULL,
-    AplicadoContabilidad BIT NOT NULL DEFAULT 0,
-    FechaAplicacion DATETIME2 NULL,
-    -- Metadata
-    SubidoPor INT NOT NULL, -- FK a pNetUsuario.IDUsuario
+    SubidoPor VARCHAR(50) NOT NULL,         -- FK a WebUsuario.UsuarioWeb
     CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
     UpdatedAt DATETIME2 NULL,
 
-    CONSTRAINT FK_ProvComplementosPago_Proveedor FOREIGN KEY (Proveedor)
-        REFERENCES Prov(Proveedor),
-    CONSTRAINT FK_ProvComplementosPago_Empresa FOREIGN KEY (Empresa)
-        REFERENCES Empresa(Empresa),
     INDEX IDX_UUID (UUID),
     INDEX IDX_Proveedor_Fecha (Proveedor, Fecha DESC),
     INDEX IDX_Empresa (Empresa),
-    INDEX IDX_Estatus (Estatus),
-    INDEX IDX_Fecha (Fecha DESC),
-    INDEX IDX_SAT (EstatusSAT)
+    INDEX IDX_Estatus (Estatus)
 );
 ```
 
 ---
 
-## 📊 RESUMEN DE DECISIONES
+## 📊 RESUMEN DE TABLAS
 
-### ✅ Tablas Reutilizadas (5):
-1. `pNetUsuario` - Usuarios base
-2. `pNetUsuarioTipo` - Tipos de usuario
-3. `pNetUsuarioPassword` - Contraseñas
-4. `Empresa` - Empresas
-5. `Prov` - Proveedores base
+### Tablas PP pre-existentes (no creadas por nosotros):
+| Tabla | Propósito |
+|-------|-----------|
+| `WebUsuario` | Auth, roles, contraseñas bcrypt |
+| `Empresa` | Catálogo de empresas |
 
-### 🆕 Tablas Nuevas Necesarias (19):
-1. `pNetUsuarioEmpresa` - Multi-empresa
-2. `pNetSesiones` - Sesiones
-3. `pNetUsuarioExtension` - Datos adicionales usuarios
-4. `ProvDocumentos` - Documentación
-5. `ProvTiposDocumento` - Catálogo documentos
-6. `pNetConversaciones` - Mensajería
-7. `pNetMensajes` - Mensajes
-8. `pNetNotificaciones` - Notificaciones
-9. `pNetAuditLog` - Auditoría
-10. `pNetTiposNotificacion` - Catálogo notificaciones
-11. `pNetConfiguracion` - Configuración
-12. `pNetVerificationTokens` - Tokens verificación
-13. `pNetPasswordResetTokens` - Tokens reset
-14. `ProvCategoria` - Categorías proveedores
-15. `ProvExtension` - Extensión proveedores
-16. `ProvFacturas` - Facturas
-17. `ProvComplementosPago` - Complementos pago
+### Tablas ERP (solo lectura, nunca desde PP):
+| Tabla | BD | Propósito |
+|-------|----|-----------|
+| `Prov` | Cantera/ERP | Datos maestros de proveedores |
 
-**TOTAL: 22 tablas (5 existentes + 17 nuevas)**
+### Tablas del portal creadas por nosotros (PP):
+| # | Tabla | Propósito |
+|---|-------|-----------|
+| 1 | `portal_proveedor_mapping` | Vincula ID portal ↔ código ERP por empresa (**CRÍTICA**) |
+| 2 | `pNetUsuarioEmpresa` | Relación usuario ↔ empresa con rol |
+| 3 | `pNetUsuarioExtension` | Datos extra del usuario (RFC, dirección, etc.) |
+| 4 | `WebSesionHistorial` | Historial de sesiones y dispositivos |
+| 5 | `ProvDocumentos` | Archivos de cumplimiento subidos por proveedores |
+| 6 | `ProvDocumentosEstado` | Estado portal de documentos del ERP (AnexoCta) |
+| 7 | `ProvTiposDocumento` | Catálogo de tipos de documento |
+| 8 | `WebConversacion` | Conversaciones de mensajería |
+| 9 | `WebMensaje` | Mensajes de cada conversación |
+| 10 | `WebNotificacion` | Notificaciones generales del sistema |
+| 11 | `proveedor_notificaciones` | Notificaciones del workflow de facturas |
+| 12 | `pNetAuditLog` | Auditoría de acciones |
+| 13 | `configuracion_empresa` | Configuración por empresa (logo, email, etc.) |
+| 14 | `PasswordResetTokens` | Tokens de recuperación de contraseña |
+| 15 | `EmailChangeTokens` | Tokens de cambio de email |
+| 16 | `ProvCategoria` | Categorías de proveedores |
+| 17 | `ProvFacturas` | Facturas subidas al portal |
+| 18 | `proveedor_facturas_ordenes` | Relación factura ↔ órdenes de compra |
+| 19 | `ProvComplementosPago` | Complementos de pago CFDI |
+
+**TOTAL: 19 tablas en PP + 2 pre-existentes + 1 ERP (solo lectura)**
 
 ---
 
-## 🚀 ESTRATEGIA DE IMPLEMENTACIÓN
+### Tablas documentadas anteriormente que ya NO se usan:
+| Tabla (nombre viejo) | Reemplazada por |
+|---------------------|----------------|
+| ~~`pNetConversaciones`~~ | `WebConversacion` |
+| ~~`pNetMensajes`~~ | `WebMensaje` |
+| ~~`pNetNotificaciones`~~ | `WebNotificacion` + `proveedor_notificaciones` |
+| ~~`pNetSesiones`~~ | `WebSesionHistorial` |
+| ~~`pNetPasswordResetTokens`~~ | `PasswordResetTokens` |
+| ~~`pNetVerificationTokens`~~ | `EmailChangeTokens` |
+| ~~`pNetConfiguracion`~~ | `configuracion_empresa` |
+| ~~`pNetTiposNotificacion`~~ | No se usa (eliminada) |
+| ~~`ProvExtension`~~ | No se usa (eliminada) |
 
-### Fase 1 - Inmediata (Semana 1):
-- ✅ Usar tablas existentes sin modificar
-- 🆕 Crear tablas de extensión: `pNetUsuarioExtension`, `ProvExtension`
-- 🆕 Crear tabla multi-empresa: `pNetUsuarioEmpresa`
-- 🆕 Crear sesiones: `pNetSesiones`
-
-### Fase 2 - Corto Plazo (Semanas 2-3):
-- 🆕 Documentación: `ProvDocumentos`, `ProvTiposDocumento`, `ProvCategoria`
-- 🆕 Mensajería: `pNetConversaciones`, `pNetMensajes`
-- 🆕 Notificaciones: `pNetNotificaciones`, `pNetTiposNotificacion`
-- 🆕 Tokens: `pNetVerificationTokens`, `pNetPasswordResetTokens`
-
-### Fase 3 - Medio Plazo (Semanas 4-6):
-- 🆕 Auditoría: `pNetAuditLog`
-- 🆕 Configuración: `pNetConfiguracion`
-- 🆕 Facturas: `ProvFacturas`, `ProvComplementosPago`
+### Tablas legacy en archivos obsoletos (`sqlserver.ts`, `auth-helpers.ts`) — NO en uso activo:
+`users`, `empresas`, `ordenes_compra`, `facturas`, `usuario_empresa`, `usuarios_empresas`, `proveedores_documentacion`
 
 ---
 
 ## 📝 NOTAS IMPORTANTES
 
-1. **NO modificar tablas del ERP** (`pNetUsuario`, `Empresa`, `Prov`)
-2. **Usar prefijos consistentes**: `pNet*` para sistema, `Prov*` para proveedores
-3. **Mantener compatibilidad** con ERP Intelisis
-4. **Denormalización estratégica** para performance (nombres de usuario, empresa, etc.)
-5. **JSON para flexibilidad** en campos complejos
-
----
-
-## 🎯 VENTAJAS DE ESTA ARQUITECTURA
-
-✅ **Reutiliza infraestructura existente** del ERP
-✅ **No rompe compatibilidad** con Intelisis
-✅ **Mínimo de tablas nuevas** necesarias
-✅ **Separación clara** entre datos ERP y Portal
-✅ **Escalable** y mantenible
-✅ **Auditoria completa** de todas las operaciones
+1. **NO modificar tablas pre-existentes** (`WebUsuario`, `Empresa`)
+2. **`Prov` solo se accede desde conexión ERP**, nunca desde PP
+3. Varias tablas se **auto-crean** con `IF NOT EXISTS` en el código: `WebConversacion`, `WebMensaje`, `WebNotificacion`, `WebSesionHistorial`, `ProvDocumentosEstado`
+4. **`portal_proveedor_mapping`** es la tabla más crítica del portal — sin ella ningún endpoint de proveedor funciona
+5. Para el mapeo de IDs ver `docs/PROVEEDOR-ID-MAP.md`
