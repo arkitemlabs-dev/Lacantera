@@ -126,16 +126,17 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * Mapea el estado devuelto por el SP al formato legible del frontend
+ * Normaliza el estatus del SP a uno de los 4 valores canónicos de Intelisis.
+ * El frontend se encarga de mostrar el label legible.
  */
 function mapEstadoToFrontend(estatus: string | null | undefined): string {
-  if (!estatus) return 'En Revisión';
+  if (!estatus) return 'SINAFECTAR';
   const s = estatus.toUpperCase();
-  if (s === 'EN_REVISION' || s === 'PENDIENTE') return 'En Revisión';
-  if (s === 'PENDIENTE_PAGO' || s === 'PENDIENTE PAGO' || s === 'APROBADA' || s === 'CONCLUIDO') return 'Pendiente pago';
-  if (s === 'PAGADA') return 'Pagada';
-  if (s === 'RECHAZADA' || s === 'CANCELADO') return 'Rechazada';
-  return estatus;
+  if (s === 'SINAFECTAR') return 'SINAFECTAR';
+  if (s === 'PENDIENTE' || s === 'EN_REVISION' || s === 'APROBADA') return 'PENDIENTE';
+  if (s === 'CONCLUIDO' || s === 'PAGADA' || s === 'PENDIENTE_PAGO' || s === 'PENDIENTE PAGO') return 'CONCLUIDO';
+  if (s === 'CANCELADO' || s === 'RECHAZADA') return 'CANCELADO';
+  return s; // devolver tal cual si no coincide (para debug)
 }
 
 /**

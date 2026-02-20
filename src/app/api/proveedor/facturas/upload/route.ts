@@ -208,7 +208,10 @@ export async function POST(request: NextRequest) {
 
     // 8.5. Ejecutar SP spGeneraRemisionCompra
     const sp = getStoredProcedures();
-    const folioFactura = String(cfdiData.folio || cfdiData.uuid).substring(0, 50);
+    // Regla inamovible: si no hay serie, el folio se prefija con 'F-'
+    const folioFactura = cfdiData.serie
+      ? String(cfdiData.folio || cfdiData.uuid).substring(0, 50)
+      : `F-${String(cfdiData.folio || cfdiData.uuid)}`.substring(0, 50);
     const archivoXml = cfdiData.uuid;
 
     console.log('📋 Llamando spGeneraRemisionCompra con:', {
@@ -265,7 +268,7 @@ export async function POST(request: NextRequest) {
       .input('empresaCode', sql.VarChar(5), empresaCode)
       .input('uuid', sql.VarChar(36), cfdiData.uuid)
       .input('serie', sql.VarChar(10), cfdiData.serie ? String(cfdiData.serie).substring(0, 10) : null)
-      .input('folio', sql.VarChar(50), String(cfdiData.folio || cfdiData.uuid).substring(0, 50))
+      .input('folio', sql.VarChar(50), folioFactura)
       .input('fechaEmision', sql.DateTime2, new Date(cfdiData.fecha))
       .input('subtotal', sql.Decimal(18, 2), cfdiData.subTotal)
       .input('impuestos', sql.Decimal(18, 2), cfdiData.totalImpuestosTrasladados || 0)

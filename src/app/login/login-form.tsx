@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Eye, EyeOff, Building2, Loader2, User } from 'lucide-react';
+import { Eye, EyeOff, Building2, Loader2, User, CheckCircle2, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
@@ -29,24 +29,35 @@ import { useAuth } from '../providers';
 import { useToast } from '@/hooks/use-toast';
 import { getTodasLasEmpresas } from '@/lib/database/tenant-configs';
 
-// Generar lista de empresas desde la fuente de verdad
-const EMPRESAS_SISTEMA = getTodasLasEmpresas().map(config => ({
+// Empresas estáticas para administradores (todos los 10 ambientes)
+const EMPRESAS_ADMIN = getTodasLasEmpresas().map((config) => ({
   codigo: config.code,
   nombre: config.nombre,
 }));
 
+interface EmpresaOpcion {
+  codigoPortal: string;
+  codigoERP: string;
+  nombre: string;
+}
+
 export function LoginForm() {
-  // Formulario unificado
   const [tipoUsuario, setTipoUsuario] = useState<'proveedor' | 'administrador' | ''>('');
   const [empresaSeleccionada, setEmpresaSeleccionada] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
 
-  // Estados
+  // RFC — solo proveedores
+  const [rfc, setRfc] = useState('');
+  const [rfcLoading, setRfcLoading] = useState(false);
+  const [rfcStatus, setRfcStatus] = useState<'idle' | 'ok' | 'error'>('idle');
+  const [empresasRfc, setEmpresasRfc] = useState<EmpresaOpcion[]>([]);
+
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -54,15 +65,83 @@ export function LoginForm() {
   const logo = PlaceHolderImages.find((img) => img.id === 'login-logo');
   const bgImage = PlaceHolderImages.find((img) => img.id === 'login-background');
 
-  // Manejo de login unificado
+  // Resetear empresa y RFC cuando cambia el tipo de usuario
+  useEffect(() => {
+    setEmpresaSeleccionada('');
+    setRfc('');
+    setRfcStatus('idle');
+    setEmpresasRfc([]);
+    setError(null);
+  }, [tipoUsuario]);
+
+  // Resetear empresa cuando cambia el RFC
+  useEffect(() => {
+    setEmpresaSeleccionada('');
+  }, [rfc]);
+
+  // Lookup de empresas con debounce cuando RFC tiene 12+ chars (solo proveedores)
+  useEffect(() => {
+    if (tipoUsuario !== 'proveedor') return;
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (rfc.length < 12) {
+      setRfcStatus('idle');
+      setEmpresasRfc([]);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      setRfcLoading(true);
+      setRfcStatus('idle');
+      try {
+        const res = await fetch(
+          `/api/auth/empresas-proveedor?rfc=${encodeURIComponent(rfc)}&ambiente=Pruebas`
+        );
+        const data = await res.json();
+        if (data.success && data.empresas.length > 0) {
+          setEmpresasRfc(data.empresas);
+          setRfcStatus('ok');
+          // Auto-seleccionar si solo hay una empresa
+          if (data.empresas.length === 1) {
+            setEmpresaSeleccionada(data.empresas[0].codigoPortal);
+          }
+        } else {
+          setEmpresasRfc([]);
+          setRfcStatus('error');
+        }
+      } catch {
+        setEmpresasRfc([]);
+        setRfcStatus('error');
+      } finally {
+        setRfcLoading(false);
+      }
+    }, 600);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [rfc, tipoUsuario]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    // Validaciones
     if (!tipoUsuario) {
       setError('Por favor, seleccione un tipo de usuario');
       return;
+    }
+
+    // RFC obligatorio para proveedores
+    if (tipoUsuario === 'proveedor') {
+      if (rfc.length < 12) {
+        setError('El RFC es obligatorio para proveedores (mínimo 12 caracteres)');
+        return;
+      }
+      if (rfcStatus !== 'ok') {
+        setError('El RFC no se encontró en ninguna empresa. Verifíquelo e intente de nuevo.');
+        return;
+      }
     }
 
     if (!empresaSeleccionada) {
@@ -83,7 +162,8 @@ export function LoginForm() {
         email,
         password,
         userType: tipoUsuario,
-        empresaCode: empresaSeleccionada, // Código numérico: '01', '06', etc.
+        empresaCode: empresaSeleccionada,
+        rfc: tipoUsuario === 'proveedor' ? rfc : '',
         userAgent: navigator.userAgent,
       });
 
@@ -94,18 +174,20 @@ export function LoginForm() {
       }
 
       if (result?.ok) {
-        const empresaObj = EMPRESAS_SISTEMA.find((e) => e.codigo === empresaSeleccionada);
+        const empresaObj =
+          tipoUsuario === 'proveedor'
+            ? empresasRfc.find((e) => e.codigoPortal === empresaSeleccionada)
+            : EMPRESAS_ADMIN.find((e) => e.codigo === empresaSeleccionada);
 
         toast({
           title: 'Inicio de sesión exitoso',
           description: `Bienvenido a ${empresaObj?.nombre || 'la aplicación'}`,
         });
 
-        // Forzar recarga o redirección
-        window.location.href = tipoUsuario === 'proveedor' ? '/proveedores/dashboard' : '/dashboard';
+        window.location.href =
+          tipoUsuario === 'proveedor' ? '/proveedores/dashboard' : '/dashboard';
       }
-    } catch (error: any) {
-      console.error('Error en login:', error);
+    } catch {
       setError('Ocurrió un error al iniciar sesión');
       setLoading(false);
     }
@@ -145,12 +227,12 @@ export function LoginForm() {
         <CardContent>
           <form className="space-y-4" onSubmit={handleLogin}>
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
                 {error}
               </div>
             )}
 
-            {/* Selector de Tipo de Usuario */}
+            {/* Tipo de Usuario */}
             <div className="space-y-2">
               <Label htmlFor="tipoUsuario">Tipo de Usuario</Label>
               <Select
@@ -178,29 +260,98 @@ export function LoginForm() {
               </Select>
             </div>
 
-            {/* Selector de Empresa */}
-            <div className="space-y-2">
-              <Label htmlFor="empresa">Empresa</Label>
-              <Select
-                value={empresaSeleccionada}
-                onValueChange={setEmpresaSeleccionada}
-                disabled={loading}
-              >
-                <SelectTrigger id="empresa">
-                  <SelectValue placeholder="Seleccione una empresa" />
-                </SelectTrigger>
-                <SelectContent>
-                  {EMPRESAS_SISTEMA.map((empresa) => (
-                    <SelectItem key={empresa.codigo} value={empresa.codigo}>
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4" />
-                        <span>{empresa.nombre}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* RFC — solo para proveedores */}
+            {tipoUsuario === 'proveedor' && (
+              <div className="space-y-2">
+                <Label htmlFor="rfc">RFC</Label>
+                <div className="relative">
+                  <Input
+                    id="rfc"
+                    type="text"
+                    placeholder="RFC del proveedor"
+                    value={rfc}
+                    onChange={(e) => setRfc(e.target.value.toUpperCase().trim())}
+                    disabled={loading}
+                    maxLength={13}
+                    className={
+                      rfcStatus === 'ok'
+                        ? 'border-green-500 pr-10'
+                        : rfcStatus === 'error'
+                        ? 'border-red-500 pr-10'
+                        : 'pr-10'
+                    }
+                    autoComplete="off"
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {rfcLoading && (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    )}
+                    {!rfcLoading && rfcStatus === 'ok' && (
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    )}
+                    {!rfcLoading && rfcStatus === 'error' && (
+                      <XCircle className="h-4 w-4 text-red-500" />
+                    )}
+                  </div>
+                </div>
+                {rfcStatus === 'error' && (
+                  <p className="text-xs text-red-600">
+                    RFC no encontrado como proveedor en el sistema.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Empresa — dinámica para proveedor, estática para admin */}
+            {tipoUsuario === 'administrador' && (
+              <div className="space-y-2">
+                <Label htmlFor="empresa">Empresa</Label>
+                <Select
+                  value={empresaSeleccionada}
+                  onValueChange={setEmpresaSeleccionada}
+                  disabled={loading}
+                >
+                  <SelectTrigger id="empresa">
+                    <SelectValue placeholder="Seleccione una empresa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EMPRESAS_ADMIN.map((empresa) => (
+                      <SelectItem key={empresa.codigo} value={empresa.codigo}>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4" />
+                          <span>{empresa.nombre}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {tipoUsuario === 'proveedor' && rfcStatus === 'ok' && empresasRfc.length > 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="empresaProveedor">Empresa</Label>
+                <Select
+                  value={empresaSeleccionada}
+                  onValueChange={setEmpresaSeleccionada}
+                  disabled={loading}
+                >
+                  <SelectTrigger id="empresaProveedor">
+                    <SelectValue placeholder="Seleccione la empresa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {empresasRfc.map((empresa) => (
+                      <SelectItem key={empresa.codigoPortal} value={empresa.codigoPortal}>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4" />
+                          <span>{empresa.nombre}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Email */}
             <div className="space-y-2">
@@ -251,8 +402,11 @@ export function LoginForm() {
                   Recordarme
                 </Label>
               </div>
-              <Link href="/forgot-password" className="inline-block text-sm text-primary hover:underline">
-                ¿Olvido su contrasena?
+              <Link
+                href="/forgot-password"
+                className="inline-block text-sm text-primary hover:underline"
+              >
+                ¿Olvidó su contraseña?
               </Link>
             </div>
 

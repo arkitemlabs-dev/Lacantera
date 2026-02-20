@@ -73,20 +73,28 @@ interface FacturaAPI {
   urlXML: string;
 }
 
-type InvoiceStatus = 'Pendiente pago' | 'En Revisión' | 'Rechazada' | 'Pagada';
+// Estatus directos de Intelisis
+type InvoiceStatus = 'SINAFECTAR' | 'PENDIENTE' | 'CONCLUIDO' | 'CANCELADO';
+
+const ESTATUS_LABEL: Record<string, string> = {
+  SINAFECTAR: 'Sin Afectar',
+  PENDIENTE:  'Pendiente',
+  CONCLUIDO:  'Concluido',
+  CANCELADO:  'Cancelado',
+};
 
 const getBadgeVariant = (status: string) => {
-  switch (status) {
-    case 'Pendiente pago':
-      return 'dark:bg-blue-500/20 dark:text-blue-200 border-blue-500/30 hover:bg-blue-500/30 bg-blue-100 text-blue-800';
-    case 'En Revisión':
+  switch (status?.toUpperCase()) {
+    case 'SINAFECTAR':
       return 'dark:bg-yellow-500/20 dark:text-yellow-200 border-yellow-500/30 hover:bg-yellow-500/30 bg-yellow-100 text-yellow-800';
-    case 'Rechazada':
-      return 'dark:bg-red-500/20 dark:text-red-200 border-red-500/30 hover:bg-red-500/30 bg-red-100 text-red-800';
-    case 'Pagada':
+    case 'PENDIENTE':
+      return 'dark:bg-blue-500/20 dark:text-blue-200 border-blue-500/30 hover:bg-blue-500/30 bg-blue-100 text-blue-800';
+    case 'CONCLUIDO':
       return 'dark:bg-green-500/20 dark:text-green-200 border-green-500/30 hover:bg-green-500/30 bg-green-100 text-green-800';
+    case 'CANCELADO':
+      return 'dark:bg-red-500/20 dark:text-red-200 border-red-500/30 hover:bg-red-500/30 bg-red-100 text-red-800';
     default:
-      return 'secondary';
+      return 'dark:bg-gray-500/20 dark:text-gray-200 border-gray-500/30 bg-gray-100 text-gray-800';
   }
 };
 
@@ -320,10 +328,10 @@ export default function FacturasPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todas">Todos los estados</SelectItem>
-                  <SelectItem value="en-revision">En Revisión</SelectItem>
-                  <SelectItem value="pendiente-pago">Pendiente pago</SelectItem>
-                  <SelectItem value="pagada">Pagada</SelectItem>
-                  <SelectItem value="rechazada">Rechazada</SelectItem>
+                  <SelectItem value="SINAFECTAR">Sin Afectar</SelectItem>
+                  <SelectItem value="PENDIENTE">Pendiente</SelectItem>
+                  <SelectItem value="CONCLUIDO">Concluido</SelectItem>
+                  <SelectItem value="CANCELADO">Cancelado</SelectItem>
                 </SelectContent>
               </Select>
               <Input
@@ -394,7 +402,7 @@ export default function FacturasPage() {
                   <TableCell>{formatDate(factura.fechaEntrada)}</TableCell>
                   <TableCell>
                     <Badge className={cn(getBadgeVariant(factura.estado))}>
-                      {factura.estado}
+                      {ESTATUS_LABEL[factura.estado?.toUpperCase()] ?? factura.estado}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
@@ -587,7 +595,7 @@ export default function FacturasPage() {
                       <div className="flex items-center justify-between p-3 rounded-md border">
                         <p className="text-sm font-medium">Estado actual:</p>
                         <Badge className={cn(getBadgeVariant(selectedInvoice.estado))}>
-                          {selectedInvoice.estado}
+                          {ESTATUS_LABEL[selectedInvoice.estado?.toUpperCase()] ?? selectedInvoice.estado}
                         </Badge>
                       </div>
                       <div className="flex items-center justify-between p-3 rounded-md border">

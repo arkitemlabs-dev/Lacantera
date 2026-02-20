@@ -81,7 +81,7 @@ export interface GetFacturasParams extends PaginationParams, DateRangeParams {
   proveedor?: string | null;
   rfc?: string | null;
   empresa?: string | null;
-  estatus?: 'EN_REVISION' | 'APROBADA' | 'PAGADA' | 'RECHAZADA' | 'todas' | null;
+  estatus?: 'SINAFECTAR' | 'PENDIENTE' | 'CONCLUIDO' | 'CANCELADO' | '' | null;
   numeroFactura?: string | null;
 }
 
@@ -323,7 +323,7 @@ export class StoredProcedures {
       proveedor = null,
       rfc = null,
       empresa, // Required
-      estatus = null,
+      estatus = '',
       fechaDesde = null,
       fechaHasta = null,
       numeroFactura = null,

@@ -2,9 +2,10 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { MoreHorizontal, PlusCircle, Eye, ListFilter, Loader2, UserCheck, UserX, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Eye, ListFilter, Loader2, UserCheck, UserX, ChevronLeft, ChevronRight, KeyRound, Copy, Check } from 'lucide-react';
 import type { SupplierStatus, SupplierType } from '@/lib/types';
 import { getProveedores } from '@/app/actions/proveedores';
+import { useToast } from '@/hooks/use-toast';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,8 +22,27 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Table,
   TableBody,
@@ -77,6 +97,7 @@ const typeText: Record<SupplierType, string> = {
 };
 
 export default function ProveedoresPage() {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -86,6 +107,12 @@ export default function ProveedoresPage() {
   const [selectedProveedor, setSelectedProveedor] = useState<any>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Reset password state
+  const [resetConfirmProveedor, setResetConfirmProveedor] = useState<any>(null);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetResult, setResetResult] = useState<{ tempPassword: string; email: string; nombre: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     cargarProveedores();
@@ -164,6 +191,42 @@ export default function ProveedoresPage() {
   const goToPage = (page: number) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetConfirmProveedor?.uid) return;
+    setResetLoading(true);
+    try {
+      const res = await fetch(
+        `/api/admin/proveedores/${resetConfirmProveedor.codigoERP}/reset-password`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ portalUserId: resetConfirmProveedor.uid }),
+        }
+      );
+      const data = await res.json();
+      if (data.success) {
+        setResetResult({ tempPassword: data.tempPassword, email: data.email, nombre: data.nombre });
+        setResetConfirmProveedor(null);
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: data.error || 'No se pudo resetear la contraseña' });
+        setResetConfirmProveedor(null);
+      }
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Error de conexión al resetear la contraseña' });
+      setResetConfirmProveedor(null);
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleCopyPassword = () => {
+    if (resetResult?.tempPassword) {
+      navigator.clipboard.writeText(resetResult.tempPassword);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -436,6 +499,14 @@ export default function ProveedoresPage() {
                                     <DropdownMenuItem>
                                       {supplier.status === "activo" ? "Desactivar" : "Activar"}
                                     </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="text-amber-600 focus:text-amber-600"
+                                      onSelect={() => setResetConfirmProveedor(supplier)}
+                                    >
+                                      <KeyRound className="mr-2 h-4 w-4" />
+                                      Resetear contraseña
+                                    </DropdownMenuItem>
                                   </>
                                 ) : (
                                   <>
@@ -514,11 +585,77 @@ export default function ProveedoresPage() {
         </Card>
       </main>
       
-      <ProveedorDetailsModal 
+      <ProveedorDetailsModal
         proveedor={selectedProveedor}
         open={showDetailsModal}
         onOpenChange={setShowDetailsModal}
       />
+
+      {/* Confirmación de reset de contraseña */}
+      <AlertDialog
+        open={!!resetConfirmProveedor}
+        onOpenChange={(open) => { if (!open) setResetConfirmProveedor(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Resetear contraseña?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se generará una contraseña temporal para{' '}
+              <strong>{resetConfirmProveedor?.razonSocial}</strong>. La contraseña
+              actual quedará invalidada de inmediato. Deberás comunicarle la nueva
+              contraseña al proveedor manualmente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetPassword}
+              disabled={resetLoading}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              {resetLoading ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Reseteando...</>
+              ) : (
+                'Sí, resetear contraseña'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Resultado: contraseña temporal generada */}
+      <Dialog open={!!resetResult} onOpenChange={(open) => { if (!open) { setResetResult(null); setCopied(false); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Contraseña temporal generada</DialogTitle>
+            <DialogDescription>
+              La contraseña de <strong>{resetResult?.nombre}</strong> ha sido reseteada.
+              Comparte esta contraseña temporal con el proveedor ({resetResult?.email}).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-2 rounded-md border bg-muted px-4 py-3">
+            <code className="flex-1 text-lg font-mono tracking-widest select-all">
+              {resetResult?.tempPassword}
+            </code>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleCopyPassword}
+              title="Copiar contraseña"
+            >
+              {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Esta contraseña solo se muestra una vez. El proveedor deberá cambiarla al ingresar.
+          </p>
+          <DialogFooter>
+            <Button onClick={() => { setResetResult(null); setCopied(false); }}>
+              Entendido
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

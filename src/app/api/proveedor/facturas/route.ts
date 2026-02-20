@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10');
 
     // 3. Mapear estatus del frontend al formato del SP
-    const estatusSP = estatusMap[estatusFiltro] || null;
+    const estatusSP = estatusMap[estatusFiltro] || '';
 
     console.log(`📍 Llamando sp_GetFacturas - Proveedor: ${proveedorERP}, Empresa: ${empresaActual}, Estatus: ${estatusSP}`);
 

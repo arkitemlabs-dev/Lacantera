@@ -15,6 +15,7 @@ export const authOptions: NextAuthOptions = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
         empresaCode: { label: 'Empresa Code', type: 'text' }, // Código 01-10
+        rfc: { label: 'RFC', type: 'text' },                  // Obligatorio para proveedores
         userAgent: { label: 'User Agent', type: 'text' },
       },
       async authorize(credentials) {

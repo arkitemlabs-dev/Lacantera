@@ -1,5 +1,7 @@
 // src/app/api/auth/register/route.ts
-// API endpoint para registro de proveedores y administradores
+// Registro de proveedores y administradores.
+// Proveedores: sin empresaCode — el sistema determina todas las empresas del RFC
+// via CNspEmpresasDelProveedor y crea mappings para todas ellas.
 
 import { NextRequest, NextResponse } from 'next/server';
 import sql from 'mssql';
@@ -8,15 +10,51 @@ import { getPortalConnection, getERPConnection } from '@/lib/database/multi-tena
 import { ERP_DATABASES, validateEmpresaCode } from '@/lib/database/tenant-configs';
 import { sendEmail } from '@/lib/email-service';
 import { getWelcomeEmail } from '@/lib/email-templates/proveedor';
-import { getNotificacionSistemaEmail } from '@/lib/email-templates/notificacion';
+
+/** Mapea fila del SP a código portal. Misma lógica que /api/auth/empresas-proveedor */
+function mapToPortalCode(row: any, ambiente: string): string | null {
+  const isTest = ambiente === 'Pruebas';
+  const allowedCodes = isTest
+    ? ['06', '07', '08', '09', '10']
+    : ['01', '02', '03', '04', '05'];
+
+  const erpEmpresa = String(
+    row.Empresa ?? row.EmpresaCodigo ?? row.IDEmpresa ?? row.CveEmpresa ?? ''
+  ).trim();
+
+  if (allowedCodes.includes(erpEmpresa)) return erpEmpresa;
+
+  const dbName = String(row.BaseDatos ?? row.Database ?? row.NombreBase ?? '').trim();
+  for (const code of allowedCodes) {
+    const config = ERP_DATABASES[code];
+    const empresaMatch = config.empresa === erpEmpresa;
+    const dbMatch = !dbName || config.db.toLowerCase() === dbName.toLowerCase();
+    if (empresaMatch && dbMatch) return code;
+  }
+
+  if (!dbName) {
+    for (const code of allowedCodes) {
+      if (ERP_DATABASES[code].empresa === erpEmpresa) return code;
+    }
+  }
+
+  const nombre = String(row.NombreEmpresa ?? row.RazonSocial ?? row.Nombre ?? '').trim();
+  if (nombre) {
+    for (const code of allowedCodes) {
+      if (ERP_DATABASES[code].nombre.toLowerCase() === nombre.toLowerCase()) return code;
+    }
+  }
+
+  return null;
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, nombre, rfc, razonSocial, rol, telefono, empresaCode } = body;
+    const { email, password, nombre, rfc, razonSocial, rol, telefono } = body;
 
-    // Validaciones
-    if (!email || !password || !nombre || !rfc) {
+    // Validaciones comunes
+    if (!email || !password || !nombre) {
       return NextResponse.json({ error: 'Todos los campos son requeridos' }, { status: 400 });
     }
 
@@ -26,12 +64,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (password.length < 6) {
-      return NextResponse.json({ error: 'La contraseña debe tener al menos 6 caracteres' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'La contraseña debe tener al menos 6 caracteres' },
+        { status: 400 }
+      );
     }
 
     const esAdmin = rol && (rol === 'super-admin' || rol === 'admin');
 
-    // ── REGISTRO DE ADMINISTRADOR ──
+    // ── REGISTRO DE ADMINISTRADOR ──────────────────────────────────────────────
     if (esAdmin) {
       console.log('[REGISTRO] Registrando administrador:', email);
       const portalPool = await getPortalConnection();
@@ -61,14 +102,17 @@ export async function POST(request: NextRequest) {
           .input('contrasena', sql.VarChar(255), passwordHash)
           .input('rol', sql.VarChar(50), rol)
           .input('telefono', sql.VarChar(50), telefono || null)
-          .input('empresa', sql.VarChar(2), '01') // Por defecto a 01 para admins
+          .input('empresa', sql.VarChar(2), '01')
           .query(`
             INSERT INTO WebUsuario (UsuarioWeb, Nombre, eMail, Contrasena, Rol, Estatus, Alta, Empresa, Telefono)
             VALUES (@usuarioWeb, @nombre, @email, @contrasena, @rol, 'ACTIVO', GETDATE(), @empresa, @telefono)
           `);
 
         await transaction.commit();
-        return NextResponse.json({ success: true, message: 'Administrador creado', userId: usuarioWebCode }, { status: 201 });
+        return NextResponse.json(
+          { success: true, message: 'Administrador creado', userId: usuarioWebCode },
+          { status: 201 }
+        );
       } catch (error: any) {
         await transaction.rollback();
         console.error('[REGISTRO] Error admin:', error);
@@ -76,40 +120,84 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── REGISTRO DE PROVEEDOR ──
-    console.log('[REGISTRO] Registrando proveedor:', email, 'empresa:', empresaCode);
-
-    if (!empresaCode) {
-      return NextResponse.json({ error: 'Debe seleccionar una empresa' }, { status: 400 });
+    // ── REGISTRO DE PROVEEDOR ──────────────────────────────────────────────────
+    if (!rfc) {
+      return NextResponse.json({ error: 'El RFC es requerido' }, { status: 400 });
     }
 
-    let numericCode: string;
-    try {
-      numericCode = validateEmpresaCode(empresaCode);
-    } catch {
-      return NextResponse.json({ error: 'Empresa no válida' }, { status: 400 });
-    }
+    const rfcUpper = rfc.toUpperCase().trim();
+    console.log('[REGISTRO] Registrando proveedor:', email, 'RFC:', rfcUpper);
 
-    const dbConfig = ERP_DATABASES[numericCode];
-
-    // 1. Buscar RFC en ERP
-    const erpPool = await getERPConnection(numericCode);
-    const rfcResult = await erpPool
+    // 1. Obtener empresas del RFC via CNspEmpresasDelProveedor
+    const erpPoolPrincipal = await getERPConnection('06');
+    const spResult = await erpPoolPrincipal
       .request()
-      .input('rfc', sql.VarChar(15), rfc)
-      .query('SELECT TOP 1 Proveedor, Nombre, RFC FROM Prov WHERE RFC = @rfc');
+      .input('Rfc', sql.VarChar(20), rfcUpper)
+      .input('Ambiente', sql.VarChar(20), 'Pruebas')
+      .execute('CNspEmpresasDelProveedor');
 
-    if (rfcResult.recordset.length === 0) {
+    const spRows: any[] = spResult.recordset ?? [];
+
+    if (spRows.length === 0) {
       return NextResponse.json(
-        { error: `El RFC ${rfc} no se encontró en ${dbConfig.nombre}.` },
+        { error: `El RFC ${rfcUpper} no se encontró como proveedor en ninguna empresa.` },
         { status: 404 }
       );
     }
 
-    const proveedorERP = rfcResult.recordset[0];
-    const proveedorCodigo = proveedorERP.Proveedor;
+    // Mapear filas del SP a códigos portal
+    const empresasMapeadas = spRows
+      .map((row) => ({ row, codigoPortal: mapToPortalCode(row, 'Pruebas') }))
+      .filter((x) => x.codigoPortal !== null) as { row: any; codigoPortal: string }[];
 
-    // 2. Transacción en Portal
+    if (empresasMapeadas.length === 0) {
+      console.error('[REGISTRO] SP devolvió filas pero no se pudieron mapear:', spRows);
+      return NextResponse.json(
+        { error: 'No se pudo determinar las empresas del proveedor. Contacte al administrador.' },
+        { status: 500 }
+      );
+    }
+
+    // 2. Para cada empresa mapeada, obtener el código ERP del proveedor (Prov.Proveedor)
+    interface EmpresaProveedor {
+      codigoPortal: string;
+      proveedorCodigo: string;
+    }
+    const empresasProveedor: EmpresaProveedor[] = [];
+
+    for (const { codigoPortal } of empresasMapeadas) {
+      try {
+        const erpPool = await getERPConnection(codigoPortal);
+        const provResult = await erpPool
+          .request()
+          .input('rfc', sql.VarChar(15), rfcUpper)
+          .query('SELECT TOP 1 Proveedor FROM Prov WHERE RFC = @rfc');
+
+        if (provResult.recordset.length > 0) {
+          empresasProveedor.push({
+            codigoPortal,
+            proveedorCodigo: provResult.recordset[0].Proveedor,
+          });
+        } else {
+          console.warn(
+            `[REGISTRO] RFC ${rfcUpper} no encontrado en Prov de empresa ${codigoPortal}. Se omite.`
+          );
+        }
+      } catch (err) {
+        console.warn(`[REGISTRO] Error consultando empresa ${codigoPortal}:`, err);
+      }
+    }
+
+    if (empresasProveedor.length === 0) {
+      return NextResponse.json(
+        { error: 'No se encontró el RFC en las tablas de proveedores. Contacte al administrador.' },
+        { status: 404 }
+      );
+    }
+
+    const primeraEmpresa = empresasProveedor[0];
+
+    // 3. Transacción en Portal: WebUsuario + mappings para todas las empresas
     const portalPool = await getPortalConnection();
     const transaction = portalPool.transaction();
 
@@ -127,78 +215,97 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Email ya registrado' }, { status: 409 });
       }
 
-      // Verificar vinculación previa
-      const yaVinculado = await transaction
-        .request()
-        .input('proveedorCode', sql.VarChar(20), proveedorCodigo)
-        .input('empresaCode', sql.VarChar(10), numericCode)
-        .query('SELECT id FROM portal_proveedor_mapping WHERE erp_proveedor_code = @proveedorCode AND empresa_code = @empresaCode AND activo = 1');
+      // Verificar si ya tiene cuenta en alguna de las empresas encontradas
+      for (const { codigoPortal, proveedorCodigo } of empresasProveedor) {
+        const yaVinculado = await transaction
+          .request()
+          .input('proveedorCode', sql.VarChar(20), proveedorCodigo)
+          .input('empresaCode', sql.VarChar(10), codigoPortal)
+          .query(
+            'SELECT id FROM portal_proveedor_mapping WHERE erp_proveedor_code = @proveedorCode AND empresa_code = @empresaCode AND activo = 1'
+          );
 
-      if (yaVinculado.recordset.length > 0) {
-        await transaction.rollback();
-        return NextResponse.json({ error: 'Este proveedor ya tiene cuenta en esta empresa' }, { status: 409 });
+        if (yaVinculado.recordset.length > 0) {
+          await transaction.rollback();
+          return NextResponse.json(
+            {
+              error: `Este proveedor ya tiene cuenta en la empresa ${ERP_DATABASES[codigoPortal]?.nombre || codigoPortal}.`,
+            },
+            { status: 409 }
+          );
+        }
       }
 
       const passwordHash = await bcrypt.hash(password, 10);
       const usuarioWebCode = `PROV${Date.now().toString().slice(-8)}`;
 
-      // Insertar WebUsuario (Fuente de Verdad)
+      // Insertar WebUsuario (empresa = primera empresa del proveedor)
       await transaction
         .request()
         .input('usuarioWeb', sql.VarChar(50), usuarioWebCode)
         .input('nombre', sql.VarChar(100), nombre)
         .input('email', sql.VarChar(100), email)
         .input('contrasena', sql.VarChar(255), passwordHash)
-        .input('proveedor', sql.VarChar(50), proveedorCodigo)
-        .input('empresa', sql.VarChar(2), numericCode)
+        .input('proveedor', sql.VarChar(50), primeraEmpresa.proveedorCodigo)
+        .input('empresa', sql.VarChar(2), primeraEmpresa.codigoPortal)
         .query(`
           INSERT INTO WebUsuario (UsuarioWeb, Nombre, eMail, Contrasena, Rol, Estatus, Alta, Proveedor, Empresa)
           VALUES (@usuarioWeb, @nombre, @email, @contrasena, 'proveedor', 'ACTIVO', GETDATE(), @proveedor, @empresa)
         `);
 
-      // Insertar Mapping (Multi-tenant)
-      await transaction
-        .request()
-        .input('userId', sql.VarChar(50), usuarioWebCode)
-        .input('proveedorCode', sql.VarChar(20), proveedorCodigo)
-        .input('empresaCode', sql.VarChar(2), numericCode)
-        .query(`
-          INSERT INTO portal_proveedor_mapping (id, portal_user_id, erp_proveedor_code, empresa_code, activo, created_at)
-          VALUES (NEWID(), @userId, @proveedorCode, @empresaCode, 1, GETDATE())
-        `);
+      // Insertar mapping para CADA empresa
+      for (const { codigoPortal, proveedorCodigo } of empresasProveedor) {
+        await transaction
+          .request()
+          .input('userId', sql.VarChar(50), usuarioWebCode)
+          .input('proveedorCode', sql.VarChar(20), proveedorCodigo)
+          .input('empresaCode', sql.VarChar(2), codigoPortal)
+          .query(`
+            INSERT INTO portal_proveedor_mapping (id, portal_user_id, erp_proveedor_code, empresa_code, activo, created_at)
+            VALUES (NEWID(), @userId, @proveedorCode, @empresaCode, 1, GETDATE())
+          `);
+      }
 
       await transaction.commit();
 
-      // Email (opcional, no bloqueante)
+      console.log(
+        `[REGISTRO] Proveedor registrado: ${usuarioWebCode} con ${empresasProveedor.length} empresa(s)`
+      );
+
+      // Email de bienvenida (no bloqueante)
       try {
+        const dbConfig = ERP_DATABASES[primeraEmpresa.codigoPortal];
         await sendEmail({
           to: email,
           subject: 'Bienvenido al Portal de Proveedores',
           html: getWelcomeEmail({
-            nombreProveedor: razonSocial,
-            nombreContacto: nombre, 
+            nombreProveedor: razonSocial || nombre,
+            nombreContacto: nombre,
             email,
-            empresaCliente: dbConfig.nombre,
-            loginUrl: `${process.env.NEXT_PUBLIC_APP_URL}/login`
-          })
+            empresaCliente: dbConfig?.nombre || 'La Cantera',
+            loginUrl: `${process.env.NEXT_PUBLIC_APP_URL}/login`,
+          }),
         });
       } catch (e) {
-        console.warn('Email no enviado:', e);
+        console.warn('[REGISTRO] Email no enviado:', e);
       }
 
-      return NextResponse.json({
-        success: true,
-        message: 'Registro exitoso',
-        userId: usuarioWebCode,
-        empresaCode: numericCode
-      }, { status: 201 });
-
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'Registro exitoso',
+          userId: usuarioWebCode,
+          primeraEmpresa: primeraEmpresa.codigoPortal,
+          totalEmpresas: empresasProveedor.length,
+        },
+        { status: 201 }
+      );
     } catch (error: any) {
       await transaction.rollback();
       throw error;
     }
   } catch (error: any) {
-    console.error('Error registro:', error);
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
+    console.error('[REGISTRO] Error:', error);
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
