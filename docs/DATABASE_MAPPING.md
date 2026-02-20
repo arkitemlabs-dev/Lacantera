@@ -159,7 +159,7 @@ CREATE TABLE WebSesionHistorial (
 
 ---
 
-### 2.2 DOCUMENTACIÓN (3 TABLAS)
+### 2.2 DOCUMENTACIÓN (4 TABLAS)
 
 #### 🆕 `ProvDocumentos` — Archivos de cumplimiento subidos por proveedores
 ```sql
@@ -227,6 +227,34 @@ CREATE TABLE ProvTiposDocumento (
 
     INDEX IDX_Codigo (Codigo),
     INDEX IDX_Activo (Activo)
+);
+```
+
+---
+
+#### 🆕 `archivos_blob` — Tracking secundario de archivos subidos a Azure Blob
+> ⚠️ **No crítica** — solo se usa en el upload de documentos del perfil del proveedor.
+> Si la tabla no existe, el upload igual funciona (el error se ignora silenciosamente).
+> Las facturas **no usan esta tabla** — guardan sus rutas directamente en `ProvFacturas.XMLURL/PDFURL`.
+
+```sql
+CREATE TABLE archivos_blob (
+    id UNIQUEIDENTIFIER PRIMARY KEY,
+    empresa_code VARCHAR(50) NOT NULL,
+    proveedor_code VARCHAR(20) NULL,
+    blob_container VARCHAR(100) NOT NULL,
+    blob_path VARCHAR(500) NOT NULL,
+    content_type VARCHAR(100) NULL,
+    tamano BIGINT NULL,
+    tipo_archivo VARCHAR(50) NULL,          -- 'documento-proveedor', etc.
+    entidad_tipo VARCHAR(50) NULL,          -- 'documento'
+    entidad_id VARCHAR(100) NULL,           -- IDR del registro en AnexoCta
+    nombre_original NVARCHAR(255) NULL,
+    created_by NVARCHAR(100) NULL,          -- email o ID del usuario
+
+    INDEX IDX_empresa (empresa_code),
+    INDEX IDX_proveedor (proveedor_code),
+    INDEX IDX_entidad (entidad_tipo, entidad_id)
 );
 ```
 
@@ -585,6 +613,7 @@ CREATE TABLE ProvComplementosPago (
 | 5 | `ProvDocumentos` | Archivos de cumplimiento subidos por proveedores |
 | 6 | `ProvDocumentosEstado` | Estado portal de documentos del ERP (AnexoCta) |
 | 7 | `ProvTiposDocumento` | Catálogo de tipos de documento |
+| 7b | `archivos_blob` | Tracking secundario de blobs (solo documentos de perfil) |
 | 8 | `WebConversacion` | Conversaciones de mensajería |
 | 9 | `WebMensaje` | Mensajes de cada conversación |
 | 10 | `WebNotificacion` | Notificaciones generales del sistema |
@@ -598,7 +627,7 @@ CREATE TABLE ProvComplementosPago (
 | 18 | `proveedor_facturas_ordenes` | Relación factura ↔ órdenes de compra |
 | 19 | `ProvComplementosPago` | Complementos de pago CFDI |
 
-**TOTAL: 19 tablas en PP + 2 pre-existentes + 1 ERP (solo lectura)**
+**TOTAL: 20 tablas en PP + 2 pre-existentes + 1 ERP (solo lectura)**
 
 ---
 
