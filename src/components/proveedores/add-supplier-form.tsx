@@ -4,7 +4,9 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, Upload } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Loader2, Upload, X, FileCheck } from 'lucide-react';
+import { uploadFile } from '@/app/actions/archivos';
 import { useSession } from 'next-auth/react';
 import { useProveedorAdmin } from '@/hooks/useProveedorAdmin';
 import type { FormProveedorAdmin } from '@/types/admin-proveedores';
@@ -36,6 +38,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 
 const formSchema = z.object({
   // Datos fiscales
@@ -57,6 +61,7 @@ const formSchema = z.object({
   state: z.string().min(2, 'El estado es requerido'),
   country: z.string().optional(),
   postalCode: z.string().min(5, 'El código postal debe tener 5 dígitos').max(5, 'El código postal debe tener 5 dígitos'),
+  geolocalizacion: z.string().optional(),
 
   // Datos de contacto
   contactName: z.string().min(2, 'El nombre del contacto es requerido'),
@@ -69,25 +74,158 @@ const formSchema = z.object({
   bankAccount: z.string().min(10, 'La cuenta bancaria es requerida'),
 });
 
-
-const complementaryDocsConfig = [
-    { id: 'poderNotarial', label: 'Poder notarial del representante legal', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
-    { id: 'opinionSat', label: 'Opinión de cumplimiento positiva del SAT (vigencia mensual)', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
-    { id: 'actaConstitutiva', label: 'Acta constitutiva y sus modificaciones', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
-    { id: 'caratulaBanco', label: 'Carátula del estado de cuenta bancaria', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
-    { id: 'fotoDomicilio', label: 'Fotografía a color del exterior del domicilio fiscal/comercial', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
-    { id: 'referencias', label: 'Referencias comerciales', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
-    { id: 'codigoEtica', label: 'Carta firmada de aceptación al código de ética', required: true, types: ['supplies', 'services', 'leasing', 'transport'] },
-    { id: 'repse', label: 'Registro en el REPSE (Solo si aplica)', required: true, types: ['services'] },
-    { id: 'tituloPropiedad', label: 'Título de propiedad del inmueble arrendado o documento que acredite propiedad (Solo si aplica)', required: true, types: ['leasing'] },
-    { id: 'pagoPredial', label: 'Comprobante de pago de predial vigente (Solo si aplica)', required: true, types: ['leasing'] },
-    { id: 'polizaSeguro', label: 'Póliza de seguro de responsabilidad civil vigente (Solo si aplica)', required: true, types: ['transport'] },
+const docsConfig = [
+  { id: 'actaConstitutiva', label: 'Acta constitutiva y sus modificaciones (en caso de persona moral)' },
+  { id: 'poderNotarial', label: 'Poder notarial del representante legal vigente inscrito ante el registro público de comercio (en caso de persona moral)' },
+  { id: 'idRepresentante', label: 'Copia de identificación oficial vigente del representante legal (en caso de persona moral)' },
+  { id: 'comprobanteDomicilio', label: 'Comprobante de domicilio fiscal actualizado (no mayor a 1 mes)' },
+  { id: 'opinionSat', label: 'Opinión de cumplimiento del SAT' },
+  { id: 'constanciaSituacion', label: 'Constancia de situación fiscal' },
+  { id: 'caratulaBanco', label: 'Carátula del estado de cuenta bancaria (obligatoriamente con nombre del titular)' },
+  { id: 'fotoDomicilio', label: 'Fotografía a color del exterior del domicilio fiscal y/o comercial' },
+  { id: 'geolocalizacion', label: 'Geolocalización' },
+  { id: 'referencias', label: 'Referencias comerciales' },
+  { id: 'codigoEtica', label: 'Carta firmada de aceptación al código de ética' },
 ];
+
+const arrendamientoDocsConfig = [
+  { id: 'fotoInmueble', label: 'Fotografía del inmueble en arrendamiento interior y exterior' },
+  { id: 'tituloPropiedad', label: 'Título de propiedad del inmueble arrendado (o documento que acredite la propiedad)' },
+  { id: 'libertadGravamen', label: 'Certificado de libertad de gravamen' },
+  { id: 'pagoPredial', label: 'Comprobante de pago de predial vigente' },
+];
+
+const serviciosDocsConfig = [
+  { id: 'opinionImss', label: 'Opinión de cumplimiento del IMSS' },
+  { id: 'opinionInfonavit', label: 'Opinión de cumplimiento del INFONAVIT' },
+  { id: 'pagoImssInfonavit', label: 'Pago de IMSS e INFONAVIT' },
+  { id: 'cedulaCuotas', label: 'Cédula de determinación de cuotas de IMSS e INFONAVIT' },
+  { id: 'idTecnicos', label: 'Identificación oficial de los técnicos o personas que prestarán el servicio dentro de nuestras instalaciones' },
+  { id: 'dc3', label: 'DC3 de los técnicos o personas que prestarán el servicio' },
+  { id: 'certificaciones', label: 'Certificaciones' },
+  { id: 'repseServicios', label: 'Registro en el REPSE (vigente)' },
+];
+
+const transporteDocsConfig = [
+  { id: 'opinionImssTransp', label: 'Opinión de cumplimiento del IMSS' },
+  { id: 'opinionInfonavitTransp', label: 'Opinión de cumplimiento del INFONAVIT' },
+  { id: 'pagoImssInfonavitTransp', label: 'Pago de IMSS e INFONAVIT' },
+  { id: 'cedulaCuotasTransp', label: 'Cédula de determinación de cuotas de IMSS e INFONAVIT' },
+  { id: 'polizaSeguro', label: 'Póliza de seguro de responsabilidad civil vigente' },
+  { id: 'repseTransp', label: 'Registro en el REPSE vigente' },
+  { id: 'verificacionVehicular', label: 'Verificación vehicular vigente' },
+  { id: 'tarjetaCirculacion', label: 'Tarjeta de circulación de cada unidad vigente' },
+  { id: 'permisoSct', label: 'Permiso de la Secretaría de Comunicaciones y Transportes (SCT) vigente' },
+  { id: 'registroChoferes', label: 'Registro de choferes asignados al servicio (nombres, identificación oficial, carta de no antecedentes penales)' },
+  { id: 'licenciaConducir', label: 'Licencia de conducir vigente de cada chofer asignado al servicio de Cantera' },
+  { id: 'listaUnidades', label: 'Lista de unidades asignadas al servicio (póliza, marca, modelo, placas, año, número de asientos)' },
+  { id: 'repuve', label: 'Reporte de REPUVE' },
+  { id: 'fotoVehiculos', label: 'Fotografía 4 frentes de cada vehículo para servicio de La Cantera incluyendo placas' },
+];
+
+function DocTable({
+  docs,
+  stagedFiles,
+  onFileSelect,
+  onRemove,
+}: {
+  docs: { id: string; label: string }[];
+  stagedFiles: Map<string, File>;
+  onFileSelect: (docId: string, file: File) => void;
+  onRemove: (docId: string) => void;
+}) {
+  const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Documento</TableHead>
+          <TableHead className="text-right w-48">Acción</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {docs.map(doc => {
+          const staged = stagedFiles.get(doc.id);
+          return (
+            <TableRow key={doc.id}>
+              <TableCell className="font-medium text-sm py-3">{doc.label}</TableCell>
+              <TableCell className="text-right py-3">
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="hidden"
+                  ref={el => { if (el) inputRefs.current.set(doc.id, el); }}
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) onFileSelect(doc.id, file);
+                    e.target.value = '';
+                  }}
+                />
+                {staged ? (
+                  <div className="flex items-center justify-end gap-2">
+                    <span className="flex items-center gap-1 text-xs text-green-600 max-w-[140px] truncate">
+                      <FileCheck className="h-3 w-3 shrink-0" />
+                      {staged.name}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => onRemove(doc.id)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    onClick={() => inputRefs.current.get(doc.id)?.click()}
+                  >
+                    <Upload className="h-3 w-3 mr-2" />
+                    Subir
+                  </Button>
+                )}
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  );
+}
+
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export function AddSupplierForm() {
   const { toast } = useToast();
   const { data: session } = useSession();
   const { crearProveedor, saving, error } = useProveedorAdmin();
+  const [stagedFiles, setStagedFiles] = useState<Map<string, File>>(new Map());
+  const [uploadingDocs, setUploadingDocs] = useState(false);
+
+  const handleFileSelect = (docId: string, file: File) => {
+    setStagedFiles(prev => new Map(prev).set(docId, file));
+  };
+
+  const handleRemoveFile = (docId: string) => {
+    setStagedFiles(prev => {
+      const next = new Map(prev);
+      next.delete(docId);
+      return next;
+    });
+  };
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -102,6 +240,7 @@ export function AddSupplierForm() {
       state: '',
       country: 'México',
       postalCode: '',
+      geolocalizacion: '',
       contactName: '',
       contactEmail: '',
       contactPhone: '',
@@ -113,12 +252,10 @@ export function AddSupplierForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      // Mapear los datos del formulario al formato esperado por la API
       const proveedorData: FormProveedorAdmin = {
         nombre: values.name.trim(),
         nombreCorto: values.name.substring(0, 20).trim(),
-        rfc: values.taxId.toUpperCase().trim(), // RFC debe ser mayúsculas
-        // Dirección
+        rfc: values.taxId.toUpperCase().trim(),
         direccion: values.street.trim(),
         numeroExterior: values.numExt.trim(),
         numeroInterior: values.numInt?.trim() || '',
@@ -127,28 +264,58 @@ export function AddSupplierForm() {
         estado: values.state.trim(),
         pais: values.country?.trim() || 'México',
         codigoPostal: values.postalCode.trim(),
-        // Contacto
+        dirInternet: values.geolocalizacion?.trim() || '',
         contactoPrincipal: values.contactName.trim(),
-        email1: values.contactEmail.toLowerCase().trim(), // Email en minúsculas
+        email1: values.contactEmail.toLowerCase().trim(),
         telefonos: values.contactPhone.trim(),
         fax: values.whatsappPhone?.trim() || '',
-        // Bancario
         banco: values.bankName.trim(),
         cuentaBancaria: values.bankAccount.trim(),
         empresa: (session?.user as any)?.empresaActual || 'la-cantera-test',
         activo: true,
       };
 
-      console.log('Creando proveedor:', proveedorData);
-
       const success = await crearProveedor(proveedorData);
 
       if (success) {
-        toast({
-          title: 'Proveedor Guardado',
-          description: `El proveedor ${values.name} ha sido guardado exitosamente.`,
-        });
+        // Subir documentos staged si hay alguno
+        if (stagedFiles.size > 0) {
+          setUploadingDocs(true);
+          const rfc = values.taxId.toUpperCase().trim();
+          const resultados = await Promise.allSettled(
+            Array.from(stagedFiles.entries()).map(async ([docId, file]) => {
+              const base64 = await fileToBase64(file);
+              return uploadFile({
+                file: base64,
+                fileName: file.name,
+                fileType: file.type,
+                folder: `proveedores/registro/${rfc}/${docId}`,
+              });
+            })
+          );
+          setUploadingDocs(false);
+
+          const fallidos = resultados.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success)).length;
+          if (fallidos > 0) {
+            toast({
+              title: 'Proveedor guardado con advertencias',
+              description: `${stagedFiles.size - fallidos} de ${stagedFiles.size} documentos subidos. Algunos fallaron.`,
+              variant: 'destructive',
+            });
+          } else {
+            toast({
+              title: 'Proveedor Guardado',
+              description: `El proveedor ${values.name} y sus ${stagedFiles.size} documentos han sido guardados exitosamente.`,
+            });
+          }
+        } else {
+          toast({
+            title: 'Proveedor Guardado',
+            description: `El proveedor ${values.name} ha sido guardado exitosamente.`,
+          });
+        }
         form.reset();
+        setStagedFiles(new Map());
       } else {
         toast({
           title: 'Error',
@@ -166,339 +333,347 @@ export function AddSupplierForm() {
     }
   }
 
-  const renderFileUpload = (label: string) => (
-     <div className="space-y-2">
-        <FormLabel>{label}</FormLabel>
-        <div className="relative border-2 border-dashed border-muted rounded-lg p-4 flex items-center justify-center text-center h-24">
-            <Upload className="w-6 h-6 text-muted-foreground" />
-            <p className="ml-2 text-xs text-muted-foreground">
-            Arrastra o haz clic para subir
-            </p>
-            <Input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-        </div>
-    </div>
-  );
-
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Form Fields */}
-          <div className="lg:col-span-2 space-y-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Datos Fiscales</CardTitle>
-                <CardDescription>Esta información será validada contra el SAT.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Razón Social (Nombre del Proveedor)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Aceros del Norte S.A. de C.V." {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="taxId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>RFC</FormLabel>
-                      <FormControl>
-                        <Input placeholder="XAXX010101000" {...field} />
-                      </FormControl>
-                       <FormDescription>Se validará que el RFC no esté duplicado.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <Tabs defaultValue="informacion">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="informacion">Información General</TabsTrigger>
+            <TabsTrigger value="documentos">Documentos</TabsTrigger>
+          </TabsList>
 
+          {/* ── TAB: INFORMACIÓN GENERAL ── */}
+          <TabsContent value="informacion" className="mt-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Dirección Fiscal</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="street"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Calle</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Av. Reforma" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="numExt"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Número Exterior</FormLabel>
-                        <FormControl>
-                          <Input placeholder="123" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="numInt"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Número Interior</FormLabel>
-                        <FormControl>
-                          <Input placeholder="4-A (opcional)" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={form.control}
-                  name="colonia"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Colonia</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Centro" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="city"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Ciudad / Población</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Ciudad de México" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="state"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Estado</FormLabel>
-                        <FormControl>
-                          <Input placeholder="CDMX" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="postalCode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Código Postal</FormLabel>
-                        <FormControl>
-                          <Input placeholder="06600" maxLength={5} {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="country"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>País</FormLabel>
-                        <FormControl>
-                          <Input placeholder="México" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Datos de Contacto</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="contactName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nombre del Contacto Principal</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Juan Pérez" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="contactEmail"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email de Contacto</FormLabel>
-                      <FormControl>
-                        <Input placeholder="contacto@empresa.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="contactPhone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Teléfono de Contacto</FormLabel>
-                      <FormControl>
-                        <Input placeholder="55 1234 5678" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="whatsappPhone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Teléfono de Contacto con WhatsApp</FormLabel>
-                      <FormControl>
-                        <Input placeholder="55 1234 5678" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Información Bancaria</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="bankName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nombre del Banco</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Banco Nacional" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="bankAccount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Número de Cuenta o CLABE</FormLabel>
-                      <FormControl>
-                        <Input placeholder="0123456789" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Side Panel */}
-          <div className="space-y-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Categoría y Documentos</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
+              <CardHeader className="flex flex-row justify-between items-start">
                 <div>
-                    <h3 className="text-sm font-medium mb-4">Documentos Iniciales</h3>
-                    <div className="space-y-4">
-                        {renderFileUpload('INE del representante legal')}
-                        {renderFileUpload('Comprobante de domicilio fiscal')}
-                        {renderFileUpload('Constancia de situación fiscal (CSF)')}
-                    </div>
+                  <CardTitle>Información del Proveedor</CardTitle>
+                  <CardDescription>Completa el formulario para registrar un nuevo proveedor.</CardDescription>
                 </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" disabled={saving}>Cancelar</Button>
+                  <Button type="submit" disabled={saving || uploadingDocs}>
+                    {saving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Guardando...
+                      </>
+                    ) : uploadingDocs ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Subiendo documentos...
+                      </>
+                    ) : (
+                      'Guardar Proveedor'
+                    )}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-8">
+
+                {/* Datos Fiscales */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Datos Fiscales</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Razón Social (Nombre del Proveedor)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Aceros del Norte S.A. de C.V." {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="taxId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>RFC</FormLabel>
+                          <FormControl>
+                            <Input placeholder="XAXX010101000" {...field} />
+                          </FormControl>
+                          <FormDescription>Se validará que el RFC no esté duplicado.</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Dirección Fiscal */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Dirección Fiscal</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="street"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Calle</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Av. Reforma" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="colonia"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Colonia</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Centro" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="numExt"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Número Exterior</FormLabel>
+                          <FormControl>
+                            <Input placeholder="123" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="numInt"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Número Interior</FormLabel>
+                          <FormControl>
+                            <Input placeholder="4-A (opcional)" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="city"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Ciudad / Población</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Ciudad de México" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="state"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Estado</FormLabel>
+                          <FormControl>
+                            <Input placeholder="CDMX" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="postalCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Código Postal</FormLabel>
+                          <FormControl>
+                            <Input placeholder="06600" maxLength={5} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="country"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>País</FormLabel>
+                          <FormControl>
+                            <Input placeholder="México" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="geolocalizacion"
+                      render={({ field }) => (
+                        <FormItem className="md:col-span-2">
+                          <FormLabel>Geolocalización</FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://maps.google.com/... o coordenadas (lat, lng)" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Datos de Contacto */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Datos de Contacto</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="contactName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nombre del Contacto Principal</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Juan Pérez" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="contactEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email de Contacto</FormLabel>
+                          <FormControl>
+                            <Input placeholder="contacto@empresa.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="contactPhone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Teléfono de Contacto</FormLabel>
+                          <FormControl>
+                            <Input placeholder="55 1234 5678" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="whatsappPhone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Teléfono de Contacto con WhatsApp</FormLabel>
+                          <FormControl>
+                            <Input placeholder="55 1234 5678" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Información Bancaria */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Información Bancaria</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="bankName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nombre del Banco</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Banco Nacional" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="bankAccount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Número de Cuenta o CLABE</FormLabel>
+                          <FormControl>
+                            <Input placeholder="0123456789" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ── TAB: DOCUMENTOS ── */}
+          <TabsContent value="documentos" className="mt-6 space-y-6">
+
+            <Card>
+              <CardHeader>
+                <CardTitle>I. Documentación Base</CardTitle>
+                <CardDescription>Requerida para todos los proveedores.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DocTable docs={docsConfig} stagedFiles={stagedFiles} onFileSelect={handleFileSelect} onRemove={handleRemoveFile} />
               </CardContent>
             </Card>
 
             <Card>
-                <CardHeader>
-                    <CardTitle>Documentación Complementaria</CardTitle>
-                    </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Documento</TableHead>
-                                <TableHead className="text-right">Acción</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {complementaryDocsConfig.map(doc => (
-                                <TableRow key={doc.id}>
-                                    <TableCell className="font-medium text-xs py-2">{doc.label}</TableCell>
-                                    <TableCell className="text-right py-2">
-                                        <Button type="button" variant="outline" size="sm" className="h-8">
-                                            <Upload className="h-3 w-3 mr-2" />
-                                            Subir
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
+              <CardHeader>
+                <CardTitle>II. Proveedores de Arrendamiento</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DocTable docs={arrendamientoDocsConfig} stagedFiles={stagedFiles} onFileSelect={handleFileSelect} onRemove={handleRemoveFile} />
+              </CardContent>
             </Card>
-          </div>
-        </div>
 
-        <div className="flex justify-end gap-2 mt-8">
-          <Button type="button" variant="outline" disabled={saving}>Cancelar</Button>
-          <Button type="submit" disabled={saving}>
-            {saving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Guardando...
-              </>
-            ) : (
-              'Guardar Proveedor'
-            )}
-          </Button>
-        </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>III. Proveedores de Servicios</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DocTable docs={serviciosDocsConfig} stagedFiles={stagedFiles} onFileSelect={handleFileSelect} onRemove={handleRemoveFile} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>IV. Proveedores de Transporte</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DocTable docs={transporteDocsConfig} stagedFiles={stagedFiles} onFileSelect={handleFileSelect} onRemove={handleRemoveFile} />
+              </CardContent>
+            </Card>
+
+          </TabsContent>
+        </Tabs>
       </form>
     </Form>
   );
 }
-
-    

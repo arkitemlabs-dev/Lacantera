@@ -625,6 +625,7 @@ export class StoredProcedures {
           .input('Estado', sql.NVarChar(30), str(fullParams.estado))
           .input('Pais', sql.NVarChar(100), str(fullParams.pais))
           .input('Codigopostal', sql.VarChar(15), str(fullParams.codigoPostal))
+          .input('DirInternet', sql.VarChar(100), str(fullParams.dirInternet))
           .input('Contacto1', sql.NVarChar(50), str(fullParams.contacto1))
           .input('Contacto2', sql.NVarChar(50), str(fullParams.contacto2))
           .input('Email1', sql.VarChar(50), str(fullParams.email1))
@@ -672,6 +673,7 @@ export class StoredProcedures {
   @Estado = '${s(fullParams.estado)}',
   @Pais = '${s(fullParams.pais)}',
   @Codigopostal = '${s(fullParams.codigoPostal)}',
+  @DirInternet = '${s(fullParams.dirInternet)}',
   @Contacto1 = '${s(fullParams.contacto1)}',
   @Contacto2 = '${s(fullParams.contacto2)}',
   @Email1 = '${s(fullParams.email1)}',

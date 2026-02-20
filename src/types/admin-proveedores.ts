@@ -208,6 +208,7 @@ export interface FormProveedorAdmin {
   estado?: string;
   pais?: string;
   codigoPostal?: string;
+  dirInternet?: string;
 
   // Contacto
   contactoPrincipal?: string;
