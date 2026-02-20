@@ -239,7 +239,7 @@ export async function cambiarContrasena(data: {
 
     // Obtener la contraseña actual del usuario
     const userResult = await pool.request()
-      .input('usuarioId', sql.Int, parseInt(data.usuarioId))
+      .input('usuarioId', sql.VarChar(50), data.usuarioId)
       .query(`
         SELECT UsuarioWeb, Contrasena, eMail
         FROM WebUsuario
@@ -273,9 +273,9 @@ export async function cambiarContrasena(data: {
     // Generar hash de la nueva contraseña
     const newPasswordHash = await bcrypt.hash(data.nuevaContrasena, 10);
 
-    // Actualizar contraseña (sin usar FechaModificacion por si no existe)
+    // Actualizar contraseña
     await pool.request()
-      .input('usuarioId', sql.Int, parseInt(data.usuarioId))
+      .input('usuarioId', sql.VarChar(50), data.usuarioId)
       .input('newPassword', sql.NVarChar(255), newPasswordHash)
       .query(`
         UPDATE WebUsuario
@@ -325,7 +325,7 @@ export async function actualizarEmailRecuperacion(usuarioId: string, nuevoEmail:
     // Verificar que el email no esté en uso por otro usuario
     const existingResult = await pool.request()
       .input('email', sql.NVarChar(100), nuevoEmail)
-      .input('usuarioId', sql.Int, parseInt(usuarioId))
+      .input('usuarioId', sql.VarChar(50), usuarioId)
       .query(`
         SELECT UsuarioWeb FROM WebUsuario
         WHERE eMailRecuperacion = @email AND UsuarioWeb != @usuarioId
@@ -337,7 +337,7 @@ export async function actualizarEmailRecuperacion(usuarioId: string, nuevoEmail:
 
     // Actualizar email de recuperación
     await pool.request()
-      .input('usuarioId', sql.Int, parseInt(usuarioId))
+      .input('usuarioId', sql.VarChar(50), usuarioId)
       .input('email', sql.NVarChar(100), nuevoEmail)
       .query(`
         UPDATE WebUsuario
@@ -383,7 +383,7 @@ export async function getDatosSeguridad(usuarioId: string) {
     if (has2FA) selectFields += ', Autenticacion2FA';
 
     const result = await pool.request()
-      .input('usuarioId', sql.Int, parseInt(usuarioId))
+      .input('usuarioId', sql.VarChar(50), usuarioId)
       .query(`
         SELECT ${selectFields}
         FROM WebUsuario
