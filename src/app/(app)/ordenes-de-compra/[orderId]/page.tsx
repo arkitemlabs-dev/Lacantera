@@ -173,8 +173,8 @@ export default function OrderProfilePage({
                       <TableHeader>
                         <TableRow>
                           <TableHead className="w-16">Renglón</TableHead>
-                          <TableHead>Código</TableHead>
                           <TableHead>Artículo / SubCuenta</TableHead>
+                          <TableHead>Descripción</TableHead>
                           <TableHead className="text-center">Unidad</TableHead>
                           <TableHead className="text-right">Cantidad</TableHead>
                           <TableHead className="text-right">Costo</TableHead>
@@ -185,9 +185,6 @@ export default function OrderProfilePage({
                         {order.partidas.map((partida: any, index: number) => (
                           <TableRow key={index}>
                             <TableCell className="font-medium text-center">{partida.Renglon}</TableCell>
-                            <TableCell>
-                              <div className="font-mono text-xs">{partida.Codigo || 'N/A'}</div>
-                            </TableCell>
                             <TableCell>
                               <div>
                                 {partida.Articulo && (
@@ -200,6 +197,9 @@ export default function OrderProfilePage({
                                   <div className="text-muted-foreground">N/A</div>
                                 )}
                               </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm text-muted-foreground">{partida.Descripcion1 || '-'}</div>
                             </TableCell>
                             <TableCell className="text-center">
                               <span className="text-xs text-muted-foreground">{partida.Unidad || 'N/A'}</span>
@@ -411,12 +411,7 @@ export default function OrderProfilePage({
                     {order.TipoCambio && order.TipoCambio !== 1 && (
                       <InfoRow label="Tipo Cambio" value={order.TipoCambio} />
                     )}
-                    {order.Observaciones && (
-                      <div className="text-sm mt-2">
-                        <span className="text-muted-foreground">Observaciones:</span>
-                        <p className="font-medium mt-1">{order.Observaciones}</p>
-                      </div>
-                    )}
+                    <InfoRow label="Observaciones" value={order.Observaciones || 'N/A'} />
                   </div>
                 </div>
               </CardContent>
